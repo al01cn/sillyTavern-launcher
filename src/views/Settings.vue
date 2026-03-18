@@ -1,0 +1,313 @@
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'vue-sonner';
+import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo } from '@phosphor-icons/vue';
+
+interface GithubProxyConfig {
+  enable: boolean;
+  url: String;
+}
+
+interface AppConfig {
+  lang: string;
+  theme: string;
+  githubProxy: GithubProxyConfig;
+}
+
+interface ProxyItem {
+  url: string;
+  latency: number;
+}
+
+const activeTab = ref<'general' | 'about'>('general');
+const loading = ref(false);
+const proxyLoading = ref(false);
+
+const config = ref<AppConfig>({
+  lang: 'zh-CN',
+  theme: 'dark',
+  githubProxy: {
+    enable: false,
+    url: 'https://ghproxy.com/'
+  }
+});
+
+const proxies = ref<ProxyItem[]>([]);
+
+const loadConfig = async () => {
+  try {
+    loading.value = true;
+    const res = await invoke<AppConfig>('get_app_config');
+    config.value = res;
+  } catch (error) {
+    console.error('Failed to load config:', error);
+    toast.error('加载配置失败，将使用默认配置');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const saveConfig = async () => {
+  try {
+    await invoke('save_app_config', { config: config.value });
+    // toast.success('设置已保存'); // Remove toast for real-time save to avoid spam
+    console.log('Config saved');
+  } catch (error) {
+    console.error('Failed to save config:', error);
+    toast.error('保存配置失败');
+  }
+};
+
+const fetchProxies = async () => {
+  try {
+    proxyLoading.value = true;
+    const res = await invoke<ProxyItem[]>('fetch_github_proxies');
+    proxies.value = res.sort((a, b) => a.latency - b.latency);
+    // toast.success('获取加速列表成功'); // Remove toast on auto-fetch
+  } catch (error) {
+    console.error('Failed to fetch proxies:', error);
+    toast.error('获取加速列表失败');
+  } finally {
+    proxyLoading.value = false;
+  }
+};
+
+const selectProxy = (url: string) => {
+  config.value.githubProxy.url = url;
+  // watch will handle saving
+};
+
+// Watch for config changes and save automatically
+watch(config, () => {
+  saveConfig();
+}, { deep: true });
+
+onMounted(async () => {
+  await loadConfig();
+  fetchProxies();
+});
+</script>
+
+<template>
+  <div class="h-full flex flex-col">
+    <h1 class="text-2xl font-bold mb-6 px-1">设置</h1>
+
+    <!-- Tabs -->
+    <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+      <button
+        @click="activeTab = 'general'"
+        :class="[
+          'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
+          activeTab === 'general' 
+            ? 'bg-white text-slate-900 shadow-sm' 
+            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+        ]"
+      >
+        <PhPalette :size="16" weight="duotone" />
+        一般设置
+      </button>
+      <button
+        @click="activeTab = 'about'"
+        :class="[
+          'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
+          activeTab === 'about' 
+            ? 'bg-white text-slate-900 shadow-sm' 
+            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+        ]"
+      >
+        <PhInfo :size="16" weight="duotone" />
+        关于
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto px-1 pb-10">
+      
+      <!-- General Settings -->
+      <div v-if="activeTab === 'general'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        
+        <!-- Interface Settings -->
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <PhPalette :size="20" class="text-blue-500" weight="duotone" />
+            界面设置
+          </h2>
+          
+          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+            <!-- Language -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                  <PhGlobe :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">界面语言</div>
+                  <div class="text-xs text-slate-500">选择应用程序显示的语言</div>
+                </div>
+              </div>
+              <select 
+                v-model="config.lang" 
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all"
+              >
+                <option value="zh-CN">简体中文</option>
+                <option value="en-US">English</option>
+              </select>
+            </div>
+
+            <div class="w-full h-px bg-slate-100"></div>
+
+            <!-- Theme -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500">
+                  <PhPalette :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">界面主题</div>
+                  <div class="text-xs text-slate-500">切换明亮或深夜模式</div>
+                </div>
+              </div>
+              <select 
+                v-model="config.theme" 
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all"
+              >
+                <option value="light">明亮</option>
+                <option value="dark">深夜</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Github Proxy Settings -->
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <PhGithubLogo :size="20" class="text-slate-700" weight="duotone" />
+            Github 加速设置
+          </h2>
+          
+          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+            <!-- Toggle -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                  <PhGithubLogo :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">加速总开关</div>
+                  <div class="text-xs text-slate-500">开启后将使用代理加速 Github 资源下载</div>
+                </div>
+              </div>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="config.githubProxy.enable" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <!-- Current URL Display -->
+             <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div class="text-sm font-medium text-slate-500 whitespace-nowrap">当前地址:</div>
+                <div class="text-sm text-slate-800 font-mono truncate select-all">{{ config.githubProxy.url }}</div>
+             </div>
+
+            <div class="w-full h-px bg-slate-100"></div>
+
+            <!-- Proxy List Header -->
+            <div class="flex items-center justify-between pt-2">
+              <h3 class="text-sm font-medium text-slate-700">加速节点列表</h3>
+              <button 
+                @click="fetchProxies" 
+                :disabled="proxyLoading"
+                class="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <PhArrowsClockwise :class="{'animate-spin': proxyLoading}" :size="14" />
+                {{ proxyLoading ? '测速中...' : '刷新列表' }}
+              </button>
+            </div>
+
+            <!-- Proxy List -->
+            <div v-if="proxies.length > 0" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+              <div 
+                v-for="proxy in proxies" 
+                :key="proxy.url"
+                @click="selectProxy(proxy.url)"
+                :class="[
+                  'flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm',
+                  config.githubProxy.url === proxy.url 
+                    ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200' 
+                    : 'bg-white border-slate-100 hover:border-slate-300'
+                ]"
+              >
+                <div class="flex items-center gap-3 overflow-hidden">
+                   <div :class="[
+                     'w-4 h-4 rounded-full flex items-center justify-center shrink-0',
+                     config.githubProxy.url === proxy.url ? 'text-blue-600' : 'text-transparent'
+                   ]">
+                     <PhCheck :size="12" weight="bold" />
+                   </div>
+                   <div class="text-sm font-mono truncate text-slate-600">{{ proxy.url }}</div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span :class="[
+                    'text-xs font-medium px-2 py-0.5 rounded',
+                    proxy.latency < 200 ? 'bg-green-100 text-green-700' : 
+                    proxy.latency < 500 ? 'bg-yellow-100 text-yellow-700' : 
+                    'bg-red-100 text-red-700'
+                  ]">
+                    {{ proxy.latency }}ms
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else-if="!proxyLoading" class="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+              点击刷新列表获取最新的 Github 加速节点
+            </div>
+            
+            <div v-else class="py-8 flex justify-center">
+               <div class="animate-pulse flex space-x-4 w-full px-4">
+                 <div class="flex-1 space-y-3 py-1">
+                   <div class="h-10 bg-slate-100 rounded"></div>
+                   <div class="h-10 bg-slate-100 rounded"></div>
+                   <div class="h-10 bg-slate-100 rounded"></div>
+                 </div>
+               </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      <!-- About Settings -->
+      <div v-if="activeTab === 'about'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+         <div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm flex flex-col items-center text-center space-y-4">
+            <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
+               <img src="/tauri.svg" alt="Logo" class="w-12 h-12 opacity-80" />
+            </div>
+            <div>
+               <h2 class="text-xl font-bold text-slate-800">Tavern Assistant</h2>
+               <p class="text-slate-500 text-sm mt-1">版本 0.1.0</p>
+            </div>
+            <p class="text-slate-600 max-w-md text-sm leading-relaxed">
+               Tavern Assistant 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
+            </p>
+         </div>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 20px;
+}
+</style>

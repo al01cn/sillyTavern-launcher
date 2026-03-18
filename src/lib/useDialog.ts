@@ -33,6 +33,11 @@ export const dialogState = reactive({
     onCancel: undefined as (() => void) | undefined
 })
 
+/**
+ * 打开指定类型的对话框
+ * @param type - 对话框类型，决定样式
+ * @param options - 对话框配置选项
+ */
 const openDialog = (type: keyof typeof typeConfig, options: DialogOptions) => {
     dialogState.type = type
     dialogState.title = options.title || '提示'
@@ -50,11 +55,37 @@ const openDialog = (type: keyof typeof typeConfig, options: DialogOptions) => {
     dialogState.show = true
 }
 
+/**
+ * 对话框工具对象，提供多种类型的对话框调用方法
+ */
 export const Dialog = {
+    /**
+     * 打开成功类型的对话框
+     * @param opts - 对话框配置选项
+     */
     success: (opts: DialogOptions) => openDialog('success', opts),
+    /**
+     * 打开警告类型的对话框
+     * @param opts - 对话框配置选项
+     */
     warning: (opts: DialogOptions) => openDialog('warning', opts),
+    /**
+     * 打开错误类型的对话框
+     * @param opts - 对话框配置选项
+     */
     error: (opts: DialogOptions) => openDialog('error', opts),
+    /**
+     * 打开信息类型的对话框
+     * @param opts - 对话框配置选项
+     */
     info: (opts: DialogOptions) => openDialog('info', opts),
+    /**
+     * 打开加载中的对话框
+     * @param opts - 对话框配置选项
+     */
     loading: (opts: DialogOptions) => openDialog('loading', opts),
+    /**
+     * 关闭当前显示的对话框
+     */
     close: () => { dialogState.show = false }
 }

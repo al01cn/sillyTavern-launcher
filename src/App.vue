@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import Oheader from './layouts/Oheader.vue';
 import { Toaster } from 'vue-sonner'
+// import { Dialog } from './lib/useDialog';
+import GlobalDialog from './components/GlobalDialog.vue';
 </script>
 
 <template>
-  <div>
-    <Oheader>
-    </Oheader>
-  </div>
+  <Oheader>
+    <!-- 页面区域 -->
+    <router-view />
 
-  <Toaster />
+    <!-- 弹窗/全局消息区域 -->
+    <template #Modal>
+      <!-- 全局确认框 -->
+      <GlobalDialog />
+    </template>
+    <Toaster />
+  </Oheader>
 </template>
 
 <style scoped></style>
