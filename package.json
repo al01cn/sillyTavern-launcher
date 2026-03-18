@@ -1,0 +1,37 @@
+{
+  "name": "tavern-assistant",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@phosphor-icons/vue": "^2.2.1",
+    "@tailwindcss/vite": "^4.2.1",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "lucide-vue-next": "^0.577.0",
+    "tailwindcss": "^4.2.1",
+    "vue": "^3.5.13",
+    "vue-router": "^5.0.3",
+    "vue-sonner": "^2.0.9"
+  },
+  "devDependencies": {
+    "@iconify-json/material-icon-theme": "^1.2.56",
+    "@iconify-json/mdi": "^1.2.3",
+    "@iconify-json/simple-icons": "^1.2.74",
+    "@iconify/vue": "^5.0.0",
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "daisyui": "^5.5.19",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
+}
