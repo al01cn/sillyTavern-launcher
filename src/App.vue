@@ -3,6 +3,7 @@ import Oheader from './layouts/Oheader.vue';
 import { Toaster } from 'vue-sonner'
 // import { Dialog } from './lib/useDialog';
 import GlobalDialog from './components/GlobalDialog.vue';
+import InstallDialog from './components/InstallDialog.vue';
 </script>
 
 <template>
@@ -14,6 +15,8 @@ import GlobalDialog from './components/GlobalDialog.vue';
     <template #Modal>
       <!-- 全局确认框 -->
       <GlobalDialog />
+      <!-- 安装进度框 -->
+      <InstallDialog />
     </template>
     <Toaster />
   </Oheader>

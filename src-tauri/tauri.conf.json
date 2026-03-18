@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tavern-assistant",
+  "productName": "sillyTavern-launcher",
   "version": "0.1.0",
-  "identifier": "com.tavern-assistant.app",
+  "identifier": "com.sillytavern-launcher.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "酒馆助手 Ta",
+        "title": "酒馆启动器",
         "width": 1200,
         "height": 800,
         "minWidth": 1200,

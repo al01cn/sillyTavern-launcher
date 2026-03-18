@@ -27,6 +27,7 @@ interface AppConfig {
   theme: string;
   rememberWindowPosition: boolean;
   githubProxy: GithubProxyConfig;
+  npmRegistry: string;
 }
 
 interface ProxyItem {
@@ -34,18 +35,31 @@ interface ProxyItem {
   latency: number;
 }
 
+interface NpmRegistry {
+  name: string;
+  url: string;
+}
+
 const activeTab = ref<'general' | 'about'>('general');
 const loading = ref(false);
 const proxyLoading = ref(false);
 
+const npmRegistries: NpmRegistry[] = [
+  { name: '官方源', url: 'https://registry.npmjs.org/' },
+  { name: '淘宝源', url: 'https://registry.npmmirror.com/' },
+  { name: '腾讯源', url: 'https://mirrors.cloud.tencent.com/npm/' },
+  { name: '华为源', url: 'https://repo.huaweicloud.com/repository/npm/' }
+];
+
 const config = ref<AppConfig>({
   lang: 'zh-CN',
-  theme: 'dark',
+  theme: 'light',
   rememberWindowPosition: false,
   githubProxy: {
     enable: false,
-    url: 'https://ghproxy.com/'
-  }
+    url: 'https://gh.llkk.cc'
+  },
+  npmRegistry: 'https://registry.npmmirror.com/'
 });
 
 const proxies = ref<ProxyItem[]>([]);
@@ -135,7 +149,9 @@ const installNode = async () => {
 
 // Watch for config changes and save automatically
 watch(config, () => {
-  saveConfig();
+  if (!loading.value) {
+    saveConfig();
+  }
 }, { deep: true });
 
 onMounted(async () => {
@@ -152,11 +168,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
+  <div class="flex flex-col h-full">
     <h1 class="text-2xl font-bold mb-6 px-1">设置</h1>
 
     <!-- Tabs -->
-    <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+    <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 shrink-0">
       <button
         @click="activeTab = 'general'"
         :class="[
@@ -184,8 +200,14 @@ onMounted(async () => {
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto px-1 pb-10">
+    <div class="flex-1 overflow-y-auto px-1 pb-10 min-h-0 relative">
       
+      <!-- Loading State -->
+      <div v-if="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/50 backdrop-blur-sm z-10">
+        <PhArrowsClockwise :size="48" class="animate-spin mb-4 text-blue-500/80" weight="duotone" />
+        <p class="text-sm font-medium text-slate-500 animate-pulse">正在加载配置...</p>
+      </div>
+
       <!-- General Settings -->
       <div v-if="activeTab === 'general'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
         
@@ -302,7 +324,6 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Progress Bar -->
             <div v-if="installingNode" class="space-y-2 pt-2 border-t border-slate-100">
                <div class="flex justify-between text-xs text-slate-500">
                   <span>{{ nodeProgress.log }}</span>
@@ -311,6 +332,33 @@ onMounted(async () => {
                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                   <div class="bg-green-500 h-1.5 rounded-full transition-all duration-300" :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
                </div>
+            </div>
+
+            <div class="w-full h-px bg-slate-100"></div>
+
+            <!-- NPM Registry Selection -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+                  <PhGlobe :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">NPM 源设置</div>
+                  <div class="text-xs text-slate-500">选择合适的镜像源以加速依赖安装</div>
+                </div>
+              </div>
+              <select 
+                v-model="config.npmRegistry" 
+                @change="saveConfig"
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-48 p-2"
+              >
+                <option v-for="registry in npmRegistries" :key="registry.url" :value="registry.url">
+                  {{ registry.name }}
+                </option>
+              </select>
+            </div>
+            <div class="text-[10px] text-slate-400 pl-11">
+               当前地址: {{ config.npmRegistry }}
             </div>
           </div>
         </section>
@@ -426,7 +474,7 @@ onMounted(async () => {
                <p class="text-slate-500 text-sm mt-1">版本 0.1.0</p>
             </div>
             <p class="text-slate-600 max-w-md text-sm leading-relaxed">
-               Tavern Assistant 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
+               SillyTavern Launcher 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
             </p>
          </div>
       </div>

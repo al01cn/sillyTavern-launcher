@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    tavern_assistant_lib::run()
+    sillytavern_launcher_lib::run()
 }

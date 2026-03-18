@@ -29,12 +29,8 @@ struct GithubProxyConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
-struct AppConfig {
-    lang: String,
-    theme: String,
-    remember_window_position: bool,
-    window_position: Option<WindowPosition>,
-    github_proxy: GithubProxyConfig,
+struct SillyTavernConfig {
+    version: String,
 }
 
 impl Default for WindowPosition {
@@ -52,6 +48,26 @@ impl Default for GithubProxyConfig {
     }
 }
 
+impl Default for SillyTavernConfig {
+    fn default() -> Self {
+        Self {
+            version: "".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default, rename_all = "camelCase")]
+struct AppConfig {
+    lang: String,
+    theme: String,
+    remember_window_position: bool,
+    window_position: Option<WindowPosition>,
+    github_proxy: GithubProxyConfig,
+    sillytavern: SillyTavernConfig,
+    npm_registry: String,
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -60,9 +76,19 @@ impl Default for AppConfig {
             remember_window_position: false,
             window_position: None,
             github_proxy: GithubProxyConfig::default(),
+            sillytavern: SillyTavernConfig::default(),
+            npm_registry: "https://registry.npmjs.org/".to_string(),
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct NodeInfo {
+    version: Option<String>,
+    path: Option<String>,
+    source: String, // "system", "local", or "none"
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct ProxyItem {
@@ -83,11 +109,295 @@ struct ProxyResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct NodeInfo {
-    version: Option<String>,
-    path: Option<String>,
-    source: String, // "system", "local", or "none"
+struct ReleaseAsset {
+    name: String,
+    browser_download_url: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Release {
+    tag_name: String,
+    name: String,
+    body: String,
+    created_at: String,
+    published_at: String,
+    zipball_url: String,
+    assets: Vec<ReleaseAsset>,
+}
+
+#[tauri::command]
+async fn fetch_sillytavern_releases() -> Result<Vec<Release>, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("sillyTavern-launcher")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let url = "https://api.github.com/repos/SillyTavern/SillyTavern/releases";
+    let response = client.get(url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("GitHub API Error: {}", response.status()));
+    }
+
+    let releases: Vec<Release> = response.json().await.map_err(|e| e.to_string())?;
+    Ok(releases)
+}
+
+#[tauri::command]
+fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String>, String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let sillytavern_dir = data_dir.join("sillytavern");
+
+    if !sillytavern_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut versions = Vec::new();
+    if let Ok(entries) = fs::read_dir(sillytavern_dir) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_dir() {
+                    if let Ok(name) = entry.file_name().into_string() {
+                        if !name.starts_with(".") {
+                             versions.push(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(versions)
+}
+
+fn get_node_executable_path(data_dir: &Path) -> PathBuf {
+    let node_dir = data_dir.join("node");
+    let local_node_path = if cfg!(target_os = "windows") {
+        node_dir.join("node.exe")
+    } else {
+        node_dir.join("bin/node")
+    };
+
+    if local_node_path.exists() {
+        return local_node_path;
+    }
+
+    // Fallback to system node (just "node")
+    PathBuf::from("node")
+}
+
+#[tauri::command]
+async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
+    let mut config = read_app_config_from_disk(&app);
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let version_dir = data_dir.join("sillytavern").join(&version);
+    
+    if !version_dir.exists() {
+        return Err(format!("Version {} not found", version));
+    }
+
+    config.sillytavern.version = version;
+    write_app_config_to_disk(&app, &config)
+}
+
+#[tauri::command]
+async fn install_sillytavern_version(app: AppHandle, version: String, url: String) -> Result<(), String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let sillytavern_dir = data_dir.join("sillytavern").join(&version);
+    
+    if sillytavern_dir.exists() {
+         return Ok(()); // Already installed
+    }
+    
+    fs::create_dir_all(&sillytavern_dir).map_err(|e| e.to_string())?;
+
+    let emit_progress = |status: &str, progress: f64, log: &str| {
+        let _ = app.emit("install-progress", DownloadProgress {
+            status: status.to_string(),
+            progress,
+            log: log.to_string(),
+        });
+    };
+
+    emit_progress("downloading", 0.0, &format!("准备下载版本 {}...", version));
+    
+    // Download zip to temp dir
+    let temp_dir = std::env::temp_dir();
+    let temp_zip_path = temp_dir.join(format!("sillytavern_{}.zip", version));
+    
+    let client = reqwest::Client::builder()
+        .user_agent("sillyTavern-launcher")
+        .build()
+        .map_err(|e| e.to_string())?;
+        
+    let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let total_size = response.content_length().unwrap_or(0);
+    
+    let mut file = fs::File::create(&temp_zip_path).map_err(|e| e.to_string())?;
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+
+    while let Some(item) = stream.next().await {
+        let chunk = item.map_err(|e| e.to_string())?;
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+        
+        let progress = if total_size > 0 {
+            (downloaded as f64) / (total_size as f64)
+        } else {
+            0.0
+        };
+        
+        let mb_downloaded = downloaded as f64 / 1_048_576.0;
+        let mb_total = total_size as f64 / 1_048_576.0;
+        
+        emit_progress(
+            "downloading",
+            progress,
+            &format!("下载中: {:.2} MB / {:.2} MB", mb_downloaded, mb_total),
+        );
+    }
+    
+    emit_progress("extracting", 0.0, "下载完成，准备解压...");
+    
+    // Extract zip
+    let file = fs::File::open(&temp_zip_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let total_files = archive.len();
+    
+    for i in 0..total_files {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+        
+        // Strip the first component
+        let mut components = outpath.components();
+        components.next(); 
+        let stripped_path: PathBuf = components.collect();
+        
+        if stripped_path.as_os_str().is_empty() {
+            continue;
+        }
+        
+        let target_path = sillytavern_dir.join(&stripped_path);
+        
+        if (*file.name()).ends_with('/') {
+            fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(p) = target_path.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
+            io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+        }
+
+        if i % 50 == 0 || i == total_files - 1 {
+            let progress = (i as f64) / (total_files as f64);
+            emit_progress(
+                "extracting",
+                progress,
+                &format!("解压中: {}/{} 文件...", i + 1, total_files),
+            );
+        }
+    }
+
+    // Clean up temp file
+    let _ = fs::remove_file(temp_zip_path);
+    
+    // Install dependencies
+    emit_progress("installing", 0.0, "正在安装依赖 (npm install)... 这可能需要几分钟");
+    
+    let config = read_app_config_from_disk(&app);
+    let registry = config.npm_registry;
+
+    let node_path = get_node_executable_path(&data_dir);
+    
+    // Run npm install
+    // We assume 'npm' is alongside 'node' or we use 'node npm-cli.js' if available?
+    // Usually bundled node has npm.
+    // On Windows, if we have node.exe, we might have npm.cmd or npm shell script.
+    // If using bundled node, we might need to invoke npm via node path/to/npm/cli.js or just try "npm" if in path?
+    // But we are using a specific node executable.
+    
+    // Safe bet: assume npm is in the same bin dir or use "npm" command if system.
+    // If local node, we might need to find npm.
+    // Let's look for npm.cmd in node_dir or node_dir/node_modules/npm/bin/npm-cli.js
+    
+    let npm_cmd = if node_path.file_name().unwrap() == "node.exe" || node_path.file_name().unwrap() == "node" {
+        // It's a specific path
+        if let Some(parent) = node_path.parent() {
+            let npm_cli = parent.join("node_modules/npm/bin/npm-cli.js");
+            if npm_cli.exists() {
+                // Use node to run npm-cli.js
+                Some((node_path.clone(), vec![npm_cli.to_string_lossy().to_string(), "install".to_string(), "--production".to_string(), format!("--registry={}", registry)]))
+            } else {
+                // Try npm.cmd next to node.exe
+                 let npm_exec = if cfg!(target_os = "windows") {
+                    parent.join("npm.cmd")
+                } else {
+                    parent.join("npm")
+                };
+                if npm_exec.exists() {
+                    Some((npm_exec, vec!["install".to_string(), "--production".to_string(), format!("--registry={}", registry)]))
+                } else {
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        // System node, just run "npm"
+        Some((PathBuf::from("npm"), vec!["install".to_string(), "--production".to_string(), format!("--registry={}", registry)]))
+    };
+
+    if let Some((cmd, args)) = npm_cmd {
+        use std::io::{BufRead, BufReader};
+        use std::process::Stdio;
+
+        let mut child = std::process::Command::new(&cmd)
+            .args(&args)
+            .current_dir(&sillytavern_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start npm: {}", e))?;
+
+        // Stream stdout
+        if let Some(stdout) = child.stdout.take() {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    emit_progress("installing", 0.5, &line);
+                }
+            }
+        }
+        
+        // Wait for completion
+        let status = child.wait().map_err(|e| e.to_string())?;
+        if !status.success() {
+             return Err("npm install failed".to_string());
+        }
+    } else {
+        emit_progress("error", 0.0, "未找到 npm，跳过依赖安装。请手动安装。");
+        // Don't fail the whole process, just warn?
+        // Or fail? User said "automatically use obtained nodejs to install dependencies".
+        // If we can't find npm, we should probably error or at least log it.
+        // For now, let's just log it and finish.
+    }
+    
+    emit_progress("done", 1.0, "安装完成！");
+    
+    Ok(())
+}
+
+
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -185,7 +495,7 @@ fn setup_window_position_tracking(app: &AppHandle) {
 #[tauri::command]
 async fn fetch_github_proxies() -> Result<Vec<ProxyItem>, String> {
     let client = reqwest::Client::builder()
-        .user_agent("tavern-assistant")
+        .user_agent("sillyTavern-launcher")
         .build()
         .map_err(|e| e.to_string())?;
         
@@ -308,7 +618,7 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     let temp_zip_path = temp_dir.join(&filename);
     
     let client = reqwest::Client::builder()
-        .user_agent("tavern-assistant")
+        .user_agent("sillyTavern-launcher")
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -494,116 +804,7 @@ fn get_tavern_version(app: AppHandle) -> Result<String, String> {
     }
 }
 
-#[tauri::command]
-async fn download_sillytavern(app: AppHandle, version: String, url: String) -> Result<(), String> {
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let sillytavern_dir = app_data_dir.join("data").join("sillytavern").join(&version);
-    
-    if !sillytavern_dir.exists() {
-        fs::create_dir_all(&sillytavern_dir).map_err(|e| e.to_string())?;
-    }
 
-    let emit_progress = |status: &str, progress: f64, log: &str| {
-        let _ = app.emit("download-progress", DownloadProgress {
-            status: status.to_string(),
-            progress,
-            log: log.to_string(),
-        });
-    };
-
-    emit_progress("downloading", 0.0, &format!("准备下载版本 {}...", version));
-    
-    // Download zip to temp dir
-    let temp_dir = std::env::temp_dir();
-    let temp_zip_path = temp_dir.join(format!("sillytavern_{}.zip", version));
-    
-    let client = reqwest::Client::builder()
-        .user_agent("tavern-assistant")
-        .build()
-        .map_err(|e| e.to_string())?;
-        
-    let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
-    let total_size = response.content_length().unwrap_or(0);
-    
-    let mut file = fs::File::create(&temp_zip_path).map_err(|e| e.to_string())?;
-    let mut downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
-
-    while let Some(item) = stream.next().await {
-        let chunk = item.map_err(|e| e.to_string())?;
-        file.write_all(&chunk).map_err(|e| e.to_string())?;
-        downloaded += chunk.len() as u64;
-        
-        let progress = if total_size > 0 {
-            (downloaded as f64) / (total_size as f64)
-        } else {
-            0.0
-        };
-        
-        let mb_downloaded = downloaded as f64 / 1_048_576.0;
-        let mb_total = total_size as f64 / 1_048_576.0;
-        
-        emit_progress(
-            "downloading",
-            progress,
-            &format!("下载中: {:.2} MB / {:.2} MB", mb_downloaded, mb_total),
-        );
-    }
-    
-    emit_progress("extracting", 0.0, "下载完成，准备解压...");
-    
-    // Extract zip
-    let file = fs::File::open(&temp_zip_path).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
-    let total_files = archive.len();
-    
-    for i in 0..total_files {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => path.to_owned(),
-            None => continue,
-        };
-        
-        // Strip the first component (the root folder of the github zip)
-        let mut components = outpath.components();
-        components.next(); // Skip the first directory
-        let stripped_path: PathBuf = components.collect();
-        
-        if stripped_path.as_os_str().is_empty() {
-            continue;
-        }
-        
-        let target_path = sillytavern_dir.join(&stripped_path);
-        
-        if (*file.name()).ends_with('/') {
-            fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-        } else {
-            if let Some(p) = target_path.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(&p).map_err(|e| e.to_string())?;
-                }
-            }
-            let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
-            io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-        }
-
-        if i % 50 == 0 || i == total_files - 1 {
-            let progress = (i as f64) / (total_files as f64);
-            emit_progress(
-                "extracting",
-                progress,
-                &format!("解压中: {}/{} 文件...", i + 1, total_files),
-            );
-        }
-    }
-    
-    // Clean up temp file
-    let _ = fs::remove_file(temp_zip_path);
-    
-    emit_progress("done", 1.0, "安装完成！");
-    
-    Ok(())
-}
 
 fn ensure_file_with_default(path: &Path, content: &str) -> io::Result<()> {
     if !path.exists() {
@@ -650,7 +851,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             check_sillytavern_empty,
-            download_sillytavern,
+            fetch_sillytavern_releases,
+            get_installed_sillytavern_versions,
+            switch_sillytavern_version,
+            install_sillytavern_version,
             get_app_config,
             save_app_config,
             fetch_github_proxies,

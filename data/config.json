@@ -3,11 +3,15 @@
   "theme": "light",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 366,
-    "y": 223
+    "x": 349,
+    "y": 221
   },
   "githubProxy": {
-    "enable": false,
+    "enable": true,
     "url": "https://gh.llkk.cc"
-  }
+  },
+  "sillytavern": {
+    "version": ""
+  },
+  "npmRegistry": "https://registry.npmmirror.com/"
 }
