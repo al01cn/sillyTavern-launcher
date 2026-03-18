@@ -1,6 +1,11 @@
 {
   "lang": "zh-CN",
   "theme": "light",
+  "rememberWindowPosition": true,
+  "windowPosition": {
+    "x": 366,
+    "y": 223
+  },
   "githubProxy": {
     "enable": false,
     "url": "https://gh.llkk.cc"

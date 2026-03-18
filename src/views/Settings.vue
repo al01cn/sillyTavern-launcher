@@ -1,17 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { toast } from 'vue-sonner';
-import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo } from '@phosphor-icons/vue';
+import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple } from '@phosphor-icons/vue';
 
 interface GithubProxyConfig {
   enable: boolean;
   url: String;
 }
 
+interface NodeInfo {
+  version: string | null;
+  path: string | null;
+  source: 'system' | 'local' | 'none';
+}
+
+interface DownloadProgress {
+  status: string;
+  progress: number;
+  log: string;
+}
+
 interface AppConfig {
   lang: string;
   theme: string;
+  rememberWindowPosition: boolean;
   githubProxy: GithubProxyConfig;
 }
 
@@ -27,6 +41,7 @@ const proxyLoading = ref(false);
 const config = ref<AppConfig>({
   lang: 'zh-CN',
   theme: 'dark',
+  rememberWindowPosition: false,
   githubProxy: {
     enable: false,
     url: 'https://ghproxy.com/'
@@ -34,6 +49,20 @@ const config = ref<AppConfig>({
 });
 
 const proxies = ref<ProxyItem[]>([]);
+const nodeInfo = ref<NodeInfo>({ version: null, path: null, source: 'none' });
+const installingNode = ref(false);
+const nodeProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
+
+const isNodeVersionValid = computed(() => {
+  if (!nodeInfo.value.version) return false;
+  // Version string usually looks like "v18.20.4"
+  const match = nodeInfo.value.version.match(/v?(\d+)\./);
+  if (match && match[1]) {
+    const majorVersion = parseInt(match[1], 10);
+    return majorVersion >= 18;
+  }
+  return false;
+});
 
 const loadConfig = async () => {
   try {
@@ -78,6 +107,32 @@ const selectProxy = (url: string) => {
   // watch will handle saving
 };
 
+const checkNode = async () => {
+  try {
+    const res = await invoke<NodeInfo>('check_nodejs');
+    nodeInfo.value = res;
+  } catch (error) {
+    console.error('Failed to check nodejs:', error);
+  }
+};
+
+const installNode = async () => {
+  if (installingNode.value) return;
+  installingNode.value = true;
+  nodeProgress.value = { status: 'starting', progress: 0, log: '准备安装...' };
+  
+  try {
+    await invoke('install_nodejs');
+    toast.success('Node.js 安装成功');
+    await checkNode();
+  } catch (error) {
+    console.error('Failed to install nodejs:', error);
+    toast.error('安装失败: ' + error);
+  } finally {
+    installingNode.value = false;
+  }
+};
+
 // Watch for config changes and save automatically
 watch(config, () => {
   saveConfig();
@@ -86,6 +141,13 @@ watch(config, () => {
 onMounted(async () => {
   await loadConfig();
   fetchProxies();
+  checkNode();
+
+  await listen<DownloadProgress>('download-progress', (event) => {
+    if (installingNode.value) {
+      nodeProgress.value = event.payload;
+    }
+  });
 });
 </script>
 
@@ -175,6 +237,80 @@ onMounted(async () => {
                 <option value="light">明亮</option>
                 <option value="dark">深夜</option>
               </select>
+            </div>
+
+            <div class="w-full h-px bg-slate-100"></div>
+
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                  <PhPalette :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">记住上次窗口位置</div>
+                  <div class="text-xs text-slate-500">开启后，下次启动会恢复到上次关闭前的位置</div>
+                </div>
+              </div>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="config.rememberWindowPosition" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- NodeJs Settings -->
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <PhPackage :size="20" class="text-green-600" weight="duotone" />
+            NodeJs 设置
+          </h2>
+          
+          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                  <PhPackage :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">NodeJs 环境</div>
+                  <div class="text-xs text-slate-500">
+                    <span v-if="nodeInfo.version">
+                      当前版本: {{ nodeInfo.version }} ({{ nodeInfo.source === 'local' ? '内置' : '系统' }})
+                      <div v-if="isNodeVersionValid && nodeInfo.path" class="mt-1 text-slate-400 break-all select-all">
+                        路径: {{ nodeInfo.path }}
+                      </div>
+                      <div v-if="!isNodeVersionValid" class="mt-1 text-red-500">
+                        版本低于 18，请更新或下载内置 NodeJs
+                      </div>
+                    </span>
+                    <span v-else>未检测到 Node.js 环境，部分功能可能无法使用</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-if="!isNodeVersionValid || nodeInfo.source === 'local'" class="flex items-center gap-2">
+                 <button 
+                    @click="installNode" 
+                    :disabled="installingNode"
+                    class="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                 >
+                    <PhArrowsClockwise v-if="installingNode" :size="14" class="animate-spin" />
+                    <PhDownloadSimple v-else :size="14" />
+                    {{ installingNode ? '安装中...' : (nodeInfo.version ? '重新安装' : '立即安装') }}
+                 </button>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div v-if="installingNode" class="space-y-2 pt-2 border-t border-slate-100">
+               <div class="flex justify-between text-xs text-slate-500">
+                  <span>{{ nodeProgress.log }}</span>
+                  <span>{{ Math.round(nodeProgress.progress * 100) }}%</span>
+               </div>
+               <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-green-500 h-1.5 rounded-full transition-all duration-300" :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
+               </div>
             </div>
           </div>
         </section>
