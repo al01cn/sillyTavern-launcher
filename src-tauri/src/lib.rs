@@ -1,13 +1,53 @@
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use chrono::Local;
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Position, WindowEvent};
 use tokio::sync::Mutex;
 use tokio::io::{AsyncBufReadExt, BufReader};
+
+// Add logger helper
+fn init_logger(data_dir: &Path) {
+    let logs_dir = data_dir.join("logs");
+    if !logs_dir.exists() {
+        let _ = fs::create_dir_all(&logs_dir);
+    }
+
+    // "每次只保存最新的日志内容" -> 每天保留最新的日志内容
+    // 我们可以清理旧日志，只保留当天的日志
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let log_file_name = format!("{}.log", today);
+
+    // 删除非今天的旧日志
+    if let Ok(entries) = fs::read_dir(&logs_dir) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if file_name.ends_with(".log") && file_name != log_file_name {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // 这里使用 tracing-appender 进行日志写入
+    let file_appender = tracing_appender::rolling::never(&logs_dir, &log_file_name);
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    // 由于我们想要全局的 _guard，可以考虑将其泄漏或者存在全局变量里
+    // 简单起见，将其放入全局，防止 drop 导致丢失最后日志
+    Box::leak(Box::new(_guard));
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .with_ansi(false) // file logger shouldn't have ansi codes
+        .with_target(false)
+        .finish();
+
+    let _ = tracing::subscriber::set_global_default(subscriber);
+}
 
 struct ProcessState {
     kill_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<()>>>>,
@@ -267,29 +307,36 @@ async fn fetch_sillytavern_releases() -> Result<Vec<Release>, String> {
 }
 
 #[tauri::command]
-fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String>, String> {
-    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let sillytavern_dir = data_dir.join("sillytavern");
+async fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String>, String> {
+    tracing::info!("获取已安装的酒馆版本列表");
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let data_dir = get_config_path(&app_clone).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+        let sillytavern_dir = data_dir.join("sillytavern");
 
-    if !sillytavern_dir.exists() {
-        return Ok(vec![]);
-    }
+        if !sillytavern_dir.exists() {
+            tracing::info!("酒馆目录不存在，返回空列表, 耗时: {:?}", start_time.elapsed());
+            return Ok(vec![]);
+        }
 
-    let mut versions = Vec::new();
-    if let Ok(entries) = fs::read_dir(sillytavern_dir) {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    if let Ok(name) = entry.file_name().into_string() {
-                        if !name.starts_with(".") {
-                             versions.push(name);
+        let mut versions = Vec::new();
+        if let Ok(entries) = fs::read_dir(sillytavern_dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        if let Ok(name) = entry.file_name().into_string() {
+                            if !name.starts_with(".") {
+                                 versions.push(name);
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    Ok(versions)
+        tracing::info!("找到已安装的版本: {:?}, 耗时: {:?}", versions, start_time.elapsed());
+        Ok(versions)
+    }).await.map_err(|e| e.to_string())?
 }
 
 fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, Vec<String>)> {
@@ -369,11 +416,13 @@ fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, 
 
 #[tauri::command]
 async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
+    tracing::info!("切换酒馆版本到: {}", version);
     let mut config = read_app_config_from_disk(&app);
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let version_dir = data_dir.join("sillytavern").join(&version);
     
     if !version_dir.exists() {
+        tracing::error!("要切换的版本 {} 不存在", version);
         return Err(format!("Version {} not found", version));
     }
 
@@ -388,14 +437,19 @@ fn cancel_install(state: tauri::State<'_, InstallState>) {
 
 #[tauri::command]
 async fn install_sillytavern_version(app: AppHandle, state: tauri::State<'_, InstallState>, version: String, url: String) -> Result<(), String> {
+    tracing::info!("开始安装酒馆版本: {}，URL: {}", version, url);
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let sillytavern_dir = data_dir.join("sillytavern").join(&version);
     
     if sillytavern_dir.exists() {
+         tracing::info!("版本 {} 已存在，跳过安装", version);
          return Ok(()); // Already installed
     }
     
-    fs::create_dir_all(&sillytavern_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&sillytavern_dir).map_err(|e| {
+        tracing::error!("创建目录失败: {}", e);
+        e.to_string()
+    })?;
 
     state.cancel_flag.store(false, std::sync::atomic::Ordering::Relaxed);
 
@@ -416,96 +470,137 @@ async fn install_sillytavern_version(app: AppHandle, state: tauri::State<'_, Ins
     let client = reqwest::Client::builder()
         .user_agent("sillyTavern-launcher")
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            tracing::error!("创建 HTTP 客户端失败: {}", e);
+            e.to_string()
+        })?;
         
-    let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let response = client.get(&url).send().await.map_err(|e| {
+        tracing::error!("请求下载失败: {}", e);
+        e.to_string()
+    })?;
     let total_size = response.content_length().unwrap_or(0);
+    tracing::info!("开始下载，总大小: {} bytes", total_size);
     
-    let mut file = fs::File::create(&temp_zip_path).map_err(|e| e.to_string())?;
+    let mut file = tokio::fs::File::create(&temp_zip_path).await.map_err(|e| e.to_string())?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
+    let mut last_emit = std::time::Instant::now();
 
     while let Some(item) = stream.next().await {
         // Only check cancel flag periodically or do it fast
         if state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
-            let _ = fs::remove_file(&temp_zip_path);
-            let _ = fs::remove_dir_all(&sillytavern_dir);
+            let _ = tokio::fs::remove_file(&temp_zip_path).await;
+            let _ = tokio::fs::remove_dir_all(&sillytavern_dir).await;
             emit_progress("error", 0.0, "下载已取消");
             return Err("下载已取消".to_string());
         }
 
         let chunk = item.map_err(|e| e.to_string())?;
-        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        use tokio::io::AsyncWriteExt;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
         
-        let progress = if total_size > 0 {
-            (downloaded as f64) / (total_size as f64)
-        } else {
-            0.0
-        };
-        
-        let mb_downloaded = downloaded as f64 / 1_048_576.0;
-        
-        emit_progress(
-            "downloading",
-            progress,
-            &format!("已下载: {:.2} MB", mb_downloaded),
-        );
+        if last_emit.elapsed() > std::time::Duration::from_millis(200) || downloaded == total_size {
+            let progress = if total_size > 0 {
+                (downloaded as f64) / (total_size as f64)
+            } else {
+                0.0
+            };
+            
+            let mb_downloaded = downloaded as f64 / 1_048_576.0;
+            
+            emit_progress(
+                "downloading",
+                progress,
+                &format!("已下载: {:.2} MB", mb_downloaded),
+            );
+            last_emit = std::time::Instant::now();
+        }
     }
     
     emit_progress("extracting", 0.0, "下载完成，准备解压...");
+    tracing::info!("下载完成，准备解压到: {:?}", sillytavern_dir);
     
-    // Extract zip
-    let file = fs::File::open(&temp_zip_path).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
-    let total_files = archive.len();
-    
-    for i in 0..total_files {
-        if i % 10 == 0 && state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
-            let _ = fs::remove_file(&temp_zip_path);
-            let _ = fs::remove_dir_all(&sillytavern_dir);
-            emit_progress("error", 0.0, "解压已取消");
-            return Err("解压已取消".to_string());
-        }
+    // Extract zip in a blocking task to avoid blocking the tokio runtime
+    let cancel_flag = state.cancel_flag.clone();
+    let app_clone = app.clone();
+    let temp_zip_path_clone = temp_zip_path.clone();
+    let sillytavern_dir_clone = sillytavern_dir.clone();
 
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => path.to_owned(),
-            None => continue,
+    let _extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let emit_progress = |status: &str, progress: f64, log: &str| {
+            let _ = app_clone.emit("install-progress", DownloadProgress {
+                status: status.to_string(),
+                progress,
+                log: log.to_string(),
+            });
         };
+
+        let file = fs::File::open(&temp_zip_path_clone).map_err(|e| e.to_string())?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+        let total_files = archive.len();
         
-        // Strip the first component
-        let mut components = outpath.components();
-        components.next(); 
-        let stripped_path: PathBuf = components.collect();
-        
-        if stripped_path.as_os_str().is_empty() {
-            continue;
-        }
-        
-        let target_path = sillytavern_dir.join(&stripped_path);
-        
-        if (*file.name()).ends_with('/') {
-            fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-        } else {
-            if let Some(p) = target_path.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+        for i in 0..total_files {
+            if i % 10 == 0 && cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = fs::remove_file(&temp_zip_path_clone);
+                let _ = fs::remove_dir_all(&sillytavern_dir_clone);
+                emit_progress("error", 0.0, "解压已取消");
+                return Err("解压已取消".to_string());
+            }
+
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let outpath = match file.enclosed_name() {
+                Some(path) => path.to_owned(),
+                None => continue,
+            };
+            
+            // Strip the first component
+            let mut components = outpath.components();
+            components.next(); 
+            let stripped_path: PathBuf = components.collect();
+            
+            if stripped_path.as_os_str().is_empty() {
+                continue;
+            }
+            
+            let target_path = sillytavern_dir_clone.join(&stripped_path);
+            
+            if (*file.name()).ends_with('/') {
+                fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+            } else {
+                if let Some(p) = target_path.parent() {
+                    if !p.exists() {
+                        fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                    }
+                }
+                let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
+                io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+            }
+
+            if i % 50 == 0 || i == total_files - 1 {
+                // Throttle progress emit during extraction as well
+                let mut should_emit = false;
+                {
+                    // Basic static logic to throttle, we can just use every 500 files or something to reduce IPC
+                    if i % 500 == 0 || i == total_files - 1 {
+                        should_emit = true;
+                    }
+                }
+                
+                if should_emit {
+                    let progress = (i as f64) / (total_files as f64);
+                    emit_progress(
+                        "extracting",
+                        progress,
+                        &format!("解压中: {}/{} 文件...", i + 1, total_files),
+                    );
                 }
             }
-            let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
-            io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
         }
+        Ok(())
+    }).await.map_err(|e| e.to_string())??;
 
-        if i % 50 == 0 || i == total_files - 1 {
-            let progress = (i as f64) / (total_files as f64);
-            emit_progress(
-                "extracting",
-                progress,
-                &format!("解压中: {}/{} 文件...", i + 1, total_files),
-            );
-        }
-    }
 
     // Clean up temp file
     let _ = fs::remove_file(temp_zip_path);
@@ -513,11 +608,25 @@ async fn install_sillytavern_version(app: AppHandle, state: tauri::State<'_, Ins
     // Install dependencies
     emit_progress("installing", 0.0, "正在安装依赖 (npm install)... 这可能需要几分钟");
     
-    if let Err(e) = run_npm_install(&app, &sillytavern_dir).await {
-         emit_progress("error", 0.0, &format!("安装依赖失败: {}", e));
-    } else {
-         emit_progress("done", 1.0, "安装完成！");
-    }
+    // Do not await run_npm_install here directly to avoid blocking
+    let app_clone = app.clone();
+    let sillytavern_dir_clone = sillytavern_dir.clone();
+    
+    tokio::spawn(async move {
+        if let Err(e) = run_npm_install(&app_clone, &sillytavern_dir_clone).await {
+             let _ = app_clone.emit("install-progress", DownloadProgress {
+                 status: "error".to_string(),
+                 progress: 0.0,
+                 log: format!("安装依赖失败: {}", e),
+             });
+        } else {
+             let _ = app_clone.emit("install-progress", DownloadProgress {
+                 status: "done".to_string(),
+                 progress: 1.0,
+                 log: "安装完成！".to_string(),
+             });
+        }
+    });
     
     Ok(())
 }
@@ -527,6 +636,7 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
     let config = read_app_config_from_disk(app);
     let registry = config.npm_registry;
     
+    tracing::info!("准备执行 npm install, 目标目录: {:?}, 注册表: {}", target_dir, registry);
     let npm_cmd = get_npm_install_command(&data_dir, &registry);
     
     let emit_progress = |status: &str, progress: f64, log: &str| {
@@ -538,36 +648,56 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
     };
 
     if let Some((cmd, args)) = npm_cmd {
-        use std::io::{BufRead, BufReader};
+        use tokio::process::Command;
         use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, BufReader};
 
         // Log the command we are running
+        tracing::info!("执行命令: {:?} {:?}", cmd, args);
         emit_progress("installing", 0.1, &format!("执行命令: {:?} {:?}", cmd, args));
 
-        let mut child = std::process::Command::new(&cmd)
+        let mut child = Command::new(&cmd)
             .args(&args)
             .current_dir(target_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Failed to start npm: {}", e))?;
+            .map_err(|e| {
+                tracing::error!("启动 npm 失败: {}", e);
+                format!("Failed to start npm: {}", e)
+            })?;
 
         // Stream stdout
         if let Some(stdout) = child.stdout.take() {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    emit_progress("installing", 0.5, &line);
+            let mut reader = BufReader::new(stdout);
+            let mut line = String::new();
+            let mut last_emit = std::time::Instant::now();
+            while let Ok(bytes) = reader.read_line(&mut line).await {
+                if bytes == 0 {
+                    break;
                 }
+                tracing::debug!("NPM_STDOUT: {}", line.trim_end());
+                // Throttle the IPC emit to avoid freezing the frontend
+                if last_emit.elapsed() > std::time::Duration::from_millis(100) {
+                    emit_progress("installing", 0.5, line.trim_end());
+                    last_emit = std::time::Instant::now();
+                }
+                line.clear();
             }
         }
         
         // Wait for completion
-        let status = child.wait().map_err(|e| e.to_string())?;
+        let status = child.wait().await.map_err(|e| {
+            tracing::error!("等待 npm 执行完成时发生错误: {}", e);
+            e.to_string()
+        })?;
         if !status.success() {
+             tracing::error!("npm install 执行失败，退出码: {:?}", status.code());
              return Err("npm install failed".to_string());
         }
+        tracing::info!("npm install 执行成功");
     } else {
+        tracing::warn!("未找到 npm，跳过依赖安装");
         return Err("未找到 npm，跳过依赖安装。请确保已安装 Node.js 或在设置中配置了正确的环境。".to_string());
     }
     
@@ -583,64 +713,81 @@ async fn install_sillytavern_dependencies(app: AppHandle, version: String) -> Re
          return Err(format!("Version {} not found", version));
     }
     
-    // We reuse run_npm_install logic
-    run_npm_install(&app, &sillytavern_dir).await?;
+    let app_clone = app.clone();
+    let sillytavern_dir_clone = sillytavern_dir.clone();
     
-    // Emit done event
-    let _ = app.emit("install-progress", DownloadProgress {
-        status: "done".to_string(),
-        progress: 1.0,
-        log: "依赖安装完成！".to_string(),
+    tokio::spawn(async move {
+        if let Err(e) = run_npm_install(&app_clone, &sillytavern_dir_clone).await {
+             let _ = app_clone.emit("install-progress", DownloadProgress {
+                 status: "error".to_string(),
+                 progress: 0.0,
+                 log: format!("安装依赖失败: {}", e),
+             });
+        } else {
+             let _ = app_clone.emit("install-progress", DownloadProgress {
+                 status: "done".to_string(),
+                 progress: 1.0,
+                 log: "依赖安装完成！".to_string(),
+             });
+        }
     });
     
     Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct InstalledVersionInfo {
     version: String,
     has_node_modules: bool,
 }
 
 #[tauri::command]
-fn get_installed_versions_info(app: AppHandle) -> Result<Vec<InstalledVersionInfo>, String> {
-    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let sillytavern_dir = data_dir.join("sillytavern");
+async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<InstalledVersionInfo>, String> {
+    tracing::info!("获取已安装版本的详细信息");
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let data_dir = get_config_path(&app_clone).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+        let sillytavern_dir = data_dir.join("sillytavern");
 
-    if !sillytavern_dir.exists() {
-        return Ok(vec![]);
-    }
+        if !sillytavern_dir.exists() {
+            tracing::info!("酒馆目录不存在，返回空详细信息列表, 耗时: {:?}", start_time.elapsed());
+            return Ok(vec![]);
+        }
 
-    let mut versions = Vec::new();
-    if let Ok(entries) = fs::read_dir(sillytavern_dir) {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    if let Ok(name) = entry.file_name().into_string() {
-                        if !name.starts_with(".") {
-                             let node_modules_path = entry.path().join("node_modules");
-                             let has_node_modules = if node_modules_path.exists() {
-                                 // Check if it's not empty
-                                 if let Ok(nm_entries) = fs::read_dir(node_modules_path) {
-                                     nm_entries.count() > 0
-                                 } else {
-                                     false
-                                 }
-                             } else {
-                                 false
-                             };
-                             
-                             versions.push(InstalledVersionInfo {
-                                 version: name,
-                                 has_node_modules,
-                             });
+        let mut versions = Vec::new();
+        if let Ok(entries) = fs::read_dir(sillytavern_dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        if let Ok(name) = entry.file_name().into_string() {
+                            if !name.starts_with(".") {
+                                let node_modules_path = entry.path().join("node_modules");
+                                let has_node_modules = if node_modules_path.exists() {
+                                    // Check if it's not empty
+                                    if let Ok(nm_entries) = fs::read_dir(node_modules_path) {
+                                        nm_entries.count() > 0
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                };
+                                
+                                versions.push(InstalledVersionInfo {
+                                    version: name,
+                                    has_node_modules,
+                                });
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    Ok(versions)
+        tracing::info!("获取到版本详细信息: {:?}, 耗时: {:?}", versions, start_time.elapsed());
+        Ok(versions)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -726,14 +873,18 @@ fn setup_window_position_tracking(app: &AppHandle) {
 
  #[tauri::command]
  async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
-     println!("Loading config from: {:?}", get_config_path(&app));
-     Ok(read_app_config_from_disk(&app))
+     let app_clone = app.clone();
+     tokio::task::spawn_blocking(move || {
+         Ok(read_app_config_from_disk(&app_clone))
+     }).await.map_err(|e| e.to_string())?
  }
 
  #[tauri::command]
  async fn save_app_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
-     println!("Saving config to: {:?}", get_config_path(&app));
-     write_app_config_to_disk(&app, &config)
+     let app_clone = app.clone();
+     tokio::task::spawn_blocking(move || {
+         write_app_config_to_disk(&app_clone, &config)
+     }).await.map_err(|e| e.to_string())?
  }
 
 #[tauri::command]
@@ -760,6 +911,7 @@ async fn fetch_github_proxies() -> Result<Vec<ProxyItem>, String> {
 
 #[tauri::command]
 async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
+    tracing::info!("检查 Node.js 环境");
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let node_dir = data_dir.join("node");
     
@@ -771,11 +923,10 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
     };
 
     if local_node_path.exists() {
-        // Use full path for command on Windows to ensure we pick the right one? 
-        // Actually Command::new works with paths.
         if let Ok(output) = std::process::Command::new(&local_node_path).arg("-v").output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                tracing::info!("找到本地 Node.js: {}", version);
                 return Ok(NodeInfo {
                     version: Some(version),
                     path: Some(local_node_path.to_string_lossy().to_string()),
@@ -792,14 +943,12 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             
-            // Try to find the actual path of the system node
             let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
             let mut node_path = "system".to_string();
             
             if let Ok(path_output) = std::process::Command::new(path_cmd).arg("node").output() {
                 if path_output.status.success() {
                     let path_str = String::from_utf8_lossy(&path_output.stdout);
-                    // 'where' might return multiple lines, take the first one
                     if let Some(first_line) = path_str.lines().next() {
                         let trimmed = first_line.trim();
                         if !trimmed.is_empty() {
@@ -809,6 +958,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
                 }
             }
 
+            tracing::info!("找到系统 Node.js: {}", version);
             return Ok(NodeInfo {
                 version: Some(version),
                 path: Some(node_path), 
@@ -817,6 +967,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         }
     }
 
+    tracing::warn!("未找到 Node.js 环境");
     Ok(NodeInfo {
         version: None,
         path: None,
@@ -826,6 +977,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
 
 #[tauri::command]
 async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
+    tracing::info!("检查 NPM 环境");
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let node_dir = data_dir.join("node");
     
@@ -837,7 +989,6 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
     };
 
     if local_node_path.exists() {
-        // Try to find npm.cmd next to node.exe (Windows) or npm in bin (Unix)
         let npm_cmd = if cfg!(target_os = "windows") {
             node_dir.join("npm.cmd")
         } else {
@@ -848,6 +999,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
              if let Ok(output) = std::process::Command::new(&npm_cmd).arg("-v").output() {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    tracing::info!("找到本地 NPM (cmd/bin): {}", version);
                     return Ok(NpmInfo {
                         version: Some(version),
                         path: Some(npm_cmd.to_string_lossy().to_string()),
@@ -857,14 +1009,12 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
             }
         }
         
-        // Try finding npm-cli.js and run with node
         let npm_cli = if cfg!(target_os = "windows") {
              node_dir.join("node_modules").join("npm").join("bin").join("npm-cli.js")
         } else {
-             node_dir.join("lib/node_modules/npm/bin/npm-cli.js") // Standard linux layout
+             node_dir.join("lib/node_modules/npm/bin/npm-cli.js")
         };
         
-        // Also check flat structure if not found
         let npm_cli_flat = node_dir.join("node_modules/npm/bin/npm-cli.js");
 
         let target_cli = if npm_cli.exists() {
@@ -882,6 +1032,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                 .output() {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    tracing::info!("找到本地 NPM (cli.js): {}", version);
                     return Ok(NpmInfo {
                         version: Some(version),
                         path: Some(cli.to_string_lossy().to_string()),
@@ -899,7 +1050,6 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             
-             // Try to find path
             let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
             let mut npm_path = "system".to_string();
             
@@ -915,6 +1065,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                 }
             }
             
+            tracing::info!("找到系统 NPM: {}", version);
             return Ok(NpmInfo {
                 version: Some(version),
                 path: Some(npm_path),
@@ -923,6 +1074,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         }
     }
 
+    tracing::warn!("未找到 NPM 环境");
     Ok(NpmInfo {
         version: None,
         path: None,
@@ -954,6 +1106,8 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let node_dir = data_dir.join("node");
     
+    tracing::info!("开始安装 Node.js, OS: {}, Arch: {}, URL: {}", node_os, node_arch, url);
+
     let emit_progress = |status: &str, progress: f64, log: &str| {
          let _ = app.emit("download-progress", DownloadProgress {
             status: status.to_string(),
@@ -970,18 +1124,26 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .user_agent("sillyTavern-launcher")
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            tracing::error!("创建 HTTP 客户端失败: {}", e);
+            e.to_string()
+        })?;
 
-    let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let response = client.get(&url).send().await.map_err(|e| {
+        tracing::error!("请求 Node.js 下载失败: {}", e);
+        e.to_string()
+    })?;
     let total_size = response.content_length().unwrap_or(0);
+    tracing::info!("Node.js 下载开始，总大小: {} bytes", total_size);
 
-    let mut file = fs::File::create(&temp_zip_path).map_err(|e| e.to_string())?;
+    let mut file = tokio::fs::File::create(&temp_zip_path).await.map_err(|e| e.to_string())?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
 
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|e| e.to_string())?;
-        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        use tokio::io::AsyncWriteExt;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
         
         let progress = if total_size > 0 {
@@ -998,51 +1160,66 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
 
     emit_progress("extracting", 0.0, "下载完成，正在解压...");
 
-    if node_dir.exists() {
-        fs::remove_dir_all(&node_dir).map_err(|e| e.to_string())?;
-    }
-    fs::create_dir_all(&node_dir).map_err(|e| e.to_string())?;
+    let app_clone = app.clone();
+    let temp_zip_path_clone = temp_zip_path.clone();
+    let node_dir_clone = node_dir.clone();
 
-    let file = fs::File::open(&temp_zip_path).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
-    let total_files = archive.len();
-
-    for i in 0..total_files {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => path.to_owned(),
-            None => continue,
+    let _extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let emit_progress = |status: &str, progress: f64, log: &str| {
+             let _ = app_clone.emit("download-progress", DownloadProgress {
+                status: status.to_string(),
+                progress,
+                log: log.to_string(),
+            });
         };
 
-        let mut components = outpath.components();
-        components.next(); // Skip root folder
-        let stripped_path: PathBuf = components.collect();
-
-        if stripped_path.as_os_str().is_empty() {
-             continue;
+        if node_dir_clone.exists() {
+            fs::remove_dir_all(&node_dir_clone).map_err(|e| e.to_string())?;
         }
+        fs::create_dir_all(&node_dir_clone).map_err(|e| e.to_string())?;
 
-        let target_path = node_dir.join(&stripped_path);
+        let file = fs::File::open(&temp_zip_path_clone).map_err(|e| e.to_string())?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+        let total_files = archive.len();
 
-        if (*file.name()).ends_with('/') {
-            fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-        } else {
-             if let Some(p) = target_path.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(&p).map_err(|e| e.to_string())?;
-                }
+        for i in 0..total_files {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let outpath = match file.enclosed_name() {
+                Some(path) => path.to_owned(),
+                None => continue,
+            };
+
+            let mut components = outpath.components();
+            components.next(); // Skip root folder
+            let stripped_path: PathBuf = components.collect();
+
+            if stripped_path.as_os_str().is_empty() {
+                 continue;
             }
-            let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
-            io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-        }
-        
-        if i % 50 == 0 || i == total_files - 1 {
-             let progress = (i as f64) / (total_files as f64);
-             emit_progress("extracting", progress, &format!("解压中: {}/{} 文件...", i + 1, total_files));
-        }
-    }
 
-    let _ = fs::remove_file(temp_zip_path);
+            let target_path = node_dir_clone.join(&stripped_path);
+
+            if (*file.name()).ends_with('/') {
+                fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+            } else {
+                 if let Some(p) = target_path.parent() {
+                    if !p.exists() {
+                        fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                    }
+                }
+                let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
+                io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+            }
+            
+            if i % 50 == 0 || i == total_files - 1 {
+                 let progress = (i as f64) / (total_files as f64);
+                 emit_progress("extracting", progress, &format!("解压中: {}/{} 文件...", i + 1, total_files));
+            }
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())??;
+
+    let _ = tokio::fs::remove_file(temp_zip_path).await;
     emit_progress("done", 1.0, "Node.js 安装完成");
     
     Ok(())
@@ -1050,16 +1227,21 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
+    tracing::info!("检查酒馆目录是否为空");
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let sillytavern_dir = data_dir.join("sillytavern");
     
     if !sillytavern_dir.exists() {
+        tracing::info!("酒馆目录不存在，视为空");
         return Ok(true);
     }
     
     let entries = match fs::read_dir(&sillytavern_dir) {
         Ok(e) => e,
-        Err(_) => return Ok(true), // If we can't read it, assume it's empty/invalid
+        Err(e) => {
+            tracing::warn!("无法读取酒馆目录，视为空: {}", e);
+            return Ok(true); // If we can't read it, assume it's empty/invalid
+        }
     };
     
     let mut has_valid_files = false;
@@ -1074,11 +1256,13 @@ async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
         }
     }
     
+    tracing::info!("酒馆目录检查结果: isEmpty={}", !has_valid_files);
     Ok(!has_valid_files)
 }
 
 #[tauri::command]
 fn open_directory(app: AppHandle, dir_type: String, custom_path: Option<String>) -> Result<(), String> {
+    tracing::info!("打开目录，类型: {}, 自定义路径: {:?}", dir_type, custom_path);
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     
     let target_dir = match dir_type.as_str() {
@@ -1136,34 +1320,43 @@ fn get_app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
-fn get_tavern_version(app: AppHandle) -> Result<String, String> {
-    let config = read_app_config_from_disk(&app);
-    let current_version = config.sillytavern.version;
+async fn get_tavern_version(app: AppHandle) -> Result<String, String> {
+    tracing::info!("获取当前使用的酒馆版本");
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let config = read_app_config_from_disk(&app_clone);
+        let current_version = config.sillytavern.version;
 
-    if current_version.is_empty() {
-        return Err("未设置".to_string());
-    }
+        if current_version.is_empty() {
+            tracing::info!("未设置版本, 耗时: {:?}", start_time.elapsed());
+            return Err("未设置".to_string());
+        }
 
-    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let version_dir = data_dir.join("sillytavern").join(&current_version);
-    let package_json_path = version_dir.join("package.json");
-    
-    if !version_dir.exists() {
-        return Err("未安装".to_string());
-    }
-    
-    if package_json_path.exists() {
-        if let Ok(content) = fs::read_to_string(&package_json_path) {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(version) = parsed.get("version").and_then(|v| v.as_str()) {
-                    return Ok(version.to_string());
+        let data_dir = get_config_path(&app_clone).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+        let version_dir = data_dir.join("sillytavern").join(&current_version);
+        let package_json_path = version_dir.join("package.json");
+        
+        if !version_dir.exists() {
+            tracing::warn!("版本 {} 未安装, 耗时: {:?}", current_version, start_time.elapsed());
+            return Err("未安装".to_string());
+        }
+        
+        if package_json_path.exists() {
+            if let Ok(content) = fs::read_to_string(&package_json_path) {
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(version) = parsed.get("version").and_then(|v| v.as_str()) {
+                        tracing::info!("从 package.json 获取到版本: {}, 耗时: {:?}", version, start_time.elapsed());
+                        return Ok(version.to_string());
+                    }
                 }
             }
         }
-    }
-    
-    // Fallback to configured version if package.json read fails or version not found
-    Ok(current_version)
+        
+        // Fallback to configured version if package.json read fails or version not found
+        tracing::info!("回退到配置的版本: {}, 耗时: {:?}", current_version, start_time.elapsed());
+        Ok(current_version)
+    }).await.map_err(|e| e.to_string())?
 }
 
 
@@ -1580,15 +1773,18 @@ fn get_or_init_child_mapping<'a>(
 
 #[tauri::command]
 async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
+    tracing::info!("准备删除酒馆版本: {}", version);
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let version_dir = data_dir.join("sillytavern").join(&version);
 
     if !version_dir.exists() {
+        tracing::warn!("要删除的版本 {} 不存在", version);
         return Err(format!("版本 {} 不存在", version));
     }
 
     // Double check we are not deleting the whole sillytavern dir or something wrong
     if version.trim().is_empty() || version.contains("..") || version.contains("/") || version.contains("\\") {
+         tracing::error!("无效的版本号: {}", version);
          return Err("无效的版本号".to_string());
     }
 
@@ -1682,22 +1878,48 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
     }).await;
 
     match result {
-        Ok(Ok(_)) => Ok(()),
-        Ok(Err(e)) => Err(format!("删除失败: {}", e)),
-        Err(e) => Err(format!("任务执行失败: {}", e)),
+        Ok(Ok(_)) => {
+            tracing::info!("版本 {} 删除成功", version);
+            Ok(())
+        },
+        Ok(Err(e)) => {
+            tracing::error!("删除版本 {} 失败: {}", version, e);
+            Err(format!("删除失败: {}", e))
+        },
+        Err(e) => {
+            tracing::error!("执行删除任务失败: {}", e);
+            Err(format!("任务执行失败: {}", e))
+        },
     }
 }
 
 #[tauri::command]
-fn read_sillytavern_config(app: AppHandle, version: String) -> Result<String, String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
-    fs::read_to_string(&config_path).map_err(|e| format!("读取失败: {}", e))
+async fn read_sillytavern_config(app: AppHandle, version: String) -> Result<String, String> {
+    tracing::info!("读取酒馆配置: 版本 {}", version);
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let result = fs::read_to_string(&config_path).map_err(|e| {
+            tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
+            format!("读取失败: {}", e)
+        });
+        tracing::info!("读取配置成功, 耗时: {:?}", start_time.elapsed());
+        result
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn write_sillytavern_config(app: AppHandle, version: String, content: String) -> Result<(), String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
-    fs::write(&config_path, content).map_err(|e| format!("写入失败: {}", e))
+async fn write_sillytavern_config(app: AppHandle, version: String, content: String) -> Result<(), String> {
+    tracing::info!("写入酒馆配置: 版本 {}", version);
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        fs::write(&config_path, content).map_err(|e| {
+            tracing::error!("写入配置失败: {}", e);
+            format!("写入失败: {}", e)
+        })
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1707,312 +1929,342 @@ fn get_sillytavern_config_path(app: AppHandle, version: String) -> Result<String
 }
 
 #[tauri::command]
-fn get_sillytavern_config_options(
+async fn get_sillytavern_config_options(
     app: AppHandle,
     version: String,
 ) -> Result<TavernConfigPayload, String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
-    let content = fs::read_to_string(&config_path).map_err(|e| format!("读取失败: {}", e))?;
-    parse_tavern_config_payload(&content)
+    tracing::info!("获取酒馆高级配置: 版本 {}", version);
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let content = fs::read_to_string(&config_path).map_err(|e| {
+            tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
+            format!("读取失败: {}", e)
+        })?;
+        let payload = parse_tavern_config_payload(&content);
+        tracing::info!("解析配置成功, 耗时: {:?}", start_time.elapsed());
+        payload
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn update_sillytavern_config_options(
+async fn update_sillytavern_config_options(
     app: AppHandle,
     version: String,
     config: TavernConfigPayload,
 ) -> Result<TavernConfigPayload, String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
-    let content = fs::read_to_string(&config_path).map_err(|e| format!("读取失败: {}", e))?;
-    let mut root: serde_yaml::Value =
-        serde_yaml::from_str(&content).map_err(|e| format!("解析配置失败: {}", e))?;
-    let mapping = root
-        .as_mapping_mut()
-        .ok_or("配置文件格式无效，根节点必须是对象".to_string())?;
+    tracing::info!("更新酒馆高级配置: 版本 {}", version);
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let content = fs::read_to_string(&config_path).map_err(|e| {
+            tracing::error!("读取配置失败: {}", e);
+            format!("读取失败: {}", e)
+        })?;
+        let mut root: serde_yaml::Value =
+            serde_yaml::from_str(&content).map_err(|e| {
+                tracing::error!("解析配置失败: {}", e);
+                format!("解析配置失败: {}", e)
+            })?;
+        let mapping = root
+            .as_mapping_mut()
+            .ok_or("配置文件格式无效，根节点必须是对象".to_string())?;
 
-    upsert_yaml_value(
-        mapping,
-        "port",
-        serde_yaml::Value::Number(serde_yaml::Number::from(config.port)),
-    );
-    upsert_yaml_value(mapping, "listen", serde_yaml::Value::Bool(config.listen));
-    let listen_address = get_or_init_child_mapping(mapping, "listenAddress")?;
-    upsert_yaml_value(
-        listen_address,
-        "ipv4",
-        serde_yaml::Value::String(config.listen_address.ipv4.clone()),
-    );
-    upsert_yaml_value(
-        listen_address,
-        "ipv6",
-        serde_yaml::Value::String(config.listen_address.ipv6.clone()),
-    );
-
-    let protocol = get_or_init_child_mapping(mapping, "protocol")?;
-    upsert_yaml_value(protocol, "ipv4", serde_yaml::Value::Bool(config.protocol.ipv4));
-    upsert_yaml_value(protocol, "ipv6", serde_yaml::Value::Bool(config.protocol.ipv6));
-    upsert_yaml_value(
-        mapping,
-        "basicAuthMode",
-        serde_yaml::Value::Bool(config.basic_auth_mode),
-    );
-    upsert_yaml_value(
-        mapping,
-        "enableUserAccounts",
-        serde_yaml::Value::Bool(config.enable_user_accounts),
-    );
-    upsert_yaml_value(
-        mapping,
-        "enableDiscreetLogin",
-        serde_yaml::Value::Bool(config.enable_discreet_login),
-    );
-    upsert_yaml_value(
-        mapping,
-        "perUserBasicAuth",
-        serde_yaml::Value::Bool(config.per_user_basic_auth),
-    );
-
-    let basic_auth_user = get_or_init_child_mapping(mapping, "basicAuthUser")?;
-    upsert_yaml_value(
-        basic_auth_user,
-        "username",
-        serde_yaml::Value::String(config.basic_auth_user.username.clone()),
-    );
-    upsert_yaml_value(
-        basic_auth_user,
-        "password",
-        serde_yaml::Value::String(config.basic_auth_user.password.clone()),
-    );
-
-    upsert_yaml_value(
-        mapping,
-        "whitelistMode",
-        serde_yaml::Value::Bool(config.whitelist_mode),
-    );
-    upsert_yaml_value(
-        mapping,
-        "whitelist",
-        serde_yaml::Value::Sequence(
-            config
-                .whitelist
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-
-    let cors = get_or_init_child_mapping(mapping, "cors")?;
-    upsert_yaml_value(cors, "enabled", serde_yaml::Value::Bool(config.cors.enabled));
-    upsert_yaml_value(
-        cors,
-        "origin",
-        serde_yaml::Value::Sequence(
-            config
-                .cors
-                .origin
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        cors,
-        "methods",
-        serde_yaml::Value::Sequence(
-            config
-                .cors
-                .methods
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        cors,
-        "allowedHeaders",
-        serde_yaml::Value::Sequence(
-            config
-                .cors
-                .allowed_headers
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        cors,
-        "exposedHeaders",
-        serde_yaml::Value::Sequence(
-            config
-                .cors
-                .exposed_headers
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        cors,
-        "credentials",
-        serde_yaml::Value::Bool(config.cors.credentials),
-    );
-    upsert_yaml_value(
-        cors,
-        "maxAge",
-        match config.cors.max_age {
-            Some(value) => serde_yaml::Value::Number(serde_yaml::Number::from(value)),
-            None => serde_yaml::Value::Null,
-        },
-    );
-
-    let request_proxy = get_or_init_child_mapping(mapping, "requestProxy")?;
-    upsert_yaml_value(
-        request_proxy,
-        "enabled",
-        serde_yaml::Value::Bool(config.request_proxy.enabled),
-    );
-    upsert_yaml_value(
-        request_proxy,
-        "url",
-        serde_yaml::Value::String(config.request_proxy.url.clone()),
-    );
-    upsert_yaml_value(
-        request_proxy,
-        "bypass",
-        serde_yaml::Value::Sequence(
-            config
-                .request_proxy
-                .bypass
-                .iter()
-                .map(|item| serde_yaml::Value::String(item.clone()))
-                .collect(),
-        ),
-    );
-
-    let backups = get_or_init_child_mapping(mapping, "backups")?;
-    let backups_common = get_or_init_child_mapping(backups, "common")?;
-    upsert_yaml_value(
-        backups_common,
-        "numberOfBackups",
-        serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.common.number_of_backups)),
-    );
-    let backups_chat = get_or_init_child_mapping(backups, "chat")?;
-    upsert_yaml_value(
-        backups_chat,
-        "enabled",
-        serde_yaml::Value::Bool(config.backups.chat.enabled),
-    );
-    upsert_yaml_value(
-        backups_chat,
-        "checkIntegrity",
-        serde_yaml::Value::Bool(config.backups.chat.check_integrity),
-    );
-    upsert_yaml_value(
-        backups_chat,
-        "maxTotalBackups",
-        serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.chat.max_total_backups)),
-    );
-    upsert_yaml_value(
-        backups_chat,
-        "throttleInterval",
-        serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.chat.throttle_interval)),
-    );
-
-    let thumbnails = get_or_init_child_mapping(mapping, "thumbnails")?;
-    upsert_yaml_value(
-        thumbnails,
-        "enabled",
-        serde_yaml::Value::Bool(config.thumbnails.enabled),
-    );
-    upsert_yaml_value(
-        thumbnails,
-        "format",
-        serde_yaml::Value::String(config.thumbnails.format.clone()),
-    );
-    upsert_yaml_value(
-        thumbnails,
-        "quality",
-        serde_yaml::Value::Number(serde_yaml::Number::from(config.thumbnails.quality)),
-    );
-    let dimensions = get_or_init_child_mapping(thumbnails, "dimensions")?;
-    upsert_yaml_value(
-        dimensions,
-        "bg",
-        serde_yaml::Value::Sequence(
-            config
-                .thumbnails
-                .dimensions
-                .bg
-                .iter()
-                .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        dimensions,
-        "avatar",
-        serde_yaml::Value::Sequence(
-            config
-                .thumbnails
-                .dimensions
-                .avatar
-                .iter()
-                .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
-                .collect(),
-        ),
-    );
-    upsert_yaml_value(
-        dimensions,
-        "persona",
-        serde_yaml::Value::Sequence(
-            config
-                .thumbnails
-                .dimensions
-                .persona
-                .iter()
-                .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
-                .collect(),
-        ),
-    );
-
-    let browser_launch_key = serde_yaml::Value::String("browserLaunch".to_string());
-    if !mapping.contains_key(&browser_launch_key) {
         upsert_yaml_value(
             mapping,
-            "browserLaunch",
-            serde_yaml::Value::Mapping(serde_yaml::Mapping::new()),
+            "port",
+            serde_yaml::Value::Number(serde_yaml::Number::from(config.port)),
         );
-    }
-    let browser_launch = mapping
-        .get_mut(&browser_launch_key)
-        .and_then(serde_yaml::Value::as_mapping_mut)
-        .ok_or("browserLaunch 配置格式无效".to_string())?;
-    upsert_yaml_value(
-        browser_launch,
-        "enabled",
-        serde_yaml::Value::Bool(config.browser_launch_enabled),
-    );
-    upsert_yaml_value(
-        browser_launch,
-        "browser",
-        serde_yaml::Value::String(config.browser_type.clone()),
-    );
+        upsert_yaml_value(mapping, "listen", serde_yaml::Value::Bool(config.listen));
+        let listen_address = get_or_init_child_mapping(mapping, "listenAddress")?;
+        upsert_yaml_value(
+            listen_address,
+            "ipv4",
+            serde_yaml::Value::String(config.listen_address.ipv4.clone()),
+        );
+        upsert_yaml_value(
+            listen_address,
+            "ipv6",
+            serde_yaml::Value::String(config.listen_address.ipv6.clone()),
+        );
 
-    let new_content = serde_yaml::to_string(&root).map_err(|e| format!("序列化配置失败: {}", e))?;
-    fs::write(&config_path, new_content).map_err(|e| format!("写入失败: {}", e))?;
-    Ok(config)
+        let protocol = get_or_init_child_mapping(mapping, "protocol")?;
+        upsert_yaml_value(protocol, "ipv4", serde_yaml::Value::Bool(config.protocol.ipv4));
+        upsert_yaml_value(protocol, "ipv6", serde_yaml::Value::Bool(config.protocol.ipv6));
+        upsert_yaml_value(
+            mapping,
+            "basicAuthMode",
+            serde_yaml::Value::Bool(config.basic_auth_mode),
+        );
+        upsert_yaml_value(
+            mapping,
+            "enableUserAccounts",
+            serde_yaml::Value::Bool(config.enable_user_accounts),
+        );
+        upsert_yaml_value(
+            mapping,
+            "enableDiscreetLogin",
+            serde_yaml::Value::Bool(config.enable_discreet_login),
+        );
+        upsert_yaml_value(
+            mapping,
+            "perUserBasicAuth",
+            serde_yaml::Value::Bool(config.per_user_basic_auth),
+        );
+
+        let basic_auth_user = get_or_init_child_mapping(mapping, "basicAuthUser")?;
+        upsert_yaml_value(
+            basic_auth_user,
+            "username",
+            serde_yaml::Value::String(config.basic_auth_user.username.clone()),
+        );
+        upsert_yaml_value(
+            basic_auth_user,
+            "password",
+            serde_yaml::Value::String(config.basic_auth_user.password.clone()),
+        );
+
+        upsert_yaml_value(
+            mapping,
+            "whitelistMode",
+            serde_yaml::Value::Bool(config.whitelist_mode),
+        );
+        upsert_yaml_value(
+            mapping,
+            "whitelist",
+            serde_yaml::Value::Sequence(
+                config
+                    .whitelist
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+
+        let cors = get_or_init_child_mapping(mapping, "cors")?;
+        upsert_yaml_value(cors, "enabled", serde_yaml::Value::Bool(config.cors.enabled));
+        upsert_yaml_value(
+            cors,
+            "origin",
+            serde_yaml::Value::Sequence(
+                config
+                    .cors
+                    .origin
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            cors,
+            "methods",
+            serde_yaml::Value::Sequence(
+                config
+                    .cors
+                    .methods
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            cors,
+            "allowedHeaders",
+            serde_yaml::Value::Sequence(
+                config
+                    .cors
+                    .allowed_headers
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            cors,
+            "exposedHeaders",
+            serde_yaml::Value::Sequence(
+                config
+                    .cors
+                    .exposed_headers
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            cors,
+            "credentials",
+            serde_yaml::Value::Bool(config.cors.credentials),
+        );
+        upsert_yaml_value(
+            cors,
+            "maxAge",
+            match config.cors.max_age {
+                Some(value) => serde_yaml::Value::Number(serde_yaml::Number::from(value)),
+                None => serde_yaml::Value::Null,
+            },
+        );
+
+        let request_proxy = get_or_init_child_mapping(mapping, "requestProxy")?;
+        upsert_yaml_value(
+            request_proxy,
+            "enabled",
+            serde_yaml::Value::Bool(config.request_proxy.enabled),
+        );
+        upsert_yaml_value(
+            request_proxy,
+            "url",
+            serde_yaml::Value::String(config.request_proxy.url.clone()),
+        );
+        upsert_yaml_value(
+            request_proxy,
+            "bypass",
+            serde_yaml::Value::Sequence(
+                config
+                    .request_proxy
+                    .bypass
+                    .iter()
+                    .map(|item| serde_yaml::Value::String(item.clone()))
+                    .collect(),
+            ),
+        );
+
+        let backups = get_or_init_child_mapping(mapping, "backups")?;
+        let backups_common = get_or_init_child_mapping(backups, "common")?;
+        upsert_yaml_value(
+            backups_common,
+            "numberOfBackups",
+            serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.common.number_of_backups)),
+        );
+        let backups_chat = get_or_init_child_mapping(backups, "chat")?;
+        upsert_yaml_value(
+            backups_chat,
+            "enabled",
+            serde_yaml::Value::Bool(config.backups.chat.enabled),
+        );
+        upsert_yaml_value(
+            backups_chat,
+            "checkIntegrity",
+            serde_yaml::Value::Bool(config.backups.chat.check_integrity),
+        );
+        upsert_yaml_value(
+            backups_chat,
+            "maxTotalBackups",
+            serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.chat.max_total_backups)),
+        );
+        upsert_yaml_value(
+            backups_chat,
+            "throttleInterval",
+            serde_yaml::Value::Number(serde_yaml::Number::from(config.backups.chat.throttle_interval)),
+        );
+
+        let thumbnails = get_or_init_child_mapping(mapping, "thumbnails")?;
+        upsert_yaml_value(
+            thumbnails,
+            "enabled",
+            serde_yaml::Value::Bool(config.thumbnails.enabled),
+        );
+        upsert_yaml_value(
+            thumbnails,
+            "format",
+            serde_yaml::Value::String(config.thumbnails.format.clone()),
+        );
+        upsert_yaml_value(
+            thumbnails,
+            "quality",
+            serde_yaml::Value::Number(serde_yaml::Number::from(config.thumbnails.quality)),
+        );
+        let dimensions = get_or_init_child_mapping(thumbnails, "dimensions")?;
+        upsert_yaml_value(
+            dimensions,
+            "bg",
+            serde_yaml::Value::Sequence(
+                config
+                    .thumbnails
+                    .dimensions
+                    .bg
+                    .iter()
+                    .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            dimensions,
+            "avatar",
+            serde_yaml::Value::Sequence(
+                config
+                    .thumbnails
+                    .dimensions
+                    .avatar
+                    .iter()
+                    .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
+                    .collect(),
+            ),
+        );
+        upsert_yaml_value(
+            dimensions,
+            "persona",
+            serde_yaml::Value::Sequence(
+                config
+                    .thumbnails
+                    .dimensions
+                    .persona
+                    .iter()
+                    .map(|value| serde_yaml::Value::Number(serde_yaml::Number::from(*value)))
+                    .collect(),
+            ),
+        );
+
+        let browser_launch_key = serde_yaml::Value::String("browserLaunch".to_string());
+        if !mapping.contains_key(&browser_launch_key) {
+            upsert_yaml_value(
+                mapping,
+                "browserLaunch",
+                serde_yaml::Value::Mapping(serde_yaml::Mapping::new()),
+            );
+        }
+        let browser_launch = mapping
+            .get_mut(&browser_launch_key)
+            .and_then(serde_yaml::Value::as_mapping_mut)
+            .ok_or("browserLaunch 配置格式无效".to_string())?;
+        upsert_yaml_value(
+            browser_launch,
+            "enabled",
+            serde_yaml::Value::Bool(config.browser_launch_enabled),
+        );
+        upsert_yaml_value(
+            browser_launch,
+            "browser",
+            serde_yaml::Value::String(config.browser_type.clone()),
+        );
+
+        let new_content = serde_yaml::to_string(&root).map_err(|e| {
+            tracing::error!("序列化配置失败: {}", e);
+            format!("序列化配置失败: {}", e)
+        })?;
+        fs::write(&config_path, new_content).map_err(|e| {
+            tracing::error!("写入失败: {}", e);
+            format!("写入失败: {}", e)
+        })?;
+        Ok(config)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>) -> Result<(), String> {
     let mut kill_tx_guard = state.kill_tx.lock().await;
     if kill_tx_guard.is_some() {
+        tracing::warn!("尝试启动酒馆，但进程已经在运行中了");
         return Err("进程已经在运行中了".to_string());
     }
+
+    tracing::info!("准备启动酒馆...");
 
     let config = read_app_config_from_disk(&app);
     let version = config.sillytavern.version;
     if version.is_empty() {
+        tracing::warn!("启动失败：未选择酒馆版本");
         return Err("未选择酒馆版本，请先在版本页面选择或安装".to_string());
     }
 
@@ -2023,11 +2275,13 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
     let st_data_dir = data_dir.join("st_data");
     if !st_data_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(&st_data_dir) {
+            tracing::error!("无法创建全局数据目录: {}", e);
             return Err(format!("无法创建全局数据目录: {}", e));
         }
     }
 
     if !sillytavern_dir.exists() {
+        tracing::error!("版本 {} 的目录不存在", version);
         return Err(format!("版本 {} 的目录不存在，请检查是否已正确安装", version));
     }
 
@@ -2039,14 +2293,18 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
     };
 
     if !node_path.exists() {
+        tracing::info!("本地 node 不存在，回退到系统 node");
         node_path = PathBuf::from("node"); // Fallback to system node
     }
 
     let server_js = sillytavern_dir.join("server.js");
 
     if !server_js.exists() {
+        tracing::error!("找不到 server.js，酒馆文件可能损坏");
         return Err("找不到 server.js，酒馆文件可能损坏".to_string());
     }
+
+    tracing::info!("正在启动酒馆，节点路径: {:?}，版本: {}", node_path, version);
 
     let mut std_cmd = std::process::Command::new(&node_path);
     std_cmd.arg(&server_js);
@@ -2070,15 +2328,25 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
     }
 
     let mut cmd = tokio::process::Command::from(std_cmd);
-    let mut child = cmd.spawn().map_err(|e| format!("启动进程失败: {}", e))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        tracing::error!("启动进程失败: {}", e);
+        format!("启动进程失败: {}", e)
+    })?;
 
-    let stdout = child.stdout.take().ok_or("无法获取标准输出")?;
-    let stderr = child.stderr.take().ok_or("无法获取标准错误")?;
+    let stdout = child.stdout.take().ok_or_else(|| {
+        tracing::error!("无法获取标准输出");
+        "无法获取标准输出"
+    })?;
+    let stderr = child.stderr.take().ok_or_else(|| {
+        tracing::error!("无法获取标准错误");
+        "无法获取标准错误"
+    })?;
 
     let app_clone1 = app.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
+            tracing::info!("ST_STDOUT: {}", line);
             let _ = app_clone1.emit("process-log", format!("INFO: {}", line));
         }
     });
@@ -2087,6 +2355,7 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
+            tracing::error!("ST_STDERR: {}", line);
             let _ = app_clone2.emit("process-log", format!("ERROR: {}", line));
         }
     });
@@ -2100,10 +2369,13 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
     tokio::spawn(async move {
         tokio::select! {
             _ = child.wait() => {
+                tracing::info!("酒馆进程已退出");
                 let _ = app_clone3.emit("process-log", "INFO: 进程已退出".to_string());
             }
             _ = kill_rx.recv() => {
+                tracing::info!("接收到停止信号，正在终止酒馆进程...");
                 let _ = child.kill().await;
+                tracing::info!("酒馆进程已被终止");
                 let _ = app_clone3.emit("process-log", "INFO: 进程已被终止".to_string());
             }
         }
@@ -2116,9 +2388,13 @@ async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>
 
 #[tauri::command]
 async fn stop_sillytavern(state: tauri::State<'_, ProcessState>) -> Result<(), String> {
+    tracing::info!("尝试停止酒馆...");
     let mut kill_tx_guard = state.kill_tx.lock().await;
     if let Some(kill_tx) = kill_tx_guard.take() {
+        tracing::info!("发送停止信号给酒馆进程");
         let _ = kill_tx.send(()).await;
+    } else {
+        tracing::info!("酒馆进程未在运行");
     }
     Ok(())
 }
@@ -2207,6 +2483,7 @@ fn verify_extension_zip(zip_path: String) -> Result<ExtensionManifest, String> {
 
 #[tauri::command]
 fn install_extension_zip(app: tauri::AppHandle, zip_path: String, scope: String, version: String) -> Result<(), String> {
+    tracing::info!("开始安装扩展, zip_path: {}, scope: {}, version: {}", zip_path, scope, version);
     let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
     
     let target_dir = if scope == "user" {
@@ -2284,63 +2561,68 @@ fn install_extension_zip(app: tauri::AppHandle, zip_path: String, scope: String,
 }
 
 #[tauri::command]
-fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<ExtensionInfo>, String> {
-    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
-    let mut extensions = Vec::new();
-    
-    // Helper function to scan a directory for extensions
-    let scan_dir = |dir_path: &PathBuf, is_system: bool, scope: &str, exts: &mut Vec<ExtensionInfo>| {
-        if !dir_path.exists() {
-            return;
-        }
-        if let Ok(entries) = std::fs::read_dir(dir_path) {
-            for entry in entries.flatten() {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_dir() {
-                        // Skip the third-party folder itself when scanning official extensions
-                        if is_system && entry.file_name() == "third-party" {
-                            continue;
-                        }
-                        
-                        let mut manifest_path = entry.path().join("manifest.json");
-                        let mut enabled = true;
-                        
-                        if !manifest_path.exists() {
-                            manifest_path = entry.path().join("manifest.json.disable");
-                            enabled = false;
-                        }
-                        
-                        if manifest_path.exists() {
-                            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
-                                if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&content) {
-                                    exts.push(ExtensionInfo {
-                                        id: entry.file_name().to_string_lossy().to_string(),
-                                        manifest,
-                                        dir_path: entry.path().to_string_lossy().to_string(),
-                                        enabled,
-                                        is_system,
-                                        scope: scope.to_string(),
-                                    });
-                                } else {
-                                    let value: Result<serde_json::Value, _> = serde_json::from_str(&content);
-                                    if let Ok(val) = value {
-                                        let mut m = ExtensionManifest::default();
-                                        if let Some(obj) = val.as_object() {
-                                            m.display_name = obj.get("display_name").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                            m.author = obj.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                            m.version = obj.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                            m.home_page = obj.get("homePage").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                            m.auto_update = obj.get("auto_update").and_then(|v| v.as_bool());
-                                            m.minimum_client_version = obj.get("minimum_client_version").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        }
+async fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<ExtensionInfo>, String> {
+    tracing::info!("获取扩展列表，当前酒馆版本: {}", version);
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        let data_dir = get_config_path(&app_clone).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
+        let mut extensions = Vec::new();
+        
+        // Helper function to scan a directory for extensions
+        let scan_dir = |dir_path: &PathBuf, is_system: bool, scope: &str, exts: &mut Vec<ExtensionInfo>| {
+            if !dir_path.exists() {
+                return;
+            }
+            if let Ok(entries) = std::fs::read_dir(dir_path) {
+                for entry in entries.flatten() {
+                    if let Ok(file_type) = entry.file_type() {
+                        if file_type.is_dir() {
+                            // Skip the third-party folder itself when scanning official extensions
+                            if is_system && entry.file_name() == "third-party" {
+                                continue;
+                            }
+                            
+                            let mut manifest_path = entry.path().join("manifest.json");
+                            let mut enabled = true;
+                            
+                            if !manifest_path.exists() {
+                                manifest_path = entry.path().join("manifest.json.disable");
+                                enabled = false;
+                            }
+                            
+                            if manifest_path.exists() {
+                                if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                                    if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&content) {
                                         exts.push(ExtensionInfo {
                                             id: entry.file_name().to_string_lossy().to_string(),
-                                            manifest: m,
+                                            manifest,
                                             dir_path: entry.path().to_string_lossy().to_string(),
                                             enabled,
                                             is_system,
                                             scope: scope.to_string(),
                                         });
+                                    } else {
+                                        let value: Result<serde_json::Value, _> = serde_json::from_str(&content);
+                                        if let Ok(val) = value {
+                                            let mut m = ExtensionManifest::default();
+                                            if let Some(obj) = val.as_object() {
+                                                m.display_name = obj.get("display_name").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                                m.author = obj.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                                m.version = obj.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                                m.home_page = obj.get("homePage").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                                m.auto_update = obj.get("auto_update").and_then(|v| v.as_bool());
+                                                m.minimum_client_version = obj.get("minimum_client_version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                            }
+                                            exts.push(ExtensionInfo {
+                                                id: entry.file_name().to_string_lossy().to_string(),
+                                                manifest: m,
+                                                dir_path: entry.path().to_string_lossy().to_string(),
+                                                enabled,
+                                                is_system,
+                                                scope: scope.to_string(),
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -2348,32 +2630,42 @@ fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<Extensio
                     }
                 }
             }
-        }
-    };
+        };
 
-    // 1. User Extensions (Current User)
-    let user_extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
-    scan_dir(&user_extensions_dir, false, "user", &mut extensions);
-    
-    // If a version is provided, scan global extensions for that version
-    if !version.is_empty() {
-        // 2. Global Official Extensions
-        let global_official_dir = data_dir.join("sillytavern").join(&version).join("public").join("scripts").join("extensions");
-        scan_dir(&global_official_dir, true, "global", &mut extensions);
+        // 1. User Extensions (Current User)
+        let user_extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
+        scan_dir(&user_extensions_dir, false, "user", &mut extensions);
         
-        // 3. Global Third-Party Extensions
-        let global_third_party_dir = global_official_dir.join("third-party");
-        scan_dir(&global_third_party_dir, false, "global", &mut extensions);
-    }
-    
-    Ok(extensions)
+        // If a version is provided, scan global extensions for that version
+        if !version.is_empty() {
+            // 2. Global Official Extensions
+            let global_official_dir = data_dir.join("sillytavern").join(&version).join("public").join("scripts").join("extensions");
+            scan_dir(&global_official_dir, true, "global", &mut extensions);
+            
+            // 3. Global Third-Party Extensions
+            let global_third_party_dir = global_official_dir.join("third-party");
+            scan_dir(&global_third_party_dir, false, "global", &mut extensions);
+        }
+        
+        let ext_names: Vec<String> = extensions.iter()
+            .map(|ext| ext.manifest.display_name.clone().unwrap_or_else(|| ext.id.clone()))
+            .collect();
+        tracing::info!("共获取到 {} 个扩展: {:?}, 耗时: {:?}", extensions.len(), ext_names, start_time.elapsed());
+        
+        Ok(extensions)
+    }).await.map_err(|e| {
+        tracing::error!("获取扩展列表失败: {}", e);
+        e.to_string()
+    })?
 }
 
 #[tauri::command]
 fn toggle_extension_enable(_app: tauri::AppHandle, _id: String, enable: bool, dir_path: String) -> Result<(), String> {
+    tracing::info!("切换扩展启用状态: id={}, enable={}, dir={}", _id, enable, dir_path);
     let extension_dir = PathBuf::from(&dir_path);
     
     if !extension_dir.exists() {
+        tracing::warn!("扩展目录不存在: {:?}", extension_dir);
         return Err("扩展目录不存在".to_string());
     }
     
@@ -2382,14 +2674,22 @@ fn toggle_extension_enable(_app: tauri::AppHandle, _id: String, enable: bool, di
     
     if enable {
         if disabled_manifest_path.exists() {
-            std::fs::rename(&disabled_manifest_path, &manifest_path).map_err(|e| e.to_string())?;
+            std::fs::rename(&disabled_manifest_path, &manifest_path).map_err(|e| {
+                tracing::error!("重命名 manifest 失败: {}", e);
+                e.to_string()
+            })?;
         } else if !manifest_path.exists() {
+            tracing::warn!("未找到清单文件 (启用操作)");
             return Err("未找到清单文件".to_string());
         }
     } else {
         if manifest_path.exists() {
-            std::fs::rename(&manifest_path, &disabled_manifest_path).map_err(|e| e.to_string())?;
+            std::fs::rename(&manifest_path, &disabled_manifest_path).map_err(|e| {
+                tracing::error!("重命名 manifest 失败: {}", e);
+                e.to_string()
+            })?;
         } else if !disabled_manifest_path.exists() {
+            tracing::warn!("未找到清单文件 (禁用操作)");
             return Err("未找到清单文件".to_string());
         }
     }
@@ -2399,19 +2699,25 @@ fn toggle_extension_enable(_app: tauri::AppHandle, _id: String, enable: bool, di
 
 #[tauri::command]
 fn delete_extension(_app: tauri::AppHandle, _id: String, dir_path: String) -> Result<(), String> {
+    tracing::info!("删除扩展: id={}, dir={}", _id, dir_path);
     let extension_dir = PathBuf::from(&dir_path);
     
     if !extension_dir.exists() {
+        tracing::warn!("要删除的扩展目录不存在: {:?}", extension_dir);
         return Err("扩展目录不存在".to_string());
     }
     
-    std::fs::remove_dir_all(&extension_dir).map_err(|e| e.to_string())?;
+    std::fs::remove_dir_all(&extension_dir).map_err(|e| {
+        tracing::error!("删除扩展目录失败: {}", e);
+        e.to_string()
+    })?;
     
     Ok(())
 }
 
 #[tauri::command]
 fn toggle_extension_auto_update(_app: tauri::AppHandle, _id: String, auto_update: bool, dir_path: String) -> Result<(), String> {
+    tracing::info!("切换扩展自动更新状态: id={}, auto_update={}, dir={}", _id, auto_update, dir_path);
     let extension_dir = PathBuf::from(&dir_path);
     
     let mut manifest_path = extension_dir.join("manifest.json");
@@ -2420,18 +2726,31 @@ fn toggle_extension_auto_update(_app: tauri::AppHandle, _id: String, auto_update
     }
     
     if !manifest_path.exists() {
+        tracing::warn!("扩展清单不存在: {:?}", manifest_path);
         return Err("扩展清单不存在".to_string());
     }
     
-    let content = std::fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
-    let mut val: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let content = std::fs::read_to_string(&manifest_path).map_err(|e| {
+        tracing::error!("读取 manifest 失败: {}", e);
+        e.to_string()
+    })?;
+    let mut val: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
+        tracing::error!("解析 manifest JSON 失败: {}", e);
+        e.to_string()
+    })?;
     
     if let Some(obj) = val.as_object_mut() {
         obj.insert("auto_update".to_string(), serde_json::Value::Bool(auto_update));
     }
     
-    let new_content = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    std::fs::write(manifest_path, new_content).map_err(|e| e.to_string())?;
+    let new_content = serde_json::to_string_pretty(&val).map_err(|e| {
+        tracing::error!("序列化 manifest JSON 失败: {}", e);
+        e.to_string()
+    })?;
+    std::fs::write(manifest_path, new_content).map_err(|e| {
+        tracing::error!("写入 manifest 失败: {}", e);
+        e.to_string()
+    })?;
     
     Ok(())
 }
@@ -2524,6 +2843,11 @@ pub fn run() {
                 path.pop();
             }
             ensure_standard_layout(&path)?;
+            
+            // 初始化日志
+            init_logger(&path.join("data"));
+            tracing::info!("应用启动");
+
             let app_handle = app.handle().clone();
             apply_saved_window_position(&app_handle);
             setup_window_position_tracking(&app_handle);

@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { 
     CheckCircle2, Sparkles, History, RefreshCw, Loader2, 
@@ -158,7 +158,7 @@ interface Release {
 
 interface InstalledVersionInfo {
     version: string;
-    has_node_modules: boolean;
+    hasNodeModules: boolean;
 }
 
 const releases = ref<Release[]>([]);
@@ -189,7 +189,7 @@ const isInstalled = (tagName: string) => {
 
 const hasDependencies = (tagName: string) => {
     const v = installedVersions.value.find(v => v.version === tagName);
-    return v ? v.has_node_modules : false;
+    return v ? v.hasNodeModules : false;
 };
 
 const formatDate = (dateString: string) => {
@@ -355,11 +355,7 @@ const handleInstallDependencies = async (version: string) => {
 
     try {
         await invoke('install_sillytavern_dependencies', { version });
-        
-        // Refresh installed list on success
-        installedVersions.value = await invoke('get_installed_versions_info');
-        toast.success(`版本 ${version} 依赖安装完成`);
-        
+        // 同理，这里的依赖安装也是后台异步执行，实际完成会通过 installState.status === 'done' 触发 watcher
     } catch (e) {
         installState.status = 'error';
         installState.logs.push(`错误: ${String(e)}`);
@@ -397,13 +393,9 @@ const handleInstall = async (release: Release) => {
             url: downloadUrl 
         });
         
-        // Refresh installed list on success
-        installedVersions.value = await invoke('get_installed_versions_info');
-        
-        // Also update current version if none selected? 
-        // Maybe user wants to switch manually.
-        // But we could prompt or just let them switch.
-        // For now, just refresh list.
+        // 我们之前把这里获取安装列表的逻辑提前了，但由于后端是异步 spawn 执行 npm install，
+        // 此时 node_modules 还没生成，所以获取到的 has_node_modules 会是 false。
+        // 现在我们在下方添加了 watch 监听 installState.status === 'done' 来自动刷新，所以这里不需要获取。
         
     } catch (e) {
         installState.status = 'error';
@@ -414,5 +406,18 @@ const handleInstall = async (release: Release) => {
 onMounted(() => {
     updateLastFetchTimeDisplay();
     refresh();
+});
+
+// 监听安装状态，如果安装成功则自动刷新列表，更新依赖状态
+watch(() => installState.status, (newStatus) => {
+    if (newStatus === 'done') {
+        // 当状态变为 done 时，说明 npm install 或者解压等已经彻底完成
+        // 此时 node_modules 已经存在，我们重新获取列表以更新 hasNodeModules
+        invoke('get_installed_versions_info').then(installed => {
+            installedVersions.value = installed as InstalledVersionInfo[];
+        }).catch(e => {
+            console.error('Failed to update installed versions after install done:', e);
+        });
+    }
 });
 </script>
