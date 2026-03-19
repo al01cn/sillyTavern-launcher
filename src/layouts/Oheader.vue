@@ -22,17 +22,9 @@ const checkCanClose = () => {
     return true;
 };
 
-const forceClose = async () => {
-    if (unlistenClose) {
-        unlistenClose();
-        unlistenClose = null;
-    }
-    await appWindow.close();
-};
-
 const close = async () => {
     if (!checkCanClose()) return;
-    await forceClose();
+    await appWindow.close();
 };
 
 const minimize = async () => {
@@ -41,11 +33,8 @@ const minimize = async () => {
 
 onMounted(async () => {
     unlistenClose = await appWindow.onCloseRequested(async (event) => {
-        // 完全接管关闭事件
-        event.preventDefault();
-        
-        if (checkCanClose()) {
-            await forceClose();
+        if (!checkCanClose()) {
+            event.preventDefault();
         }
     });
 });
