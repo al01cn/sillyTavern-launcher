@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, ref, nextTick } from 'vue';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { installState, resetInstallState } from '../lib/useInstall';
 import { CheckCircle2, Loader2, XCircle, Terminal } from 'lucide-vue-next';
 
@@ -32,6 +33,9 @@ onMounted(async () => {
         // Add log if not duplicate of last log (optional, but good for cleanliness)
         if (installState.logs.length === 0 || installState.logs[installState.logs.length - 1] !== log) {
             installState.logs.push(log);
+            if (installState.logs.length > 300) {
+                installState.logs.shift();
+            }
             scrollToBottom();
         }
     });
@@ -46,6 +50,19 @@ onUnmounted(() => {
 const close = () => {
     if (installState.status === 'done' || installState.status === 'error') {
         resetInstallState();
+    }
+};
+
+const cancel = async () => {
+    if (installState.isCanceling) return;
+    
+    try {
+        installState.isCanceling = true;
+        await invoke('cancel_install');
+        resetInstallState();
+    } catch (e) {
+        console.error('Failed to cancel:', e);
+        installState.isCanceling = false;
     }
 };
 
@@ -106,7 +123,20 @@ const close = () => {
             </div>
 
             <!-- Footer -->
-            <div class="p-5 border-t border-slate-100 bg-white flex justify-end">
+            <div class="p-5 border-t border-slate-100 bg-white flex justify-end gap-3">
+                <button 
+                    v-if="['downloading', 'extracting'].includes(installState.status)"
+                    @click="cancel"
+                    :disabled="installState.isCanceling"
+                    :class="[
+                        'px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm',
+                        installState.isCanceling 
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                            : 'bg-red-50 text-red-500 hover:bg-red-100 active:scale-95'
+                    ]"
+                >
+                    {{ installState.isCanceling ? '正在取消...' : '取消' }}
+                </button>
                 <button 
                     @click="close"
                     :disabled="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)"

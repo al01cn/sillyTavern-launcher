@@ -1,18 +1,60 @@
 <script lang="ts" setup>
+import { onMounted, onUnmounted } from 'vue';
 import { PhMinus, PhX, PhPlay, PhList, PhClock, PhPlug, PhWrench, PhTerminalWindow, PhGear } from '@phosphor-icons/vue';
 import config from '../lib/config'
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { installState } from '../lib/useInstall';
+import { Dialog } from '../lib/useDialog';
 
 const appWindow = getCurrentWindow();
+let unlistenClose: (() => void) | null = null;
+
+const checkCanClose = () => {
+    if (installState.show && ['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)) {
+        Dialog.warning({
+            title: '警告',
+            msg: '正在下载或删除版本，请等待完成',
+            showCancel: false,
+            confirmText: '我知道了'
+        });
+        return false;
+    }
+    return true;
+};
+
+const forceClose = async () => {
+    if (unlistenClose) {
+        unlistenClose();
+        unlistenClose = null;
+    }
+    await appWindow.close();
+};
 
 const close = async () => {
-    await appWindow.close();
+    if (!checkCanClose()) return;
+    await forceClose();
 };
 
 const minimize = async () => {
     await appWindow.minimize();
 };
 
+onMounted(async () => {
+    unlistenClose = await appWindow.onCloseRequested(async (event) => {
+        // 完全接管关闭事件
+        event.preventDefault();
+        
+        if (checkCanClose()) {
+            await forceClose();
+        }
+    });
+});
+
+onUnmounted(() => {
+    if (unlistenClose) {
+        unlistenClose();
+    }
+});
 </script>
 
 <template>

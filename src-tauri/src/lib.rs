@@ -13,6 +13,10 @@ struct ProcessState {
     kill_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<()>>>>,
 }
 
+struct InstallState {
+    cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+}
+
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
     status: String,
@@ -378,7 +382,12 @@ async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(
 }
 
 #[tauri::command]
-async fn install_sillytavern_version(app: AppHandle, version: String, url: String) -> Result<(), String> {
+fn cancel_install(state: tauri::State<'_, InstallState>) {
+    state.cancel_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+async fn install_sillytavern_version(app: AppHandle, state: tauri::State<'_, InstallState>, version: String, url: String) -> Result<(), String> {
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let sillytavern_dir = data_dir.join("sillytavern").join(&version);
     
@@ -387,6 +396,8 @@ async fn install_sillytavern_version(app: AppHandle, version: String, url: Strin
     }
     
     fs::create_dir_all(&sillytavern_dir).map_err(|e| e.to_string())?;
+
+    state.cancel_flag.store(false, std::sync::atomic::Ordering::Relaxed);
 
     let emit_progress = |status: &str, progress: f64, log: &str| {
         let _ = app.emit("install-progress", DownloadProgress {
@@ -415,6 +426,14 @@ async fn install_sillytavern_version(app: AppHandle, version: String, url: Strin
     let mut stream = response.bytes_stream();
 
     while let Some(item) = stream.next().await {
+        // Only check cancel flag periodically or do it fast
+        if state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = fs::remove_file(&temp_zip_path);
+            let _ = fs::remove_dir_all(&sillytavern_dir);
+            emit_progress("error", 0.0, "下载已取消");
+            return Err("下载已取消".to_string());
+        }
+
         let chunk = item.map_err(|e| e.to_string())?;
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
@@ -442,6 +461,13 @@ async fn install_sillytavern_version(app: AppHandle, version: String, url: Strin
     let total_files = archive.len();
     
     for i in 0..total_files {
+        if i % 10 == 0 && state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = fs::remove_file(&temp_zip_path);
+            let _ = fs::remove_dir_all(&sillytavern_dir);
+            emit_progress("error", 0.0, "解压已取消");
+            return Err("解压已取消".to_string());
+        }
+
         let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
         let outpath = match file.enclosed_name() {
             Some(path) => path.to_owned(),
@@ -1566,8 +1592,100 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
          return Err("无效的版本号".to_string());
     }
 
-    fs::remove_dir_all(&version_dir).map_err(|e| format!("删除失败: {}", e))?;
-    Ok(())
+    let app_clone = app.clone();
+    let version_dir_clone = version_dir.clone();
+    let version_clone = version.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let _ = app_clone.emit("install-progress", DownloadProgress {
+            status: "deleting".to_string(),
+            progress: 0.1,
+            log: format!("开始删除版本 {}...", version_clone),
+        });
+        
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let _ = app_clone.emit("install-progress", DownloadProgress {
+            status: "deleting".to_string(),
+            progress: 0.3,
+            log: format!("正在快速清理版本 {} 的全部文件...", version_clone),
+        });
+
+        // Collect some top-level file/dir names to simulate progress
+        let mut sample_paths = Vec::new();
+        if let Ok(entries) = fs::read_dir(&version_dir_clone) {
+            for entry in entries.flatten() {
+                if let Ok(name) = entry.file_name().into_string() {
+                    sample_paths.push(name);
+                }
+            }
+        }
+
+        let total_samples = sample_paths.len();
+        // Emit fake deletion logs for files to give visual feedback
+        for (i, name) in sample_paths.iter().enumerate() {
+            std::thread::sleep(std::time::Duration::from_millis(15));
+            let _ = app_clone.emit("install-progress", DownloadProgress {
+                status: "deleting".to_string(),
+                progress: 0.3 + (0.5 * (i as f64 / total_samples as f64)),
+                log: format!("已删除：{}/{}", version_clone, name),
+            });
+        }
+
+        fn fast_remove_dir_all(dir: &Path) -> io::Result<()> {
+            if dir.is_dir() {
+                if let Ok(entries) = fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Ok(file_type) = entry.file_type() {
+                            if file_type.is_dir() {
+                                let _ = fast_remove_dir_all(&path);
+                            } else {
+                                if let Err(_e) = fs::remove_file(&path) {
+                                    #[cfg(target_os = "windows")]
+                                    {
+                                        if let Ok(mut perms) = fs::metadata(&path).map(|m| m.permissions()) {
+                                            if perms.readonly() {
+                                                perms.set_readonly(false);
+                                                let _ = fs::set_permissions(&path, perms);
+                                                let _ = fs::remove_file(&path);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let _ = fs::remove_dir(dir);
+            }
+            Ok(())
+        }
+        
+        let _ = fast_remove_dir_all(&version_dir_clone);
+        
+        // Finally, ensure the directory is completely removed using standard library
+        // to handle any edge cases
+        if version_dir_clone.exists() {
+            if let Err(e) = fs::remove_dir_all(&version_dir_clone) {
+                return Err(e);
+            }
+        }
+        
+        let _ = app_clone.emit("install-progress", DownloadProgress {
+            status: "deleting".to_string(),
+            progress: 1.0,
+            log: format!("版本 {} 的文件已全部删除完成", version_clone),
+        });
+        
+        Ok(())
+    }).await;
+
+    match result {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(format!("删除失败: {}", e)),
+        Err(e) => Err(format!("任务执行失败: {}", e)),
+    }
 }
 
 #[tauri::command]
@@ -2061,48 +2179,70 @@ struct ExtensionInfo {
     id: String,
     manifest: ExtensionManifest,
     dir_path: String,
+    enabled: bool,
+    is_official: bool,
+    scope: String, // "global" or "user"
 }
 
 #[tauri::command]
-fn get_extensions(app: tauri::AppHandle) -> Result<Vec<ExtensionInfo>, String> {
+fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<ExtensionInfo>, String> {
     let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
-    let extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
-    
-    if !extensions_dir.exists() {
-        return Ok(vec![]);
-    }
-    
     let mut extensions = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(extensions_dir) {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    let manifest_path = entry.path().join("manifest.json");
-                    if manifest_path.exists() {
-                        if let Ok(content) = std::fs::read_to_string(&manifest_path) {
-                            if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&content) {
-                                extensions.push(ExtensionInfo {
-                                    id: entry.file_name().to_string_lossy().to_string(),
-                                    manifest,
-                                    dir_path: entry.path().to_string_lossy().to_string(),
-                                });
-                            } else {
-                                let value: Result<serde_json::Value, _> = serde_json::from_str(&content);
-                                if let Ok(val) = value {
-                                    let mut m = ExtensionManifest::default();
-                                    if let Some(obj) = val.as_object() {
-                                        m.display_name = obj.get("display_name").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        m.author = obj.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        m.version = obj.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        m.home_page = obj.get("homePage").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        m.auto_update = obj.get("auto_update").and_then(|v| v.as_bool());
-                                        m.minimum_client_version = obj.get("minimum_client_version").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                    }
-                                    extensions.push(ExtensionInfo {
+    
+    // Helper function to scan a directory for extensions
+    let scan_dir = |dir_path: &PathBuf, is_official: bool, scope: &str, exts: &mut Vec<ExtensionInfo>| {
+        if !dir_path.exists() {
+            return;
+        }
+        if let Ok(entries) = std::fs::read_dir(dir_path) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        // Skip the third-party folder itself when scanning official extensions
+                        if is_official && entry.file_name() == "third-party" {
+                            continue;
+                        }
+                        
+                        let mut manifest_path = entry.path().join("manifest.json");
+                        let mut enabled = true;
+                        
+                        if !manifest_path.exists() {
+                            manifest_path = entry.path().join("manifest.json.disable");
+                            enabled = false;
+                        }
+                        
+                        if manifest_path.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                                if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&content) {
+                                    exts.push(ExtensionInfo {
                                         id: entry.file_name().to_string_lossy().to_string(),
-                                        manifest: m,
+                                        manifest,
                                         dir_path: entry.path().to_string_lossy().to_string(),
+                                        enabled,
+                                        is_official,
+                                        scope: scope.to_string(),
                                     });
+                                } else {
+                                    let value: Result<serde_json::Value, _> = serde_json::from_str(&content);
+                                    if let Ok(val) = value {
+                                        let mut m = ExtensionManifest::default();
+                                        if let Some(obj) = val.as_object() {
+                                            m.display_name = obj.get("display_name").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                            m.author = obj.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                            m.version = obj.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                            m.home_page = obj.get("homePage").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                            m.auto_update = obj.get("auto_update").and_then(|v| v.as_bool());
+                                            m.minimum_client_version = obj.get("minimum_client_version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        }
+                                        exts.push(ExtensionInfo {
+                                            id: entry.file_name().to_string_lossy().to_string(),
+                                            manifest: m,
+                                            dir_path: entry.path().to_string_lossy().to_string(),
+                                            enabled,
+                                            is_official,
+                                            scope: scope.to_string(),
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -2110,15 +2250,75 @@ fn get_extensions(app: tauri::AppHandle) -> Result<Vec<ExtensionInfo>, String> {
                 }
             }
         }
+    };
+
+    // 1. User Extensions (Current User)
+    let user_extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
+    scan_dir(&user_extensions_dir, false, "user", &mut extensions);
+    
+    // If a version is provided, scan global extensions for that version
+    if !version.is_empty() {
+        // 2. Global Official Extensions
+        let global_official_dir = data_dir.join("sillytavern").join(&version).join("public").join("scripts").join("extensions");
+        scan_dir(&global_official_dir, true, "global", &mut extensions);
+        
+        // 3. Global Third-Party Extensions
+        let global_third_party_dir = global_official_dir.join("third-party");
+        scan_dir(&global_third_party_dir, false, "global", &mut extensions);
     }
     
     Ok(extensions)
 }
 
 #[tauri::command]
-fn toggle_extension_auto_update(app: tauri::AppHandle, id: String, auto_update: bool) -> Result<(), String> {
-    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
-    let manifest_path = data_dir.join("st_data").join("default-user").join("extensions").join(&id).join("manifest.json");
+fn toggle_extension_enable(_app: tauri::AppHandle, _id: String, enable: bool, dir_path: String) -> Result<(), String> {
+    let extension_dir = PathBuf::from(&dir_path);
+    
+    if !extension_dir.exists() {
+        return Err("扩展目录不存在".to_string());
+    }
+    
+    let manifest_path = extension_dir.join("manifest.json");
+    let disabled_manifest_path = extension_dir.join("manifest.json.disable");
+    
+    if enable {
+        if disabled_manifest_path.exists() {
+            std::fs::rename(&disabled_manifest_path, &manifest_path).map_err(|e| e.to_string())?;
+        } else if !manifest_path.exists() {
+            return Err("未找到清单文件".to_string());
+        }
+    } else {
+        if manifest_path.exists() {
+            std::fs::rename(&manifest_path, &disabled_manifest_path).map_err(|e| e.to_string())?;
+        } else if !disabled_manifest_path.exists() {
+            return Err("未找到清单文件".to_string());
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_extension(_app: tauri::AppHandle, _id: String, dir_path: String) -> Result<(), String> {
+    let extension_dir = PathBuf::from(&dir_path);
+    
+    if !extension_dir.exists() {
+        return Err("扩展目录不存在".to_string());
+    }
+    
+    std::fs::remove_dir_all(&extension_dir).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn toggle_extension_auto_update(_app: tauri::AppHandle, _id: String, auto_update: bool, dir_path: String) -> Result<(), String> {
+    let extension_dir = PathBuf::from(&dir_path);
+    
+    let mut manifest_path = extension_dir.join("manifest.json");
+    if !manifest_path.exists() {
+        manifest_path = extension_dir.join("manifest.json.disable");
+    }
     
     if !manifest_path.exists() {
         return Err("扩展清单不存在".to_string());
@@ -2138,9 +2338,17 @@ fn toggle_extension_auto_update(app: tauri::AppHandle, id: String, auto_update: 
 }
 
 #[tauri::command]
-fn open_extension_folder(app: tauri::AppHandle) -> Result<(), String> {
+fn open_extension_folder(app: tauri::AppHandle, scope: String, version: String) -> Result<(), String> {
     let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
-    let extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
+    
+    let extensions_dir = if scope == "global" {
+        if version.is_empty() {
+            return Err("未指定酒馆版本，无法打开全局扩展目录".to_string());
+        }
+        data_dir.join("sillytavern").join(&version).join("public").join("scripts").join("extensions")
+    } else {
+        data_dir.join("st_data").join("default-user").join("extensions")
+    };
     
     if !extensions_dir.exists() {
         std::fs::create_dir_all(&extensions_dir).map_err(|e| e.to_string())?;
@@ -2170,12 +2378,47 @@ fn open_extension_folder(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn open_specific_extension_folder(_app: tauri::AppHandle, dir_path: String) -> Result<(), String> {
+    let extension_dir = PathBuf::from(&dir_path);
+    
+    if !extension_dir.exists() {
+        return Err("扩展目录不存在".to_string());
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&extension_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&extension_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&extension_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             app.manage(ProcessState {
                 kill_tx: Arc::new(Mutex::new(None)),
+            });
+            app.manage(InstallState {
+                cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             });
             let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
             if path.ends_with("src-tauri") {
@@ -2198,6 +2441,7 @@ pub fn run() {
             get_installed_sillytavern_versions,
             switch_sillytavern_version,
             install_sillytavern_version,
+            cancel_install,
             get_app_config,
             save_app_config,
             fetch_github_proxies,
@@ -2220,8 +2464,11 @@ pub fn run() {
             stop_sillytavern,
             check_sillytavern_status,
             get_extensions,
+            toggle_extension_enable,
+            delete_extension,
             toggle_extension_auto_update,
-            open_extension_folder
+            open_extension_folder,
+            open_specific_extension_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

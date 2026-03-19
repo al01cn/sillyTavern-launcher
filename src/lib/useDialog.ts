@@ -16,8 +16,12 @@ interface DialogOptions {
     closeOnMask?: boolean
     confirmText?: string
     cancelText?: string
+    showCancel?: boolean
+    thirdBtnText?: string
     onConfirm?: () => void
     onCancel?: () => void
+    onThirdBtn?: () => void
+    onClose?: () => void
 }
 
 export const dialogState = reactive({
@@ -28,9 +32,13 @@ export const dialogState = reactive({
     closeOnMask: true,
     confirmText: '确定',
     cancelText: '取消',
+    showCancel: true,
+    thirdBtnText: '',
     // 存储回调函数
     onConfirm: undefined as (() => void) | undefined,
-    onCancel: undefined as (() => void) | undefined
+    onCancel: undefined as (() => void) | undefined,
+    onThirdBtn: undefined as (() => void) | undefined,
+    onClose: undefined as (() => void) | undefined
 })
 
 /**
@@ -41,16 +49,18 @@ export const dialogState = reactive({
 const openDialog = (type: keyof typeof typeConfig, options: DialogOptions) => {
     dialogState.type = type
     dialogState.title = options.title || '提示'
-    dialogState.msg = options.msg || '' 
-    dialogState.msg = options.context || ''
-    dialogState.msg = options.message || ''
+    dialogState.msg = options.msg || options.context || options.message || ''
     dialogState.closeOnMask = options.closeOnMask ?? true
     dialogState.confirmText = options.confirmText || '确定'
     dialogState.cancelText = options.cancelText || '取消'
+    dialogState.showCancel = options.showCancel ?? true
+    dialogState.thirdBtnText = options.thirdBtnText || ''
 
     // 绑定传入的函数
     dialogState.onConfirm = options.onConfirm
     dialogState.onCancel = options.onCancel
+    dialogState.onThirdBtn = options.onThirdBtn
+    dialogState.onClose = options.onClose
 
     dialogState.show = true
 }

@@ -1,13 +1,17 @@
 <script lang="ts" setup>
 import { dialogState, typeConfig } from '../lib/useDialog'
-import { CheckCircle2, AlertTriangle, Info, Loader2, XCircle } from 'lucide-vue-next'
+import { CheckCircle2, AlertTriangle, Info, Loader2, XCircle, X } from 'lucide-vue-next'
 
-const handleAction = (isConfirm: boolean) => {
+const handleAction = (action: 'confirm' | 'cancel' | 'third' | 'close') => {
     // 1. 执行回调
-    if (isConfirm) {
+    if (action === 'confirm') {
         dialogState.onConfirm?.()
-    } else {
+    } else if (action === 'cancel') {
         dialogState.onCancel?.()
+    } else if (action === 'third') {
+        dialogState.onThirdBtn?.()
+    } else if (action === 'close') {
+        dialogState.onClose?.()
     }
 
     // 2. 关闭弹窗动画
@@ -16,13 +20,13 @@ const handleAction = (isConfirm: boolean) => {
 
 const handleMaskClick = () => {
     if (!dialogState.closeOnMask) return
-    handleAction(false)
+    handleAction('close')
 }
 </script>
 
 <template>
     <div :class="[
-        'absolute inset-0 z-200 flex items-center justify-center px-4 transition-all duration-300',
+        'absolute inset-0 z-[300] flex items-center justify-center px-4 transition-all duration-300',
         dialogState.show ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
     ]">
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md" @click="handleMaskClick"></div>
@@ -31,6 +35,14 @@ const handleMaskClick = () => {
             'modal-content relative bg-white w-full max-w-85 rounded-4xl shadow-modal border border-slate-100 overflow-hidden transition-all duration-300 transform',
             dialogState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
         ]">
+            <!-- Close Button -->
+            <button 
+                @click="handleAction('close')"
+                class="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors z-10"
+            >
+                <X class="w-5 h-5" />
+            </button>
+
             <div class="p-8 text-center">
                 <div :class="[
                     'w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5',
@@ -51,11 +63,15 @@ const handleMaskClick = () => {
             </div>
 
             <div v-if="dialogState.type !== 'loading'" class="flex gap-2.5 p-5 pt-0">
-                <button @click="handleAction(false)"
+                <button v-if="dialogState.showCancel" @click="handleAction('cancel')"
                     class="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors text-[13px]">
                     {{ dialogState.cancelText }}
                 </button>
-                <button @click="handleAction(true)" :class="[
+                <button v-if="dialogState.thirdBtnText" @click="handleAction('third')"
+                    class="flex-1 py-3 rounded-xl font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 transition-colors text-[13px]">
+                    {{ dialogState.thirdBtnText }}
+                </button>
+                <button @click="handleAction('confirm')" :class="[
                     'flex-1 py-3 rounded-xl font-bold text-white transition-all active:scale-95 text-[13px]',
                     typeConfig[dialogState.type].bg
                 ]">

@@ -95,10 +95,35 @@ const loadConfig = async () => {
 
   globalLoadConfigPromise = (async () => {
     try {
-      loading.value = true;
+      // 先尝试从缓存中读取，实现秒开
+      const cachedConfig = localStorage.getItem('app_settings_config_cache');
+      if (cachedConfig) {
+        try {
+          config.value = JSON.parse(cachedConfig);
+          loading.value = false;
+        } catch (e) {
+          console.error('缓存解析失败:', e);
+          loading.value = true;
+        }
+      } else {
+        loading.value = true;
+      }
+
+      // 后台静默获取最新配置
       const res = await invoke<AppConfig>('get_app_config');
-      config.value = res;
-      // Wait for watcher to trigger before enabling save
+      const resStr = JSON.stringify(res);
+
+      if (resStr !== cachedConfig) {
+        // 如果接口数据与缓存不一致，更新缓存并静默刷新界面
+        // 注意：由于下面有一个 watch(config, ...) 自动保存逻辑
+        // 我们需要一种机制避免初次读取后触发无意义的保存，
+        // 这里 loading.value 状态可以用于控制 watch，我们暂时保持为 true
+        loading.value = true; 
+        config.value = res;
+        localStorage.setItem('app_settings_config_cache', resStr);
+      }
+
+      // 等待 DOM 更新后解除 loading 状态，这样 watch 里如果判断 loading=false 才会去保存
       await nextTick();
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -115,6 +140,18 @@ const loadConfig = async () => {
 const saveConfig = async () => {
   try {
     await invoke('save_app_config', { config: config.value });
+    
+    // 保存成功后同时更新本地缓存，合并现有数据以免覆盖其他模块追加的数据(如 sillytavern.version)
+    const cachedStr = localStorage.getItem('app_settings_config_cache');
+    let mergedConfig = { ...config.value };
+    if (cachedStr) {
+        try {
+            const cached = JSON.parse(cachedStr);
+            mergedConfig = { ...cached, ...config.value };
+        } catch(e) {}
+    }
+    localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
+    
     // toast.success('设置已保存'); // Remove toast for real-time save to avoid spam
     console.log('Config saved');
   } catch (error) {

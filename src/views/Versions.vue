@@ -25,11 +25,17 @@
     <!-- Versions List -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-slate-800 flex items-center gap-2">
-          <History class="w-5 h-5 text-slate-400" />
-          版本列表
-        </h3>
-        <button @click="refresh" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-lg hover:bg-slate-50">
+        <div class="flex items-center gap-3">
+          <h3 class="font-bold text-slate-800 flex items-center gap-2">
+            <History class="w-5 h-5 text-slate-400" />
+            版本列表
+          </h3>
+          <span v-if="lastFetchTimeDisplay" class="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 flex items-center gap-1">
+            <Clock class="w-3 h-3" />
+            上次同步: {{ lastFetchTimeDisplay }}
+          </span>
+        </div>
+        <button @click="refresh(true)" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-lg hover:bg-slate-50" title="强制刷新版本列表">
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
         </button>
       </div>
@@ -161,6 +167,14 @@ const currentVersion = ref('');
 const loading = ref(false);
 const switchingVersion = ref<string | null>(null);
 const deletingVersions = ref<Set<string>>(new Set());
+const lastFetchTimeDisplay = ref('');
+
+const updateLastFetchTimeDisplay = () => {
+    const lastFetch = localStorage.getItem('sillytavern_releases_last_fetch');
+    if (lastFetch) {
+        lastFetchTimeDisplay.value = formatDate(new Date(Number(lastFetch)).toISOString());
+    }
+};
 
 const latestVersion = computed(() => {
     if (releases.value.length > 0) {
@@ -188,20 +202,77 @@ const formatDate = (dateString: string) => {
     });
 };
 
-const refresh = async () => {
-    loading.value = true;
-    try {
-        // Fetch releases
-        releases.value = await invoke('fetch_sillytavern_releases');
-        
-        // Fetch installed
-        installedVersions.value = await invoke('get_installed_versions_info');
-        
-        // Fetch config for current version
-        const config: any = await invoke('get_app_config');
-        if (config.sillytavern && config.sillytavern.version) {
-            currentVersion.value = config.sillytavern.version;
+const refresh = async (forceUpdate = false) => {
+    // 尝试从缓存中加载版本列表，实现秒开
+    const cachedReleases = localStorage.getItem('sillytavern_releases_cache');
+    const lastFetchTime = localStorage.getItem('sillytavern_releases_last_fetch');
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    
+    let shouldUseCache = false;
+
+    if (cachedReleases) {
+        try {
+            const parsed = JSON.parse(cachedReleases);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                releases.value = parsed;
+                
+                // 如果不是强制刷新，并且距离上次获取还没超过一周，则不再请求接口
+                if (!forceUpdate && lastFetchTime && (now - Number(lastFetchTime) < ONE_WEEK_MS)) {
+                    shouldUseCache = true;
+                }
+            }
+        } catch (e) {
+            console.error('缓存解析失败:', e);
         }
+    }
+
+    // 更新本地安装和配置状态（不需要等太久，每次进入都可以更新）
+    try {
+        const [installed] = await Promise.all([
+            invoke('get_installed_versions_info')
+        ]);
+        
+        installedVersions.value = installed as InstalledVersionInfo[];
+        
+        let versionFromConfig = '';
+        const cachedConfig = localStorage.getItem('app_settings_config_cache');
+        if (cachedConfig) {
+            try {
+                const parsed = JSON.parse(cachedConfig);
+                if (parsed?.sillytavern?.version) {
+                    versionFromConfig = parsed.sillytavern.version;
+                }
+            } catch(e) {}
+        }
+        
+        if (!versionFromConfig) {
+            const config: any = await invoke('get_app_config');
+            if (config?.sillytavern?.version) {
+                versionFromConfig = config.sillytavern.version;
+            }
+        }
+        currentVersion.value = versionFromConfig;
+
+        // 如果可以使用缓存并且不是强制刷新，则结束
+        if (shouldUseCache) {
+            return;
+        }
+
+        // 否则后台静默请求最新版本列表
+        loading.value = true;
+        const fetchedReleases = await invoke<Release[]>('fetch_sillytavern_releases');
+        const fetchedString = JSON.stringify(fetchedReleases);
+        
+        // 只有当接口返回的数据与缓存不同，才更新列表和缓存
+        if (cachedReleases !== fetchedString) {
+            releases.value = fetchedReleases;
+            localStorage.setItem('sillytavern_releases_cache', fetchedString);
+        }
+        // 更新最后获取时间
+        localStorage.setItem('sillytavern_releases_last_fetch', now.toString());
+        updateLastFetchTimeDisplay();
+        
     } catch (e) {
         console.error(e);
         toast.error('获取数据失败: ' + String(e));
@@ -216,6 +287,22 @@ const handleSwitch = async (version: string) => {
     try {
         await invoke('switch_sillytavern_version', { version });
         currentVersion.value = version;
+        
+        // 更新全局缓存中的版本号，确保其他页面（如酒馆配置、扩展管理）能立即响应版本切换
+        const cachedConfigStr = localStorage.getItem('app_settings_config_cache');
+        if (cachedConfigStr) {
+            try {
+                const parsedConfig = JSON.parse(cachedConfigStr);
+                if (!parsedConfig.sillytavern) {
+                    parsedConfig.sillytavern = {};
+                }
+                parsedConfig.sillytavern.version = version;
+                localStorage.setItem('app_settings_config_cache', JSON.stringify(parsedConfig));
+            } catch (e) {
+                console.error('更新本地缓存版本号失败:', e);
+            }
+        }
+        
         toast.success(`已切换到版本 ${version}`);
     } catch (e) {
         toast.error('切换版本失败: ' + String(e));
@@ -325,6 +412,7 @@ const handleInstall = async (release: Release) => {
 };
 
 onMounted(() => {
+    updateLastFetchTimeDisplay();
     refresh();
 });
 </script>

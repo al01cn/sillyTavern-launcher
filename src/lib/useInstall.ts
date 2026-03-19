@@ -7,6 +7,7 @@ export interface InstallState {
     progress: number
     logs: string[]
     operation: 'install' | 'delete'
+    isCanceling?: boolean
 }
 
 export const installState = reactive<InstallState>({
@@ -15,7 +16,8 @@ export const installState = reactive<InstallState>({
     status: 'downloading',
     progress: 0,
     logs: [],
-    operation: 'install'
+    operation: 'install',
+    isCanceling: false
 })
 
 export const resetInstallState = () => {
@@ -25,4 +27,5 @@ export const resetInstallState = () => {
     installState.progress = 0
     installState.logs = []
     installState.operation = 'install'
+    installState.isCanceling = false
 }

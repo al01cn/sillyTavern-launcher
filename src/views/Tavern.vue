@@ -135,23 +135,80 @@ const isInitialLoad = ref(true);
 
 const loadConfig = async () => {
   try {
-    loading.value = true;
-    configError.value = null;
-    isInitialLoad.value = true;
-
-    // Get current version
-    const appConfig = await invoke<any>('get_app_config');
-    version.value = appConfig.sillytavern?.version || '';
-
-    if (!version.value) {
-      configError.value = '未选择酒馆版本，请先在"版本"页面选择或安装一个版本。';
-      return;
+    // 尝试从缓存加载，实现秒开
+    const cachedConfig = localStorage.getItem('tavern_config_data_cache');
+    
+    let hasCache = false;
+    
+    // 从 app_settings_config_cache 获取当前选择的版本号作为唯一真理
+    let currentVersionName = '';
+    const cachedAppConfig = localStorage.getItem('app_settings_config_cache');
+    if (cachedAppConfig) {
+      try {
+        const parsed = JSON.parse(cachedAppConfig);
+        if (parsed?.sillytavern?.version) {
+          currentVersionName = parsed.sillytavern.version;
+        }
+      } catch (e) {}
+    }
+    
+    if (!currentVersionName) {
+      const appConfig = await invoke<any>('get_app_config');
+      currentVersionName = appConfig.sillytavern?.version || '';
     }
 
-    tavernConfig.value = await invoke<TavernConfigPayload>('get_sillytavern_config_options', {
-      version: version.value
+    if (!currentVersionName) {
+      configError.value = '未选择酒馆版本，请先在"版本"页面选择或安装一个版本。';
+      loading.value = false;
+      return;
+    }
+    
+    if (cachedConfig) {
+      try {
+        const parsedConfig = JSON.parse(cachedConfig);
+        // 检查缓存的配置是否真的是当前选中版本的配置
+        // 由于 tavern_config_data_cache 中本身并没有显式存储版本号，我们通过界面状态先假设它是
+        version.value = currentVersionName;
+        tavernConfig.value = parsedConfig;
+        loading.value = false;
+        isInitialLoad.value = false; // 有缓存则立即结束初次加载状态，允许用户立刻操作
+        hasCache = true;
+      } catch (e) {
+        console.error('缓存解析失败:', e);
+        loading.value = true;
+        isInitialLoad.value = true;
+      }
+    } else {
+      loading.value = true;
+      isInitialLoad.value = true;
+    }
+
+    configError.value = null;
+
+    const fetchedConfig = await invoke<TavernConfigPayload>('get_sillytavern_config_options', {
+      version: currentVersionName
     });
-    isInitialLoad.value = false;
+    
+    const fetchedConfigStr = JSON.stringify(fetchedConfig);
+    
+    // 如果接口数据与缓存不一致，则静默更新界面和缓存
+    if (currentVersionName !== version.value || fetchedConfigStr !== cachedConfig) {
+      // 临时屏蔽 watch，防止因应用后端数据而触发无意义的自动保存
+      isInitialLoad.value = true;
+      
+      version.value = currentVersionName;
+      tavernConfig.value = fetchedConfig;
+      
+      localStorage.setItem('tavern_config_data_cache', fetchedConfigStr);
+      
+      // 延迟恢复 watch，确保数据更新完成
+      setTimeout(() => {
+        isInitialLoad.value = false;
+      }, 50);
+    } else if (!hasCache) {
+      // 如果没有缓存且数据一致（说明是首次加载完毕），也要解除初始状态
+      isInitialLoad.value = false;
+    }
 
   } catch (error: any) {
     console.error('Failed to load tavern config:', error);
