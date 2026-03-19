@@ -54,6 +54,7 @@ interface NpmRegistry {
 const activeTab = ref<'general' | 'about'>('general');
 const loading = ref(false);
 const proxyLoading = ref(false);
+let isSyncing = false;
 
 const npmRegistries: NpmRegistry[] = [
   { name: '官方源', url: 'https://registry.npmjs.org/' },
@@ -111,20 +112,40 @@ const loadConfig = async () => {
 
       // 后台静默获取最新配置
       const res = await invoke<AppConfig>('get_app_config');
-      const resStr = JSON.stringify(res);
 
-      if (resStr !== cachedConfig) {
-        // 如果接口数据与缓存不一致，更新缓存并静默刷新界面
-        // 注意：由于下面有一个 watch(config, ...) 自动保存逻辑
-        // 我们需要一种机制避免初次读取后触发无意义的保存，
-        // 这里 loading.value 状态可以用于控制 watch，我们暂时保持为 true
-        loading.value = true; 
-        config.value = res;
-        localStorage.setItem('app_settings_config_cache', resStr);
+      // 检查后端数据与当前状态是否不一致（只对比当前配置的关键字段）
+      let isDifferent = false;
+      if (!cachedConfig) {
+        isDifferent = true;
+      } else {
+        for (const key in res) {
+          if (JSON.stringify(res[key as keyof AppConfig]) !== JSON.stringify(config.value[key as keyof AppConfig])) {
+            isDifferent = true;
+            break;
+          }
+        }
       }
 
-      // 等待 DOM 更新后解除 loading 状态，这样 watch 里如果判断 loading=false 才会去保存
+      if (isDifferent) {
+        // 避免触发 watch 的自动保存
+        isSyncing = true; 
+        config.value = { ...config.value, ...res };
+        
+        // 更新缓存并保留其他模块追加的数据
+        const currentCachedStr = localStorage.getItem('app_settings_config_cache');
+        let mergedConfig = { ...res };
+        if (currentCachedStr) {
+            try {
+                const cached = JSON.parse(currentCachedStr);
+                mergedConfig = { ...cached, ...res };
+            } catch(e) {}
+        }
+        localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
+      }
+
+      // 等待 DOM 更新后解除状态
       await nextTick();
+      isSyncing = false;
     } catch (error) {
       console.error('Failed to load config:', error);
       toast.error('加载配置失败，将使用默认配置');
@@ -181,8 +202,21 @@ const selectProxy = (url: string) => {
 
 const checkNode = async () => {
   try {
+    // 优先从缓存读取
+    const cachedNode = localStorage.getItem('app_settings_node_cache');
+    if (cachedNode) {
+      try {
+        nodeInfo.value = JSON.parse(cachedNode);
+      } catch(e) {}
+    }
+
     const res = await invoke<NodeInfo>('check_nodejs');
-    nodeInfo.value = res;
+    
+    // 如果与缓存不一致，则更新缓存和状态
+    if (JSON.stringify(res) !== JSON.stringify(nodeInfo.value)) {
+      nodeInfo.value = res;
+      localStorage.setItem('app_settings_node_cache', JSON.stringify(res));
+    }
   } catch (error) {
     console.error('Failed to check nodejs:', error);
   }
@@ -190,8 +224,21 @@ const checkNode = async () => {
 
 const checkNpm = async () => {
   try {
+    // 优先从缓存读取
+    const cachedNpm = localStorage.getItem('app_settings_npm_cache');
+    if (cachedNpm) {
+      try {
+        npmInfo.value = JSON.parse(cachedNpm);
+      } catch(e) {}
+    }
+
     const res = await invoke<NpmInfo>('check_npm');
-    npmInfo.value = res;
+
+    // 如果与缓存不一致，则更新缓存和状态
+    if (JSON.stringify(res) !== JSON.stringify(npmInfo.value)) {
+      npmInfo.value = res;
+      localStorage.setItem('app_settings_npm_cache', JSON.stringify(res));
+    }
   } catch (error) {
     console.error('Failed to check npm:', error);
   }
@@ -217,7 +264,7 @@ const installNode = async () => {
 
 // Watch for config changes and save automatically
 watch(config, () => {
-  if (!loading.value) {
+  if (!loading.value && !isSyncing) {
     saveConfig();
   }
 }, { deep: true });

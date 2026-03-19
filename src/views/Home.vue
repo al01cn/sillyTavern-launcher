@@ -49,7 +49,7 @@
           <div class="flex flex-col gap-4 text-sm">
             <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
               <span class="text-slate-500 font-medium flex items-center gap-2">
-                <BoxIcon class="w-4 h-4" /> 助手版本
+                <BoxIcon class="w-4 h-4" /> 启动器版本
               </span>
               <span class="font-bold text-slate-700">{{ appVersion || '获取中...' }}</span>
             </div>
@@ -207,24 +207,75 @@ const dirs = [
 ]
 
 const fetchVersions = async () => {
+  // 优先从缓存读取
+  const cachedAppVersion = localStorage.getItem('app_settings_app_version_cache');
+  if (cachedAppVersion) appVersion.value = cachedAppVersion;
+
+  const cachedNode = localStorage.getItem('app_settings_node_cache');
+  if (cachedNode) {
+    try {
+      const parsedNode = JSON.parse(cachedNode);
+      nodeVersion.value = parsedNode.version || '未安装';
+      nodePath.value = parsedNode.path || '';
+    } catch(e) {}
+  }
+
+  const cachedConfig = localStorage.getItem('app_settings_config_cache');
+  if (cachedConfig) {
+    try {
+      const parsedConfig = JSON.parse(cachedConfig);
+      if (parsedConfig?.sillytavern?.version) {
+        tavernVersion.value = parsedConfig.sillytavern.version;
+      }
+    } catch(e) {}
+  }
+
+  // 后台静默获取最新数据并更新缓存
   try {
-    appVersion.value = await invoke('get_app_version')
+    const appVer = await invoke<string>('get_app_version');
+    if (appVer !== appVersion.value) {
+      appVersion.value = appVer;
+      localStorage.setItem('app_settings_app_version_cache', appVer);
+    }
   } catch (e) {
-    console.error(e)
+    console.error(e);
   }
 
   try {
-    const nodeInfo: any = await invoke('check_nodejs')
-    nodeVersion.value = nodeInfo.version || '未安装'
-    nodePath.value = nodeInfo.path || ''
+    const nodeInfo: any = await invoke('check_nodejs');
+    const newVersion = nodeInfo.version || '未安装';
+    const newPath = nodeInfo.path || '';
+    if (newVersion !== nodeVersion.value || newPath !== nodePath.value) {
+      nodeVersion.value = newVersion;
+      nodePath.value = newPath;
+      localStorage.setItem('app_settings_node_cache', JSON.stringify(nodeInfo));
+    }
   } catch (e) {
-    nodeVersion.value = '未安装'
+    if (nodeVersion.value !== '未安装') {
+      nodeVersion.value = '未安装';
+    }
   }
 
   try {
-    tavernVersion.value = await invoke('get_tavern_version')
+    const tavernVer = await invoke<string>('get_tavern_version');
+    if (tavernVer !== tavernVersion.value) {
+      tavernVersion.value = tavernVer;
+      
+      // 合并到全局配置缓存中
+      const currentCachedConfig = localStorage.getItem('app_settings_config_cache');
+      let mergedConfig: any = { sillytavern: { version: tavernVer } };
+      if (currentCachedConfig) {
+        try {
+          const parsed = JSON.parse(currentCachedConfig);
+          mergedConfig = { ...parsed, sillytavern: { ...(parsed.sillytavern || {}), version: tavernVer } };
+        } catch(e) {}
+      }
+      localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
+    }
   } catch (e) {
-    tavernVersion.value = '未安装'
+    if (tavernVersion.value !== '未安装') {
+      tavernVersion.value = '未安装';
+    }
   }
 }
 
