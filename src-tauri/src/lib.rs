@@ -1017,8 +1017,8 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let sillytavern_dir = app_data_dir.join("data").join("sillytavern");
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let sillytavern_dir = data_dir.join("sillytavern");
     
     if !sillytavern_dir.exists() {
         return Ok(true);
@@ -1908,11 +1908,11 @@ fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), S
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|err| io::Error::other(err.to_string()))?;
-            ensure_standard_layout(&app_data_dir)?;
+            let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            if path.ends_with("src-tauri") {
+                path.pop();
+            }
+            ensure_standard_layout(&path)?;
             let app_handle = app.handle().clone();
             apply_saved_window_position(&app_handle);
             setup_window_position_tracking(&app_handle);
