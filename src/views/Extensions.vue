@@ -55,9 +55,24 @@
           <Puzzle class="w-5 h-5 text-slate-400" />
           已安装扩展
         </h3>
-        <button @click="refresh(true)" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-lg hover:bg-slate-50">
-          <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
-        </button>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-slate-600">显示系统扩展</span>
+            <button 
+              @click="showOfficial = !showOfficial"
+              class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="showOfficial ? 'bg-blue-500' : 'bg-slate-200'"
+            >
+              <span 
+                class="inline-block h-3 w-3 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm"
+                :class="showOfficial ? 'translate-x-5' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+          <button @click="refresh(true)" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-lg hover:bg-slate-50">
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          </button>
+        </div>
       </div>
       
       <div v-if="loading && extensions.length === 0" class="p-10 text-center text-slate-400">
@@ -65,7 +80,7 @@
         <p>正在扫描扩展...</p>
       </div>
 
-      <div v-else-if="extensions.length === 0" class="p-10 text-center text-slate-400 flex flex-col items-center">
+      <div v-else-if="filteredExtensions.length === 0" class="p-10 text-center text-slate-400 flex flex-col items-center">
         <Puzzle class="w-12 h-12 mb-3 text-slate-300" />
         <p>没有找到任何扩展</p>
         <p class="text-xs mt-1">您可以点击右上角按钮打开文件夹放入扩展</p>
@@ -97,10 +112,10 @@
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide" :class="ext.scope === 'global' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'">
                     {{ ext.scope === 'global' ? '全局' : '当前用户' }}
                   </span>
-                  <!-- Official Badge -->
-                  <span v-if="ext.is_official" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold tracking-wide flex items-center gap-1">
+                  <!-- System Badge -->
+                  <span v-if="ext.is_system" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold tracking-wide flex items-center gap-1">
                     <ShieldCheck class="w-3 h-3" />
-                    官方
+                    系统
                   </span>
                 </div>
                 
@@ -139,7 +154,7 @@
               </div>
 
               <div class="flex flex-col items-end gap-3 shrink-0">
-                 <div v-if="!ext.is_official" class="flex items-center gap-2">
+                 <div v-if="!ext.is_system" class="flex items-center gap-2">
                    <!-- Enable/Disable Switch -->
                    <div class="flex items-center gap-2">
                      <span class="text-sm font-medium" :class="ext.enabled ? 'text-slate-600' : 'text-slate-400'">{{ ext.enabled ? '已启用' : '已禁用' }}</span>
@@ -166,7 +181,7 @@
                  </div>
                  
                  <!-- Auto Update Switch -->
-                 <div v-if="ext.manifest.auto_update !== undefined && ext.manifest.auto_update !== null" class="flex items-center gap-2" :class="{ 'pr-[34px]': !ext.is_official }">
+                 <div v-if="ext.manifest.auto_update !== undefined && ext.manifest.auto_update !== null" class="flex items-center gap-2" :class="{ 'pr-[34px]': !ext.is_system }">
                    <span class="text-sm text-slate-500 font-medium">自动更新</span>
                    <button 
                      @click="toggleAutoUpdate(ext)"
@@ -187,7 +202,7 @@
         <!-- Pagination Controls -->
         <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
           <span class="text-sm text-slate-500">
-            共 {{ extensions.length }} 个扩展
+            共 {{ filteredExtensions.length }} 个扩展
           </span>
           <div class="flex items-center gap-2">
             <button 
@@ -230,6 +245,7 @@ import {
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Dialog } from '../lib/useDialog';
+import { openInstallExtensionDialog } from '../lib/useExtensionInstall';
 
 interface ExtensionManifest {
     display_name?: string;
@@ -245,7 +261,7 @@ interface ExtensionInfo {
     manifest: ExtensionManifest;
     dir_path: string;
     enabled: boolean;
-    is_official: boolean;
+    is_system: boolean;
     scope: string;
 }
 
@@ -258,19 +274,43 @@ const extensions = ref<ExtensionInfo[]>([]);
 const installedVersions = ref<InstalledVersionInfo[]>([]);
 const selectedVersion = ref('');
 const loading = ref(false);
+const showOfficial = ref(false);
+
+// Filtered and sorted extensions
+const filteredExtensions = computed(() => {
+    let result = extensions.value;
+    if (!showOfficial.value) {
+        result = result.filter(ext => !ext.is_system);
+    }
+    
+    // Sort logic: 
+    // 1. User scope extensions first
+    // 2. Global third-party extensions next
+    // 3. System extensions last
+    return [...result].sort((a, b) => {
+        const getPriority = (ext: ExtensionInfo) => {
+            if (ext.scope === 'user') return 1;
+            if (ext.scope === 'global' && !ext.is_system) return 2;
+            if (ext.is_system) return 3;
+            return 4;
+        };
+        
+        return getPriority(a) - getPriority(b);
+    });
+});
 
 // Pagination
 const currentPage = ref(1);
 const itemsPerPage = 5;
 
 const totalPages = computed(() => {
-    return Math.max(1, Math.ceil(extensions.value.length / itemsPerPage));
+    return Math.max(1, Math.ceil(filteredExtensions.value.length / itemsPerPage));
 });
 
 const paginatedExtensions = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
     const end = start + itemsPerPage;
-    return extensions.value.slice(start, end);
+    return filteredExtensions.value.slice(start, end);
 });
 
 const prevPage = () => {
@@ -429,8 +469,9 @@ const openSpecificExtensionFolder = async (dirPath: string) => {
 };
 
 const handleInstallPlugin = () => {
-    toast.info('请在打开的文件夹中放入解压后的扩展，然后刷新列表');
-    openExtensionFolder();
+    openInstallExtensionDialog(selectedVersion.value, () => {
+        refresh(true);
+    });
 };
 
 const openUrl = async (url?: string) => {
@@ -493,6 +534,12 @@ const deleteExtension = (ext: ExtensionInfo) => {
             } finally {
                 Dialog.close();
             }
+        },
+        onCancel: () => {
+            Dialog.close();
+        },
+        onClose: () => {
+            Dialog.close();
         }
     });
 };

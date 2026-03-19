@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 // import { Dialog } from './lib/useDialog';
 import GlobalDialog from './components/GlobalDialog.vue';
 import InstallDialog from './components/InstallDialog.vue';
+import InstallExtensionDialog from './components/InstallExtensionDialog.vue';
 import { initConsoleState, consoleStatus } from './lib/consoleState';
 
 onMounted(async () => {
@@ -33,6 +34,8 @@ onMounted(async () => {
       <GlobalDialog />
       <!-- 安装进度框 -->
       <InstallDialog />
+      <!-- 扩展安装框 -->
+      <InstallExtensionDialog />
     </template>
     <Toaster />
   </Oheader>

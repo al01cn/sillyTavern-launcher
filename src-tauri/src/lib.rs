@@ -2180,8 +2180,107 @@ struct ExtensionInfo {
     manifest: ExtensionManifest,
     dir_path: String,
     enabled: bool,
-    is_official: bool,
+    is_system: bool,
     scope: String, // "global" or "user"
+}
+
+#[tauri::command]
+fn verify_extension_zip(zip_path: String) -> Result<ExtensionManifest, String> {
+    let file = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let name = file.name().to_string();
+        
+        if name == "manifest.json" || name.ends_with("/manifest.json") {
+            let mut contents = String::new();
+            std::io::Read::read_to_string(&mut file, &mut contents).map_err(|e| e.to_string())?;
+            
+            let manifest: ExtensionManifest = serde_json::from_str(&contents).map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
+            return Ok(manifest);
+        }
+    }
+    
+    Err("未在压缩包中找到 manifest.json 文件，这不是一个有效的扩展".to_string())
+}
+
+#[tauri::command]
+fn install_extension_zip(app: tauri::AppHandle, zip_path: String, scope: String, version: String) -> Result<(), String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
+    
+    let target_dir = if scope == "user" {
+        data_dir.join("st_data").join("default-user").join("extensions")
+    } else {
+        if version.is_empty() {
+            return Err("未指定酒馆版本，无法安装全局扩展".to_string());
+        }
+        data_dir.join("sillytavern").join(&version).join("public").join("scripts").join("extensions").join("third-party")
+    };
+    
+    if !target_dir.exists() {
+        std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    }
+    
+    let file = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    
+    let mut root_dir: Option<String> = None;
+    let mut single_root = true;
+    
+    for i in 0..archive.len() {
+        let file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let name = file.name().to_string();
+        
+        let first_component = name.split('/').next().unwrap_or("").to_string();
+        
+        if root_dir.is_none() {
+            root_dir = Some(first_component.clone());
+        } else if root_dir.as_ref().unwrap() != &first_component {
+            single_root = false;
+            break;
+        }
+    }
+    
+    let file_stem = std::path::Path::new(&zip_path)
+        .file_stem()
+        .unwrap_or(std::ffi::OsStr::new("extension"))
+        .to_string_lossy()
+        .to_string();
+        
+    let extract_target = if single_root {
+        target_dir.clone()
+    } else {
+        target_dir.join(&file_stem)
+    };
+    
+    if !extract_target.exists() {
+        std::fs::create_dir_all(&extract_target).map_err(|e| e.to_string())?;
+    }
+    
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+        
+        let target_path = extract_target.join(&outpath);
+        
+        if (*file.name()).ends_with('/') {
+            std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(p) = target_path.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut outfile = std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+        }
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -2190,7 +2289,7 @@ fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<Extensio
     let mut extensions = Vec::new();
     
     // Helper function to scan a directory for extensions
-    let scan_dir = |dir_path: &PathBuf, is_official: bool, scope: &str, exts: &mut Vec<ExtensionInfo>| {
+    let scan_dir = |dir_path: &PathBuf, is_system: bool, scope: &str, exts: &mut Vec<ExtensionInfo>| {
         if !dir_path.exists() {
             return;
         }
@@ -2199,7 +2298,7 @@ fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<Extensio
                 if let Ok(file_type) = entry.file_type() {
                     if file_type.is_dir() {
                         // Skip the third-party folder itself when scanning official extensions
-                        if is_official && entry.file_name() == "third-party" {
+                        if is_system && entry.file_name() == "third-party" {
                             continue;
                         }
                         
@@ -2219,7 +2318,7 @@ fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<Extensio
                                         manifest,
                                         dir_path: entry.path().to_string_lossy().to_string(),
                                         enabled,
-                                        is_official,
+                                        is_system,
                                         scope: scope.to_string(),
                                     });
                                 } else {
@@ -2239,7 +2338,7 @@ fn get_extensions(app: tauri::AppHandle, version: String) -> Result<Vec<Extensio
                                             manifest: m,
                                             dir_path: entry.path().to_string_lossy().to_string(),
                                             enabled,
-                                            is_official,
+                                            is_system,
                                             scope: scope.to_string(),
                                         });
                                     }
@@ -2468,7 +2567,9 @@ pub fn run() {
             delete_extension,
             toggle_extension_auto_update,
             open_extension_folder,
-            open_specific_extension_folder
+            open_specific_extension_folder,
+            verify_extension_zip,
+            install_extension_zip
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
