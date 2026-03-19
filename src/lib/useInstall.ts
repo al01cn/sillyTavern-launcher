@@ -3,9 +3,10 @@ import { reactive } from 'vue'
 export interface InstallState {
     show: boolean
     version: string
-    status: 'downloading' | 'extracting' | 'installing' | 'done' | 'error'
+    status: 'downloading' | 'extracting' | 'installing' | 'done' | 'error' | 'deleting'
     progress: number
     logs: string[]
+    operation: 'install' | 'delete'
 }
 
 export const installState = reactive<InstallState>({
@@ -13,7 +14,8 @@ export const installState = reactive<InstallState>({
     version: '',
     status: 'downloading',
     progress: 0,
-    logs: []
+    logs: [],
+    operation: 'install'
 })
 
 export const resetInstallState = () => {
@@ -22,4 +24,5 @@ export const resetInstallState = () => {
     installState.status = 'downloading'
     installState.progress = 0
     installState.logs = []
+    installState.operation = 'install'
 }

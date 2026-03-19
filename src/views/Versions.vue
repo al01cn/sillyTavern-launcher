@@ -46,7 +46,7 @@
               <div class="flex items-center gap-2 mb-1">
                 <h4 class="font-bold text-slate-800">{{ release.name || release.tag_name }}</h4>
                 <span v-if="release.tag_name === latestVersion" class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold uppercase tracking-wide">Latest</span>
-                <span v-if="installedVersions.includes(release.tag_name)" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-bold uppercase tracking-wide">Installed</span>
+                <span v-if="isInstalled(release.tag_name)" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-bold uppercase tracking-wide">Installed</span>
                 <span v-if="currentVersion === release.tag_name" class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-wide">Current</span>
               </div>
               
@@ -72,20 +72,43 @@
 
             <div class="flex flex-col gap-2 shrink-0 pt-1">
                <button 
-                 v-if="installedVersions.includes(release.tag_name)"
-                 @click="handleSwitch(release.tag_name)"
-                 :disabled="currentVersion === release.tag_name"
-                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 w-32 justify-center"
-                 :class="currentVersion === release.tag_name 
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm'"
+                 v-if="isInstalled(release.tag_name) && !hasDependencies(release.tag_name)"
+                 @click="handleInstallDependencies(release.tag_name)"
+                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 w-32 justify-center bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
                >
-                 <Power class="w-4 h-4" />
-                 {{ currentVersion === release.tag_name ? '当前使用' : '切换版本' }}
+                 <Download class="w-4 h-4" />
+                 安装依赖
                </button>
 
                <button 
-                 v-else
+                 v-else-if="isInstalled(release.tag_name)"
+                 @click="handleSwitch(release.tag_name)"
+                 :disabled="currentVersion === release.tag_name || switchingVersion !== null || deletingVersions.size > 0"
+                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 w-32 justify-center"
+                 :class="(currentVersion === release.tag_name || switchingVersion !== null || deletingVersions.size > 0)
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm'"
+               >
+                 <Power class="w-4 h-4" :class="{ 'animate-spin': switchingVersion === release.tag_name }" />
+                 {{ currentVersion === release.tag_name ? '当前使用' : (switchingVersion === release.tag_name ? '切换中...' : '切换版本') }}
+               </button>
+
+               <button 
+                 v-if="isInstalled(release.tag_name) && currentVersion !== release.tag_name"
+                 @click="handleDelete(release.tag_name)"
+                 :disabled="deletingVersions.has(release.tag_name) || switchingVersion !== null"
+                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 w-32 justify-center bg-white border shadow-sm"
+                 :class="(deletingVersions.has(release.tag_name) || switchingVersion !== null)
+                    ? 'border-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'border-red-100 text-red-500 hover:bg-red-50 hover:text-red-600'"
+               >
+                 <Loader2 v-if="deletingVersions.has(release.tag_name)" class="w-4 h-4 animate-spin" />
+                 <Trash2 v-else class="w-4 h-4" />
+                 {{ deletingVersions.has(release.tag_name) ? '删除中...' : '删除版本' }}
+               </button>
+
+               <button 
+                 v-else-if="!isInstalled(release.tag_name)"
                  @click="handleInstall(release)"
                  class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 w-32 justify-center bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200 active:scale-95"
                >
@@ -105,9 +128,10 @@ import { ref, onMounted, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { 
     CheckCircle2, Sparkles, History, RefreshCw, Loader2, 
-    Calendar, Clock, Download, Power 
+    Calendar, Clock, Download, Power, Trash2 
 } from 'lucide-vue-next';
 import { installState } from '../lib/useInstall';
+import { Dialog } from '../lib/useDialog';
 import { toast } from 'vue-sonner';
 
 interface ReleaseAsset {
@@ -126,10 +150,17 @@ interface Release {
     assets: ReleaseAsset[];
 }
 
+interface InstalledVersionInfo {
+    version: string;
+    has_node_modules: boolean;
+}
+
 const releases = ref<Release[]>([]);
-const installedVersions = ref<string[]>([]);
+const installedVersions = ref<InstalledVersionInfo[]>([]);
 const currentVersion = ref('');
 const loading = ref(false);
+const switchingVersion = ref<string | null>(null);
+const deletingVersions = ref<Set<string>>(new Set());
 
 const latestVersion = computed(() => {
     if (releases.value.length > 0) {
@@ -137,6 +168,15 @@ const latestVersion = computed(() => {
     }
     return '';
 });
+
+const isInstalled = (tagName: string) => {
+    return installedVersions.value.some(v => v.version === tagName);
+};
+
+const hasDependencies = (tagName: string) => {
+    const v = installedVersions.value.find(v => v.version === tagName);
+    return v ? v.has_node_modules : false;
+};
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('zh-CN', {
@@ -155,7 +195,7 @@ const refresh = async () => {
         releases.value = await invoke('fetch_sillytavern_releases');
         
         // Fetch installed
-        installedVersions.value = await invoke('get_installed_sillytavern_versions');
+        installedVersions.value = await invoke('get_installed_versions_info');
         
         // Fetch config for current version
         const config: any = await invoke('get_app_config');
@@ -171,12 +211,71 @@ const refresh = async () => {
 };
 
 const handleSwitch = async (version: string) => {
+    if (switchingVersion.value || deletingVersions.value.size > 0) return;
+    switchingVersion.value = version;
     try {
         await invoke('switch_sillytavern_version', { version });
         currentVersion.value = version;
         toast.success(`已切换到版本 ${version}`);
     } catch (e) {
         toast.error('切换版本失败: ' + String(e));
+    } finally {
+        switchingVersion.value = null;
+    }
+};
+
+const handleDelete = (version: string) => {
+    Dialog.warning({
+        title: '删除确认',
+        msg: `确定要删除版本 ${version} 吗？此操作不可恢复。`,
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: async () => {
+            installState.show = true;
+            installState.version = version;
+            installState.status = 'deleting';
+            installState.operation = 'delete';
+            installState.progress = 0;
+            installState.logs = [`开始删除版本 ${version}...`];
+
+            deletingVersions.value.add(version);
+            try {
+                await invoke('delete_sillytavern_version', { version });
+                installState.logs.push(`版本 ${version} 删除成功`);
+                installState.status = 'done';
+                installState.progress = 1;
+                
+                // Refresh list
+                await refresh();
+            } catch (e) {
+                installState.status = 'error';
+                installState.logs.push(`删除失败: ${String(e)}`);
+            } finally {
+                deletingVersions.value.delete(version);
+                Dialog.close();
+            }
+        }
+    });
+};
+
+const handleInstallDependencies = async (version: string) => {
+    installState.show = true;
+    installState.version = version;
+    installState.status = 'downloading';
+    installState.operation = 'install';
+    installState.progress = 0;
+    installState.logs = [`开始为版本 ${version} 安装依赖...`];
+
+    try {
+        await invoke('install_sillytavern_dependencies', { version });
+        
+        // Refresh installed list on success
+        installedVersions.value = await invoke('get_installed_versions_info');
+        toast.success(`版本 ${version} 依赖安装完成`);
+        
+    } catch (e) {
+        installState.status = 'error';
+        installState.logs.push(`错误: ${String(e)}`);
     }
 };
 
@@ -184,6 +283,7 @@ const handleInstall = async (release: Release) => {
     installState.show = true;
     installState.version = release.tag_name;
     installState.status = 'downloading';
+    installState.operation = 'install';
     installState.progress = 0;
     installState.logs = [`开始安装版本 ${release.tag_name}...`];
 
@@ -211,7 +311,7 @@ const handleInstall = async (release: Release) => {
         });
         
         // Refresh installed list on success
-        installedVersions.value = await invoke('get_installed_sillytavern_versions');
+        installedVersions.value = await invoke('get_installed_versions_info');
         
         // Also update current version if none selected? 
         // Maybe user wants to switch manually.

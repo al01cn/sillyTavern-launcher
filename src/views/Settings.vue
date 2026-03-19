@@ -1,5 +1,10 @@
+<script lang="ts">
+// Global promise to prevent concurrent loads across component instances
+let globalLoadConfigPromise: Promise<void> | null = null;
+</script>
+
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { toast } from 'vue-sonner';
@@ -11,6 +16,12 @@ interface GithubProxyConfig {
 }
 
 interface NodeInfo {
+  version: string | null;
+  path: string | null;
+  source: 'system' | 'local' | 'none';
+}
+
+interface NpmInfo {
   version: string | null;
   path: string | null;
   source: 'system' | 'local' | 'none';
@@ -64,6 +75,7 @@ const config = ref<AppConfig>({
 
 const proxies = ref<ProxyItem[]>([]);
 const nodeInfo = ref<NodeInfo>({ version: null, path: null, source: 'none' });
+const npmInfo = ref<NpmInfo>({ version: null, path: null, source: 'none' });
 const installingNode = ref(false);
 const nodeProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
 
@@ -79,16 +91,25 @@ const isNodeVersionValid = computed(() => {
 });
 
 const loadConfig = async () => {
-  try {
-    loading.value = true;
-    const res = await invoke<AppConfig>('get_app_config');
-    config.value = res;
-  } catch (error) {
-    console.error('Failed to load config:', error);
-    toast.error('加载配置失败，将使用默认配置');
-  } finally {
-    loading.value = false;
-  }
+  if (globalLoadConfigPromise) return globalLoadConfigPromise;
+
+  globalLoadConfigPromise = (async () => {
+    try {
+      loading.value = true;
+      const res = await invoke<AppConfig>('get_app_config');
+      config.value = res;
+      // Wait for watcher to trigger before enabling save
+      await nextTick();
+    } catch (error) {
+      console.error('Failed to load config:', error);
+      toast.error('加载配置失败，将使用默认配置');
+    } finally {
+      loading.value = false;
+      globalLoadConfigPromise = null;
+    }
+  })();
+
+  return globalLoadConfigPromise;
 };
 
 const saveConfig = async () => {
@@ -130,6 +151,15 @@ const checkNode = async () => {
   }
 };
 
+const checkNpm = async () => {
+  try {
+    const res = await invoke<NpmInfo>('check_npm');
+    npmInfo.value = res;
+  } catch (error) {
+    console.error('Failed to check npm:', error);
+  }
+};
+
 const installNode = async () => {
   if (installingNode.value) return;
   installingNode.value = true;
@@ -139,6 +169,7 @@ const installNode = async () => {
     await invoke('install_nodejs');
     toast.success('Node.js 安装成功');
     await checkNode();
+    await checkNpm();
   } catch (error) {
     console.error('Failed to install nodejs:', error);
     toast.error('安装失败: ' + error);
@@ -158,6 +189,7 @@ onMounted(async () => {
   await loadConfig();
   fetchProxies();
   checkNode();
+  checkNpm();
 
   await listen<DownloadProgress>('download-progress', (event) => {
     if (installingNode.value) {
@@ -332,6 +364,29 @@ onMounted(async () => {
                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                   <div class="bg-green-500 h-1.5 rounded-full transition-all duration-300" :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
                </div>
+            </div>
+
+            <div class="w-full h-px bg-slate-100"></div>
+
+            <!-- NPM Info -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
+                  <PhPackage :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700">NPM 环境</div>
+                  <div class="text-xs text-slate-500">
+                    <span v-if="npmInfo.version">
+                      当前版本: {{ npmInfo.version }} ({{ npmInfo.source === 'local' ? '内置' : '系统' }})
+                      <div v-if="npmInfo.path" class="mt-1 text-slate-400 break-all select-all">
+                        路径: {{ npmInfo.path }}
+                      </div>
+                    </span>
+                    <span v-else>未检测到 NPM 环境</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="w-full h-px bg-slate-100"></div>

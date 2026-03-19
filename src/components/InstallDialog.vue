@@ -24,7 +24,7 @@ const scrollToBottom = () => {
 onMounted(async () => {
     unlisten = await listen<DownloadProgress>('install-progress', (event) => {
         const { status, progress, log } = event.payload;
-        
+
         // Update state
         installState.status = status as any;
         installState.progress = progress;
@@ -49,9 +49,6 @@ const close = () => {
     }
 };
 
-// Calculate progress percentage
-const percentage = () => Math.round(installState.progress * 100);
-
 </script>
 
 <template>
@@ -64,56 +61,47 @@ const percentage = () => Math.round(installState.progress * 100);
 
         <!-- Modal Content -->
         <div :class="[
-            'modal-content relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transition-all duration-300 transform flex flex-col max-h-[85vh]',
-            installState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
+            'modal-content relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transition-all duration-300 transform flex flex-col',
+            installState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8',
+            'h-[600px]'
         ]">
             <!-- Header -->
             <div class="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <Loader2 v-if="['downloading', 'extracting', 'installing'].includes(installState.status)" class="w-5 h-5 animate-spin text-blue-500" />
+                        <Loader2 v-if="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)" class="w-5 h-5 animate-spin text-blue-500" />
                         <CheckCircle2 v-else-if="installState.status === 'done'" class="w-6 h-6 text-emerald-500" />
                         <XCircle v-else-if="installState.status === 'error'" class="w-6 h-6 text-red-500" />
-                        <span>安装酒馆版本 {{ installState.version }}</span>
+                        <span>{{ installState.operation === 'delete' ? '删除' : '安装' }}酒馆版本 {{ installState.version }}</span>
                     </h3>
                     <p class="text-slate-500 text-sm mt-1">
                         {{ 
                             installState.status === 'downloading' ? '正在下载文件...' : 
                             installState.status === 'extracting' ? '正在解压文件...' : 
                             installState.status === 'installing' ? '正在安装依赖...' : 
-                            installState.status === 'done' ? '安装已完成' : 
+                            installState.status === 'deleting' ? '正在删除文件...' :
+                            installState.status === 'done' ? (installState.operation === 'delete' ? '删除已完成' : '安装已完成') : 
                             '发生错误'
                         }}
                     </p>
                 </div>
-                <div class="text-right">
-                    <span class="text-2xl font-black text-slate-700">{{ percentage() }}%</span>
-                </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="h-1 bg-slate-100 w-full">
-                <div class="h-full transition-all duration-300 ease-out"
-                    :class="[
-                        installState.status === 'error' ? 'bg-red-500' : 
-                        installState.status === 'done' ? 'bg-emerald-500' : 'bg-blue-500'
-                    ]"
-                    :style="{ width: `${percentage()}%` }">
-                </div>
             </div>
 
             <!-- Terminal / Logs -->
-            <div class="flex-1 p-0 bg-slate-900 overflow-hidden flex flex-col min-h-[300px]">
-                <div class="px-4 py-2 bg-slate-800 border-b border-slate-700 flex items-center gap-2 text-xs text-slate-400 font-mono">
-                    <Terminal class="w-3 h-3" />
-                    <span>INSTALLATION LOGS</span>
+            <div class="flex-1 bg-slate-900 overflow-hidden flex flex-col">
+                <div class="px-4 h-10 bg-slate-800 border-b border-slate-700 flex items-center justify-between gap-2 text-xs text-slate-400 font-mono">
+                    <div class="flex items-center gap-2">
+                        <Terminal class="w-3 h-3" />
+                        <span>{{ installState.operation === 'delete' ? 'DELETION' : 'INSTALLATION' }} LOGS</span>
+                    </div>
                 </div>
+                
                 <div ref="logContainer" class="flex-1 p-4 overflow-y-auto font-mono text-xs text-slate-300 space-y-1">
                     <div v-for="(log, index) in installState.logs" :key="index" class="break-words">
                         <span class="text-slate-500 mr-2">[{{ new Date().toLocaleTimeString() }}]</span>
                         <span :class="log.toLowerCase().includes('error') ? 'text-red-400' : ''">{{ log }}</span>
                     </div>
-                    <div v-if="['downloading', 'extracting', 'installing'].includes(installState.status)" class="animate-pulse">_</div>
+                    <div v-if="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)" class="animate-pulse">_</div>
                 </div>
             </div>
 
@@ -121,10 +109,10 @@ const percentage = () => Math.round(installState.progress * 100);
             <div class="p-5 border-t border-slate-100 bg-white flex justify-end">
                 <button 
                     @click="close"
-                    :disabled="['downloading', 'extracting', 'installing'].includes(installState.status)"
+                    :disabled="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)"
                     :class="[
                         'px-6 py-2.5 rounded-xl font-bold transition-all',
-                        ['downloading', 'extracting', 'installing'].includes(installState.status)
+                        ['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                             : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-lg shadow-slate-200'
                     ]"
