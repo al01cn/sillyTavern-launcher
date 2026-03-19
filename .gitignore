@@ -26,3 +26,4 @@ data/logs/*
 data/sillytavern/*
 data/node/*
 data/st_data/*
+data/config.json

@@ -1,70 +1,82 @@
 <template>
-  <div class="h-full flex flex-col p-4 gap-8 text-black">
+  <div class="h-full flex flex-col gap-6 text-slate-800">
     <!-- 顶部 Banner -->
-    <div class="w-full h-48 rounded-xl overflow-hidden">
-      <img src="../assets/images/banner.png" alt="Banner" class="w-full h-full object-cover" />
+    <div class="w-full h-48 sm:h-56 rounded-2xl overflow-hidden shadow-sm relative group shrink-0">
+      <img src="../assets/images/banner.png" alt="Banner" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+      <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
 
-    <!-- 中部 目录按钮 -->
-    <div class="flex-1 bg-slate-100 p-6 rounded-xl shadow-sm border border-slate-200">
-      <h2 class="text-lg font-bold mb-4 flex items-center text-black">
-        <FolderOpenIcon class="w-5 h-5 mr-2 text-primary" />
-        快捷目录
-      </h2>
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-6">
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('root')">
-          <FolderIcon class="w-5 h-5 mr-1" />
-          根目录
-        </button>
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('data')">
-          <DatabaseIcon class="w-5 h-5 mr-1" />
-          数据目录
-        </button>
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('logs')">
-          <FileTextIcon class="w-5 h-5 mr-1" />
-          日志目录
-        </button>
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('tavern')">
-          <BeerIcon class="w-5 h-5 mr-1" />
-          酒馆目录
-        </button>
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openExtensionFolder">
-          <PuzzleIcon class="w-5 h-5 mr-1" />
-          扩展目录
-        </button>
-        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('node')">
-          <BoxIcon class="w-5 h-5 mr-1" />
-          NodeJs
-        </button>
-      </div>
-    </div>
-
-    <!-- 底部 版本信息和一键启动按钮 -->
-    <div class="flex items-center justify-between flex-shrink-0 p-6 bg-slate-100 rounded-xl shadow-sm border border-slate-200">
-      <div class="flex flex-col space-y-2 text-sm text-black/80">
-        <div class="flex items-center">
-          <span class="w-24">助手版本：</span>
-          <span class="font-medium text-black">{{ appVersion || '获取中...' }}</span>
-        </div>
-        <div class="flex items-center">
-          <span class="w-24">Node.js：</span>
-          <span class="font-medium text-black">{{ nodeVersion || '未安装' }}</span>
-        </div>
-        <div class="flex items-center">
-          <span class="w-24">酒馆版本：</span>
-          <span class="font-medium text-black">{{ tavernVersion || '未安装' }}</span>
-        </div>
-      </div>
+    <!-- 中部 快捷目录和版本信息 -->
+    <div class="flex-1 flex flex-col md:flex-row gap-6">
       
-      <button 
-        class="btn btn-lg flex items-center justify-center gap-2 px-10 h-20 rounded-2xl shadow-md hover:shadow-lg transition-all border-none text-white"
-        :class="status === 1 || status === 2 ? 'btn-error' : 'btn-primary'"
-        @click="handleToggleProcess"
-      >
-        <StopCircleIcon v-if="status === 1 || status === 2" class="w-8 h-8 fill-current" />
-        <PlayIcon v-else class="w-8 h-8 fill-current" />
-        <span class="text-2xl font-bold tracking-widest">{{ (status === 1 || status === 2) ? '停止进程' : '一键启动' }}</span>
-      </button>
+      <!-- 左侧：快捷目录 -->
+      <div class="flex-[3] bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+        <h2 class="text-lg font-bold mb-5 flex items-center text-slate-800 shrink-0">
+          <FolderOpenIcon class="w-5 h-5 mr-2 text-primary" />
+          快捷目录
+        </h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <button 
+            v-for="btn in dirs" :key="btn.id"
+            class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 hover:text-primary hover:-translate-y-1 hover:shadow-sm transition-all duration-300 group"
+            @click="btn.action"
+          >
+            <component :is="btn.icon" class="w-8 h-8 text-slate-400 group-hover:text-primary transition-colors duration-300" />
+            <span class="text-sm font-medium text-slate-700 group-hover:text-primary transition-colors">{{ btn.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧：版本信息与一键启动 -->
+      <div class="flex-[2] flex flex-col gap-6">
+        
+        <!-- 版本信息 -->
+        <div class="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
+          <h2 class="text-lg font-bold mb-5 flex items-center text-slate-800">
+            <InfoIcon class="w-5 h-5 mr-2 text-primary" />
+            系统信息
+          </h2>
+          <div class="flex flex-col gap-4 text-sm">
+            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+              <span class="text-slate-500 font-medium flex items-center gap-2">
+                <BoxIcon class="w-4 h-4" /> 助手版本
+              </span>
+              <span class="font-bold text-slate-700">{{ appVersion || '获取中...' }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+              <span class="text-slate-500 font-medium flex items-center gap-2">
+                <TerminalIcon class="w-4 h-4" /> Node.js
+              </span>
+              <span class="font-bold text-slate-700">{{ nodeVersion || '未安装' }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+              <span class="text-slate-500 font-medium flex items-center gap-2">
+                <BeerIcon class="w-4 h-4" /> 酒馆版本
+              </span>
+              <span class="font-bold text-slate-700">{{ tavernVersion || '未安装' }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 一键启动按钮 -->
+        <button 
+          class="btn shrink-0 h-24 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden"
+          :class="status === 1 || status === 2 ? 'bg-error hover:bg-error/90' : 'bg-primary hover:bg-primary/90'"
+          @click="handleToggleProcess"
+        >
+          <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+          
+          <div class="flex items-center gap-2 z-10">
+            <StopCircleIcon v-if="status === 1 || status === 2" class="w-7 h-7 fill-current animate-pulse" />
+            <PlayIcon v-else class="w-7 h-7 fill-current" />
+            <span class="text-2xl font-bold tracking-widest">{{ (status === 1 || status === 2) ? '停止进程' : '一键启动' }}</span>
+          </div>
+          <span class="text-xs font-medium opacity-90 z-10">
+            {{ (status === 1 || status === 2) ? '点击以安全关闭酒馆及相关服务' : '点击以快速启动酒馆及相关服务' }}
+          </span>
+        </button>
+
+      </div>
     </div>
   </div>
 </template>
@@ -82,7 +94,9 @@ import {
   Beer as BeerIcon, 
   Box as BoxIcon,
   Database as DatabaseIcon,
-  Puzzle as PuzzleIcon
+  Puzzle as PuzzleIcon,
+  Info as InfoIcon,
+  Terminal as TerminalIcon
 } from 'lucide-vue-next'
 import { consoleStatus as status, startProcess, stopProcess } from '../lib/consoleState'
 import { Dialog } from '../lib/useDialog'
@@ -171,6 +185,15 @@ const openExtensionFolder = async () => {
         }
     });
 };
+
+const dirs = [
+  { id: 'root', label: '根目录', icon: FolderIcon, action: () => openDir('root') },
+  { id: 'data', label: '数据目录', icon: DatabaseIcon, action: () => openDir('data') },
+  { id: 'logs', label: '日志目录', icon: FileTextIcon, action: () => openDir('logs') },
+  { id: 'tavern', label: '酒馆目录', icon: BeerIcon, action: () => openDir('tavern') },
+  { id: 'extension', label: '扩展目录', icon: PuzzleIcon, action: openExtensionFolder },
+  { id: 'node', label: 'NodeJs', icon: BoxIcon, action: () => openDir('node') },
+]
 
 const fetchVersions = async () => {
   try {
