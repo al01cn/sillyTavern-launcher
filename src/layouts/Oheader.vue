@@ -5,6 +5,7 @@ import config from '../lib/config'
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { installState } from '../lib/useInstall';
 import { Dialog } from '../lib/useDialog';
+import { consoleStatus } from '../lib/consoleState';
 
 const appWindow = getCurrentWindow();
 let unlistenClose: (() => void) | null = null;
@@ -108,8 +109,14 @@ onUnmounted(() => {
 
                 <!-- Bottom Menu -->
                 <div class="flex flex-col gap-2 px-3">
-                    <router-link to="/console" active-class="bg-slate-100 text-slate-900"
-                        class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-900 group">
+                    <router-link to="/console"
+                        :active-class="consoleStatus === 2 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'"
+                        :class="[
+                            'flex flex-col items-center justify-center w-full aspect-square rounded-xl transition-colors group',
+                            consoleStatus === 2 
+                                ? 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600' 
+                                : 'text-red-500 hover:bg-red-50 hover:text-red-600'
+                        ]">
                         <PhTerminalWindow :size="24" weight="duotone"
                             class="mb-1.5 group-hover:scale-110 transition-transform" />
                         <span class="text-[11px] font-medium">控制台</span>

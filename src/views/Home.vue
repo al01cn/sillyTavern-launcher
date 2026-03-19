@@ -32,10 +32,20 @@
         
         <!-- 版本信息 -->
         <div class="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
-          <h2 class="text-lg font-bold mb-5 flex items-center text-slate-800">
-            <InfoIcon class="w-5 h-5 mr-2 text-primary" />
-            系统信息
-          </h2>
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-bold flex items-center text-slate-800">
+              <InfoIcon class="w-5 h-5 mr-2 text-primary" />
+              系统信息
+            </h2>
+            <button 
+              v-if="status === 2 && serverUrl"
+              @click="handleOpenServer"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors group"
+            >
+              <span>访问酒馆</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </button>
+          </div>
           <div class="flex flex-col gap-4 text-sm">
             <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
               <span class="text-slate-500 font-medium flex items-center gap-2">
@@ -98,7 +108,8 @@ import {
   Info as InfoIcon,
   Terminal as TerminalIcon
 } from 'lucide-vue-next'
-import { consoleStatus as status, startProcess, stopProcess } from '../lib/consoleState'
+import { consoleStatus as status, serverUrl, startProcess, stopProcess } from '../lib/consoleState'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { Dialog } from '../lib/useDialog'
 import { toast } from 'vue-sonner'
 
@@ -224,6 +235,16 @@ const handleToggleProcess = async () => {
   } else {
     router.push('/console')
     await startProcess()
+  }
+}
+
+const handleOpenServer = async () => {
+  if (serverUrl.value) {
+    try {
+      await openUrl(serverUrl.value)
+    } catch (err) {
+      toast.error('无法打开浏览器，请重试')
+    }
   }
 }
 
