@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { 
   TerminalSquare, 
   Play, 
@@ -9,28 +9,24 @@ import {
   CheckCircle2, 
   XCircle 
 } from 'lucide-vue-next'
+import { consoleStatus as status, consoleLogs as logs, startProcess, stopProcess } from '../lib/consoleState'
 
-// 控制台状态
-// 0: 未启动, 1: 启动中, 2: 启动成功, 3: 启动失败
-const status = ref(0)
+const logsContainer = ref<HTMLElement | null>(null)
 
-// 一键启动
-const startProcess = () => {
-  if (status.value === 1 || status.value === 2) return
-  status.value = 1
-  
-  // 模拟启动过程
-  setTimeout(() => {
-    // 随机模拟成功或失败，以便查看UI效果
-    status.value = Math.random() > 0.2 ? 2 : 3
-  }, 2000)
+// 自动滚动到底部
+const scrollToBottom = () => {
+  if (logsContainer.value) {
+    logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+  }
 }
 
-// 停止进程
-const stopProcess = () => {
-  if (status.value === 0) return
-  status.value = 0
-}
+watch(logs, () => {
+  nextTick(scrollToBottom)
+}, { deep: true })
+
+onMounted(() => {
+  scrollToBottom()
+})
 </script>
 
 <template>
@@ -67,8 +63,8 @@ const stopProcess = () => {
           <span>
             <template v-if="status === 0">未启动</template>
             <template v-else-if="status === 1">启动中...</template>
-            <template v-else-if="status === 2">启动成功</template>
-            <template v-else-if="status === 3">启动失败</template>
+            <template v-else-if="status === 2">运行中</template>
+            <template v-else-if="status === 3">已停止 / 异常</template>
           </span>
         </div>
       </div>
@@ -78,7 +74,7 @@ const stopProcess = () => {
         <!-- 停止进程按钮 -->
         <button 
           @click="stopProcess"
-          :disabled="status === 0"
+          :disabled="status === 0 || status === 3"
           class="btn btn-sm btn-error btn-outline flex items-center gap-1.5 disabled:opacity-50 disabled:bg-transparent"
         >
           <StopCircle class="w-4 h-4" />
@@ -98,36 +94,30 @@ const stopProcess = () => {
     </div>
     
     <!-- 日志内容区域（深色主题） -->
-    <div class="flex-1 overflow-y-auto bg-[#1e1e2e] p-4 text-slate-300 font-mono text-sm leading-relaxed selection:bg-blue-500/30">
+    <div ref="logsContainer" class="flex-1 overflow-y-auto bg-[#1e1e2e] p-4 text-slate-300 font-mono text-sm leading-relaxed selection:bg-blue-500/30">
       <div class="max-w-full space-y-1">
         <!-- 初始提示 -->
-        <div class="flex gap-4 opacity-50">
+        <div v-if="logs.length === 0" class="flex gap-4 opacity-50">
           <span class="shrink-0 text-slate-500 w-20">System</span>
           <span>控制台已就绪，等待进程启动...</span>
         </div>
         
-        <!-- 模拟启动日志 -->
-        <template v-if="status > 0">
-          <div class="flex gap-4">
-            <span class="shrink-0 text-blue-400 w-20">Info</span>
-            <span>正在初始化酒馆环境...</span>
-          </div>
-          <div class="flex gap-4">
-            <span class="shrink-0 text-blue-400 w-20">Info</span>
-            <span>检查 Node.js 依赖...</span>
-          </div>
-        </template>
-        
-        <!-- 成功日志 -->
-        <div v-if="status === 2" class="flex gap-4 mt-2">
-          <span class="shrink-0 text-emerald-400 w-20">Success</span>
-          <span class="text-emerald-300">酒馆服务已成功启动！运行在 http://localhost:8000</span>
-        </div>
-        
-        <!-- 失败日志 -->
-        <div v-if="status === 3" class="flex gap-4 mt-2">
-          <span class="shrink-0 text-red-400 w-20">Error</span>
-          <span class="text-red-300">启动失败：环境初始化异常或端口被占用。</span>
+        <!-- 动态日志 -->
+        <div v-for="log in logs" :key="log.id" class="flex gap-4 break-all whitespace-pre-wrap">
+          <span class="shrink-0 w-20 capitalize" :class="{
+            'text-blue-400': log.type === 'info',
+            'text-emerald-400': log.type === 'success',
+            'text-red-400': log.type === 'error',
+            'text-slate-400': log.type === 'output',
+            'text-slate-500': log.type === 'system'
+          }">{{ log.type }}</span>
+          <span :class="{
+            'text-blue-300': log.type === 'info',
+            'text-emerald-300': log.type === 'success',
+            'text-red-300': log.type === 'error',
+            'text-slate-300': log.type === 'output',
+            'text-slate-400': log.type === 'system'
+          }">{{ log.text }}</span>
         </div>
       </div>
     </div>

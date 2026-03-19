@@ -62,10 +62,10 @@ const minimize = async () => {
                             class="mb-1.5 group-hover:scale-110 transition-transform" />
                         <span class="text-[11px] font-medium">版本管理</span>
                     </router-link>
-                    <router-link to="/plugins" active-class="bg-slate-100 text-slate-900"
+                    <router-link to="/extensions" active-class="bg-slate-100 text-slate-900"
                         class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-900 group">
                         <PhPlug :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
-                        <span class="text-[11px] font-medium">插件管理</span>
+                        <span class="text-[11px] font-medium">扩展管理</span>
                     </router-link>
                     <router-link to="/tools" active-class="bg-slate-100 text-slate-900"
                         class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-900 group">

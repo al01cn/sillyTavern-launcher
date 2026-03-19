@@ -1,10 +1,17 @@
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Position, WindowEvent};
+use tokio::sync::Mutex;
+use tokio::io::{AsyncBufReadExt, BufReader};
+
+struct ProcessState {
+    kill_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<()>>>>,
+}
 
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
@@ -1052,6 +1059,7 @@ fn open_directory(app: AppHandle, dir_type: String, custom_path: Option<String>)
         "root" => data_dir,
         "logs" => data_dir.join("logs"),
         "tavern" => data_dir.join("sillytavern"),
+        "data" => data_dir.join("st_data"),
         "node" => {
             if let Some(path) = custom_path {
                 let path_buf = PathBuf::from(path);
@@ -1145,10 +1153,12 @@ fn ensure_standard_layout(base_dir: &Path) -> io::Result<()> {
     let data_dir = base_dir.join("data");
     let sillytavern_dir = data_dir.join("sillytavern");
     let logs_dir = data_dir.join("logs");
+    let st_data_dir = data_dir.join("st_data");
     let config_path = data_dir.join("config.json");
 
     fs::create_dir_all(&sillytavern_dir)?;
     fs::create_dir_all(&logs_dir)?;
+    fs::create_dir_all(&st_data_dir)?;
     
     let default_config = AppConfig::default();
     let default_config_str = serde_json::to_string_pretty(&default_config).unwrap();
@@ -1876,6 +1886,132 @@ fn update_sillytavern_config_options(
 }
 
 #[tauri::command]
+async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>) -> Result<(), String> {
+    let mut kill_tx_guard = state.kill_tx.lock().await;
+    if kill_tx_guard.is_some() {
+        return Err("进程已经在运行中了".to_string());
+    }
+
+    let config = read_app_config_from_disk(&app);
+    let version = config.sillytavern.version;
+    if version.is_empty() {
+        return Err("未选择酒馆版本，请先在版本页面选择或安装".to_string());
+    }
+
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let sillytavern_dir = data_dir.join("sillytavern").join(&version);
+    
+    // 全局数据目录
+    let st_data_dir = data_dir.join("st_data");
+    if !st_data_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&st_data_dir) {
+            return Err(format!("无法创建全局数据目录: {}", e));
+        }
+    }
+
+    if !sillytavern_dir.exists() {
+        return Err(format!("版本 {} 的目录不存在，请检查是否已正确安装", version));
+    }
+
+    let node_dir = data_dir.join("node");
+    let mut node_path = if cfg!(target_os = "windows") {
+        node_dir.join("node.exe")
+    } else {
+        node_dir.join("bin/node")
+    };
+
+    if !node_path.exists() {
+        node_path = PathBuf::from("node"); // Fallback to system node
+    }
+
+    let server_js = sillytavern_dir.join("server.js");
+
+    if !server_js.exists() {
+        return Err("找不到 server.js，酒馆文件可能损坏".to_string());
+    }
+
+    let mut std_cmd = std::process::Command::new(&node_path);
+    std_cmd.arg(&server_js);
+    
+    // 使用 --dataRoot 参数来指定全局数据目录
+    let st_data_dir_str = st_data_dir.to_string_lossy().to_string();
+    std_cmd.arg("--dataRoot");
+    std_cmd.arg(&st_data_dir_str);
+    
+    std_cmd.current_dir(&sillytavern_dir);
+    // 同时设置环境变量，确保兼容性
+    std_cmd.env("SILLYTAVERN_DATA_DIR", &st_data_dir_str);
+    std_cmd.env("SillyTavern_DATA_DIR", &st_data_dir_str);
+    std_cmd.stdout(std::process::Stdio::piped());
+    std_cmd.stderr(std::process::Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        std_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let mut cmd = tokio::process::Command::from(std_cmd);
+    let mut child = cmd.spawn().map_err(|e| format!("启动进程失败: {}", e))?;
+
+    let stdout = child.stdout.take().ok_or("无法获取标准输出")?;
+    let stderr = child.stderr.take().ok_or("无法获取标准错误")?;
+
+    let app_clone1 = app.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let _ = app_clone1.emit("process-log", format!("INFO: {}", line));
+        }
+    });
+
+    let app_clone2 = app.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let _ = app_clone2.emit("process-log", format!("ERROR: {}", line));
+        }
+    });
+
+    let (kill_tx, mut kill_rx) = tokio::sync::mpsc::channel::<()>(1);
+    *kill_tx_guard = Some(kill_tx);
+
+    let app_clone3 = app.clone();
+    let kill_tx_arc = state.inner().kill_tx.clone();
+    
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = child.wait() => {
+                let _ = app_clone3.emit("process-log", "INFO: 进程已退出".to_string());
+            }
+            _ = kill_rx.recv() => {
+                let _ = child.kill().await;
+                let _ = app_clone3.emit("process-log", "INFO: 进程已被终止".to_string());
+            }
+        }
+        *kill_tx_arc.lock().await = None;
+        let _ = app_clone3.emit("process-exit", ());
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_sillytavern(state: tauri::State<'_, ProcessState>) -> Result<(), String> {
+    let mut kill_tx_guard = state.kill_tx.lock().await;
+    if let Some(kill_tx) = kill_tx_guard.take() {
+        let _ = kill_tx.send(()).await;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn check_sillytavern_status(state: tauri::State<'_, ProcessState>) -> Result<bool, String> {
+    let kill_tx_guard = state.kill_tx.lock().await;
+    Ok(kill_tx_guard.is_some())
+}
+
+#[tauri::command]
 fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), String> {
     let config_path = get_sillytavern_config_file_path(&app, &version)?;
 
@@ -1904,10 +2040,143 @@ fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), S
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+struct ExtensionManifest {
+    #[serde(rename = "display_name", default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    author: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(rename = "homePage", default)]
+    home_page: Option<String>,
+    #[serde(default)]
+    auto_update: Option<bool>,
+    #[serde(default)]
+    minimum_client_version: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ExtensionInfo {
+    id: String,
+    manifest: ExtensionManifest,
+    dir_path: String,
+}
+
+#[tauri::command]
+fn get_extensions(app: tauri::AppHandle) -> Result<Vec<ExtensionInfo>, String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
+    let extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
+    
+    if !extensions_dir.exists() {
+        return Ok(vec![]);
+    }
+    
+    let mut extensions = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(extensions_dir) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_dir() {
+                    let manifest_path = entry.path().join("manifest.json");
+                    if manifest_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                            if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&content) {
+                                extensions.push(ExtensionInfo {
+                                    id: entry.file_name().to_string_lossy().to_string(),
+                                    manifest,
+                                    dir_path: entry.path().to_string_lossy().to_string(),
+                                });
+                            } else {
+                                let value: Result<serde_json::Value, _> = serde_json::from_str(&content);
+                                if let Ok(val) = value {
+                                    let mut m = ExtensionManifest::default();
+                                    if let Some(obj) = val.as_object() {
+                                        m.display_name = obj.get("display_name").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        m.author = obj.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        m.version = obj.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        m.home_page = obj.get("homePage").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        m.auto_update = obj.get("auto_update").and_then(|v| v.as_bool());
+                                        m.minimum_client_version = obj.get("minimum_client_version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                    }
+                                    extensions.push(ExtensionInfo {
+                                        id: entry.file_name().to_string_lossy().to_string(),
+                                        manifest: m,
+                                        dir_path: entry.path().to_string_lossy().to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(extensions)
+}
+
+#[tauri::command]
+fn toggle_extension_auto_update(app: tauri::AppHandle, id: String, auto_update: bool) -> Result<(), String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
+    let manifest_path = data_dir.join("st_data").join("default-user").join("extensions").join(&id).join("manifest.json");
+    
+    if !manifest_path.exists() {
+        return Err("扩展清单不存在".to_string());
+    }
+    
+    let content = std::fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
+    let mut val: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("auto_update".to_string(), serde_json::Value::Bool(auto_update));
+    }
+    
+    let new_content = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
+    std::fs::write(manifest_path, new_content).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn open_extension_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let data_dir = get_config_path(&app).parent().unwrap_or(&std::path::PathBuf::from(".")).to_path_buf();
+    let extensions_dir = data_dir.join("st_data").join("default-user").join("extensions");
+    
+    if !extensions_dir.exists() {
+        std::fs::create_dir_all(&extensions_dir).map_err(|e| e.to_string())?;
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&extensions_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&extensions_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&extensions_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            app.manage(ProcessState {
+                kill_tx: Arc::new(Mutex::new(None)),
+            });
             let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
             if path.ends_with("src-tauri") {
                 path.pop();
@@ -1946,7 +2215,13 @@ pub fn run() {
             get_sillytavern_config_path,
             get_sillytavern_config_options,
             update_sillytavern_config_options,
-            open_sillytavern_config_file
+            open_sillytavern_config_file,
+            start_sillytavern,
+            stop_sillytavern,
+            check_sillytavern_status,
+            get_extensions,
+            toggle_extension_auto_update,
+            open_extension_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,10 +11,14 @@
         <FolderOpenIcon class="w-5 h-5 mr-2 text-primary" />
         快捷目录
       </h2>
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('root')">
           <FolderIcon class="w-5 h-5 mr-1" />
           根目录
+        </button>
+        <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('data')">
+          <DatabaseIcon class="w-5 h-5 mr-1" />
+          数据目录
         </button>
         <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('logs')">
           <FileTextIcon class="w-5 h-5 mr-1" />
@@ -26,7 +30,7 @@
         </button>
         <button class="btn btn-outline hover:bg-slate-200 bg-slate-100 border-slate-300 text-black hover:text-black" @click="openDir('node')">
           <BoxIcon class="w-5 h-5 mr-1" />
-          NodeJs目录
+          NodeJs
         </button>
       </div>
     </div>
@@ -48,9 +52,14 @@
         </div>
       </div>
       
-      <button class="btn btn-primary btn-lg flex items-center justify-center gap-2 px-10 h-20 rounded-2xl shadow-md hover:shadow-lg transition-all border-none text-white">
-        <PlayIcon class="w-8 h-8 fill-current" />
-        <span class="text-2xl font-bold tracking-widest">一键启动</span>
+      <button 
+        class="btn btn-lg flex items-center justify-center gap-2 px-10 h-20 rounded-2xl shadow-md hover:shadow-lg transition-all border-none text-white"
+        :class="status === 1 || status === 2 ? 'btn-error' : 'btn-primary'"
+        @click="handleToggleProcess"
+      >
+        <StopCircleIcon v-if="status === 1 || status === 2" class="w-8 h-8 fill-current" />
+        <PlayIcon v-else class="w-8 h-8 fill-current" />
+        <span class="text-2xl font-bold tracking-widest">{{ (status === 1 || status === 2) ? '停止进程' : '一键启动' }}</span>
       </button>
     </div>
   </div>
@@ -58,16 +67,21 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { 
   Play as PlayIcon, 
+  StopCircle as StopCircleIcon,
   Folder as FolderIcon, 
   FolderOpen as FolderOpenIcon,
   FileText as FileTextIcon, 
   Beer as BeerIcon, 
-  Box as BoxIcon 
+  Box as BoxIcon,
+  Database as DatabaseIcon
 } from 'lucide-vue-next'
+import { consoleStatus as status, startProcess, stopProcess } from '../lib/consoleState'
 
+const router = useRouter()
 const appVersion = ref('')
 const nodeVersion = ref('')
 const tavernVersion = ref('')
@@ -101,6 +115,16 @@ const fetchVersions = async () => {
     tavernVersion.value = await invoke('get_tavern_version')
   } catch (e) {
     tavernVersion.value = '未安装'
+  }
+}
+
+const handleToggleProcess = async () => {
+  if (status.value === 1 || status.value === 2) {
+    router.push('/console')
+    await stopProcess()
+  } else {
+    router.push('/console')
+    await startProcess()
   }
 }
 

@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import Tavern from '../views/Tavern.vue'
 import Versions from '../views/Versions.vue'
-import Plugins from '../views/Plugins.vue'
+import Extensions from '../views/Extensions.vue'
 import Tools from '../views/Tools.vue'
 import Console from '../views/Console.vue'
 import Settings from '../views/Settings.vue'
@@ -24,9 +24,9 @@ const routes = [
     component: Versions
   },
   {
-    path: '/plugins',
-    name: 'Plugins',
-    component: Plugins
+    path: '/extensions',
+    name: 'Extensions',
+    component: Extensions
   },
   {
     path: '/tools',

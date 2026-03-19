@@ -1,9 +1,25 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import Oheader from './layouts/Oheader.vue';
 import { Toaster } from 'vue-sonner'
+import { invoke } from '@tauri-apps/api/core';
 // import { Dialog } from './lib/useDialog';
 import GlobalDialog from './components/GlobalDialog.vue';
 import InstallDialog from './components/InstallDialog.vue';
+import { initConsoleState, consoleStatus } from './lib/consoleState';
+
+onMounted(async () => {
+  await initConsoleState();
+  // 检查是否已经在运行
+  try {
+    const isRunning = await invoke<boolean>('check_sillytavern_status');
+    if (isRunning && consoleStatus.value === 0) {
+      consoleStatus.value = 2; // 假设运行中
+    }
+  } catch (e) {
+    console.error(e);
+  }
+});
 </script>
 
 <template>
