@@ -9,6 +9,8 @@ import InstallDialog from './components/InstallDialog.vue';
 import InstallExtensionDialog from './components/InstallExtensionDialog.vue';
 import CharacterCardDialog from './components/CharacterCardDialog.vue';
 import UploadCharacterCardDialog from './components/UploadCharacterCardDialog.vue';
+import WorldInfoDialog from './components/WorldInfoDialog.vue';
+import UploadWorldInfoDialog from './components/UploadWorldInfoDialog.vue';
 import { initConsoleState, consoleStatus } from './lib/consoleState';
 
 onMounted(async () => {
@@ -41,6 +43,10 @@ onMounted(async () => {
       <CharacterCardDialog />
       <!-- 角色卡导入框 -->
       <UploadCharacterCardDialog />
+      <!-- 世界书详情弹窗 -->
+      <WorldInfoDialog />
+      <!-- 世界书导入框 -->
+      <UploadWorldInfoDialog />
     </template>
     <Toaster />
   </Oheader>
