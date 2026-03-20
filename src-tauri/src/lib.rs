@@ -1390,6 +1390,119 @@ fn ensure_standard_layout(base_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CharacterCardFile {
+    file_name: String,
+    size: u64,
+    modified_ms: Option<i64>,
+}
+
+fn get_character_cards_dir(app: &AppHandle) -> PathBuf {
+    let data_dir = get_config_path(app)
+        .parent()
+        .unwrap_or(&PathBuf::from("."))
+        .to_path_buf();
+
+    let primary = data_dir.join("st_data").join("characters");
+    if primary.exists() {
+        return primary;
+    }
+
+    let fallback = data_dir.join("st_data").join("default-user").join("characters");
+    if fallback.exists() {
+        return fallback;
+    }
+
+    primary
+}
+
+#[tauri::command]
+async fn list_character_card_pngs(app: AppHandle) -> Result<Vec<CharacterCardFile>, String> {
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let dir = get_character_cards_dir(&app_clone);
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut result = Vec::new();
+        let entries = fs::read_dir(&dir).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let entry = match entry {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let file_type = match entry.file_type() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if !file_type.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let ext_ok = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.eq_ignore_ascii_case("png"))
+                .unwrap_or(false);
+            if !ext_ok {
+                continue;
+            }
+            let file_name = match path.file_name().and_then(|s| s.to_str()) {
+                Some(v) => v.to_string(),
+                None => continue,
+            };
+
+            let meta = match entry.metadata() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let modified_ms = meta.modified().ok().and_then(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .map(|d| d.as_millis() as i64)
+            });
+
+            result.push(CharacterCardFile {
+                file_name,
+                size: meta.len(),
+                modified_ms,
+            });
+        }
+
+        result.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+        Ok(result)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn read_character_card_png(app: AppHandle, file_name: String) -> Result<Vec<u8>, String> {
+    if file_name.trim().is_empty() {
+        return Err("文件名不能为空".to_string());
+    }
+    if file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
+        return Err("文件名不合法".to_string());
+    }
+    if !file_name.to_lowercase().ends_with(".png") {
+        return Err("仅支持 .png 文件".to_string());
+    }
+
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let dir = get_character_cards_dir(&app_clone);
+        let file_path = dir.join(&file_name);
+        if !file_path.exists() {
+            return Err("文件不存在".to_string());
+        }
+        fs::read(&file_path).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 fn get_sillytavern_config_file_path(app: &AppHandle, version: &str) -> Result<PathBuf, String> {
     if version.trim().is_empty() {
         return Err("版本号不能为空".to_string());
@@ -2893,7 +3006,9 @@ pub fn run() {
             open_extension_folder,
             open_specific_extension_folder,
             verify_extension_zip,
-            install_extension_zip
+            install_extension_zip,
+            list_character_card_pngs,
+            read_character_card_png
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

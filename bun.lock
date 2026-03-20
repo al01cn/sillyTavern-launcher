@@ -12,6 +12,7 @@
         "@tauri-apps/plugin-fs": "^2.4.5",
         "@tauri-apps/plugin-http": "^2.5.7",
         "@tauri-apps/plugin-opener": "^2",
+        "gstinfo": "^0.0.3",
         "lucide-vue-next": "^0.577.0",
         "tailwindcss": "^4.2.1",
         "vue": "^3.5.13",
@@ -313,6 +314,8 @@
     "fsevents": ["fsevents@2.3.3", "https://registry.npmmirror.com/fsevents/-/fsevents-2.3.3.tgz", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
     "graceful-fs": ["graceful-fs@4.2.11", "https://registry.npmmirror.com/graceful-fs/-/graceful-fs-4.2.11.tgz", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
+
+    "gstinfo": ["gstinfo@0.0.3", "https://registry.npmmirror.com/gstinfo/-/gstinfo-0.0.3.tgz", {}, "sha512-vBVDCXvpNwoN4WfIudACRvdQhFEYLZSwT1FxBvTHOMTeBwH57EzT/O4ZELd2hHDJ8n9vRKQpaov+Vfh2GN5Vjg=="],
 
     "he": ["he@1.2.0", "https://registry.npmmirror.com/he/-/he-1.2.0.tgz", { "bin": { "he": "bin/he" } }, "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw=="],
 

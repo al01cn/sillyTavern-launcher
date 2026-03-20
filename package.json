@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-http": "^2.5.7",
     "@tauri-apps/plugin-opener": "^2",
+    "gstinfo": "^0.0.3",
     "lucide-vue-next": "^0.577.0",
     "tailwindcss": "^4.2.1",
     "vue": "^3.5.13",
