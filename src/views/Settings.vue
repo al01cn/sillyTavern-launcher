@@ -54,7 +54,18 @@ interface NpmRegistry {
 const activeTab = ref<'general' | 'about'>('general');
 const loading = ref(false);
 const proxyLoading = ref(false);
+const proxyLastFetchTimeDisplay = ref('');
 let isSyncing = false;
+
+const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
 
 const npmRegistries: NpmRegistry[] = [
   { name: '官方源', url: 'https://registry.npmjs.org/' },
@@ -181,11 +192,44 @@ const saveConfig = async () => {
   }
 };
 
-const fetchProxies = async () => {
+const fetchProxies = async (forceUpdate = false) => {
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const cachedProxies = localStorage.getItem('app_settings_proxies_cache');
+  const lastFetchTime = localStorage.getItem('app_settings_proxies_last_fetch');
+
+  if (cachedProxies) {
+    try {
+      const parsed = JSON.parse(cachedProxies);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        proxies.value = parsed;
+        if (lastFetchTime) {
+          proxyLastFetchTimeDisplay.value = formatDate(new Date(Number(lastFetchTime)).toISOString());
+        }
+        
+        // 如果不是强制刷新，并且距离上次获取还没超过3天，则不再请求接口
+        if (!forceUpdate && lastFetchTime && (now - Number(lastFetchTime) < THREE_DAYS_MS)) {
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('加速节点缓存解析失败:', e);
+    }
+  }
+
   try {
     proxyLoading.value = true;
     const res = await invoke<ProxyItem[]>('fetch_github_proxies');
-    proxies.value = res.sort((a, b) => a.latency - b.latency);
+    const sortedProxies = res.sort((a, b) => a.latency - b.latency);
+    
+    const fetchedString = JSON.stringify(sortedProxies);
+    if (cachedProxies !== fetchedString) {
+      proxies.value = sortedProxies;
+      localStorage.setItem('app_settings_proxies_cache', fetchedString);
+    }
+    
+    localStorage.setItem('app_settings_proxies_last_fetch', now.toString());
+    proxyLastFetchTimeDisplay.value = formatDate(new Date(now).toISOString());
     // toast.success('获取加速列表成功'); // Remove toast on auto-fetch
   } catch (error) {
     console.error('Failed to fetch proxies:', error);
@@ -537,9 +581,14 @@ onMounted(async () => {
 
             <!-- Proxy List Header -->
             <div class="flex items-center justify-between pt-2">
-              <h3 class="text-sm font-medium text-slate-700">加速节点列表</h3>
+              <div class="flex items-center gap-3">
+                <h3 class="text-sm font-medium text-slate-700">加速节点列表</h3>
+                <span v-if="proxyLastFetchTimeDisplay" class="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 flex items-center gap-1">
+                  上次同步: {{ proxyLastFetchTimeDisplay }}
+                </span>
+              </div>
               <button 
-                @click="fetchProxies" 
+                @click="fetchProxies(true)" 
                 :disabled="proxyLoading"
                 class="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

@@ -206,7 +206,7 @@ const refresh = async (forceUpdate = false) => {
     // 尝试从缓存中加载版本列表，实现秒开
     const cachedReleases = localStorage.getItem('sillytavern_releases_cache');
     const lastFetchTime = localStorage.getItem('sillytavern_releases_last_fetch');
-    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     
     let shouldUseCache = false;
@@ -217,8 +217,8 @@ const refresh = async (forceUpdate = false) => {
             if (Array.isArray(parsed) && parsed.length > 0) {
                 releases.value = parsed;
                 
-                // 如果不是强制刷新，并且距离上次获取还没超过一周，则不再请求接口
-                if (!forceUpdate && lastFetchTime && (now - Number(lastFetchTime) < ONE_WEEK_MS)) {
+                // 如果不是强制刷新，并且距离上次获取还没超过3天，则不再请求接口
+                if (!forceUpdate && lastFetchTime && (now - Number(lastFetchTime) < THREE_DAYS_MS)) {
                     shouldUseCache = true;
                 }
             }
