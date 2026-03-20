@@ -4,10 +4,12 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCharacterInfo, getValueByPath } from 'gstinfo'
 import { X, Loader2, FileImage, Tags, User, BookOpen } from 'lucide-vue-next'
 import { characterCardDialogState, closeCharacterCardDialog } from '../lib/useCharacterCardDialog'
+import { Dialog } from '../lib/useDialog'
 
 type CharacterInfo = Awaited<ReturnType<typeof getCharacterInfo>>
 
 const loading = ref(false)
+const isImporting = ref(false)
 const errorMsg = ref('')
 const imageUrl = ref('')
 const info = ref<CharacterInfo | null>(null)
@@ -233,6 +235,28 @@ const revokeImageUrl = () => {
   }
 }
 
+const handleImport = async () => {
+  if (!characterCardDialogState.importSourcePath) return
+  
+  isImporting.value = true
+  try {
+    await invoke('import_character_card', { sourcePath: characterCardDialogState.importSourcePath })
+    window.dispatchEvent(new Event('character-card-imported'))
+    Dialog.success({
+      title: '导入成功',
+      context: `角色卡 ${characterCardDialogState.fileName} 已成功添加到酒馆`
+    })
+    closeCharacterCardDialog()
+  } catch (e: any) {
+    Dialog.error({
+      title: '导入失败',
+      context: e?.message || String(e)
+    })
+  } finally {
+    isImporting.value = false
+  }
+}
+
 const loadDetail = async () => {
   loading.value = true
   errorMsg.value = ''
@@ -240,7 +264,13 @@ const loadDetail = async () => {
   revokeImageUrl()
 
   try {
-    const bytes = await invoke<number[]>('read_character_card_png', { fileName: characterCardDialogState.fileName })
+    let bytes: number[]
+    if (characterCardDialogState.isImportMode && characterCardDialogState.importSourcePath) {
+      bytes = await invoke<number[]>('read_local_file', { path: characterCardDialogState.importSourcePath })
+    } else {
+      bytes = await invoke<number[]>('read_character_card_png', { fileName: characterCardDialogState.fileName })
+    }
+    
     const u8 = new Uint8Array(bytes)
     imageUrl.value = URL.createObjectURL(new Blob([u8], { type: 'image/png' }))
     info.value = (await getCharacterInfo(u8)) as CharacterInfo
@@ -308,7 +338,7 @@ onUnmounted(() => {
 
             <div class="flex-1 overflow-y-auto pr-4 pb-2 -mr-4 custom-scrollbar">
               <div class="grid grid-cols-2 gap-3">
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
                   <User class="w-4 h-4 text-blue-500" />
                   作者
@@ -470,6 +500,27 @@ onUnmounted(() => {
 
         <div v-else-if="errorMsg" class="mt-6 bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-600">
           {{ errorMsg }}
+        </div>
+
+        <!-- Import Actions -->
+        <div v-if="characterCardDialogState.isImportMode && !loading && !errorMsg" class="shrink-0 mt-6 pt-4 border-t border-slate-100 flex justify-end gap-3">
+          <button
+            type="button"
+            @click="closeCharacterCardDialog"
+            class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+            :disabled="isImporting"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            @click="handleImport"
+            class="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors flex items-center gap-2"
+            :disabled="isImporting"
+          >
+            <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
+            {{ isImporting ? '导入中...' : '确认添加' }}
+          </button>
         </div>
       </div>
     </div>
