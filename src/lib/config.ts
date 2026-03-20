@@ -1,11 +1,17 @@
 import pkg from '../../package.json'
 import { PhOpenAiLogo, PhGoogleLogo } from '@phosphor-icons/vue'
+import logo from '../assets/logo.svg'
 
 export default {
     appName: '酒馆启动器',
     appVersion: pkg.version,
+    appIcon: logo,
+    git: {
+        github: "",
+        gitee: ""
+    },
     tools: {
-        "资源": [
+        "资源/工具": [
             {
                 icon: "https://cdn.discordapp.com/icons/1134557553011998840/d419091a2a50009ddee0617ac43b0ead.png",
                 name: '类脑',
@@ -15,6 +21,11 @@ export default {
                 icon: "https://cdn.discordapp.com/icons/1134557553011998840/d419091a2a50009ddee0617ac43b0ead.png",
                 name: '类脑索引',
                 url: 'https://odysseia-index.pages.dev/',
+            },
+            {
+                icon: "https://sillytavern.wiki/favicon.ico",
+                name: 'SillyTavern',
+                url: 'https://sillytavern.wiki/',
             }
         ],
         "公益API": [
@@ -32,7 +43,7 @@ export default {
                 icon: "https://zipline.chat-linmou.online/u/a3nEt5.jpg",
                 name: 'GuDuFree',
                 url: 'https://gudufree.yeelam.site/register?aff=YVo4',
-            }   
+            }
         ],
         "半公益API": [
             {

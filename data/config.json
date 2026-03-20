@@ -1,17 +1,14 @@
 {
   "lang": "zh-CN",
-  "theme": "light",
-  "rememberWindowPosition": true,
-  "windowPosition": {
-    "x": 333,
-    "y": 217
-  },
+  "theme": "dark",
+  "rememberWindowPosition": false,
+  "windowPosition": null,
   "githubProxy": {
-    "enable": true,
+    "enable": false,
     "url": "https://gh.llkk.cc"
   },
   "sillytavern": {
     "version": "1.16.0"
   },
-  "npmRegistry": "https://registry.npmmirror.com/"
+  "npmRegistry": "https://registry.npmjs.org/"
 }

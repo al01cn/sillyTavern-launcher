@@ -53,7 +53,7 @@ onUnmounted(() => {
         <header class="app-titlebar h-14 shrink-0 flex items-center justify-between px-6 z-60">
             <div class="flex items-center gap-2.5 w-40">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white">
-                    <img src="/tauri.svg" alt="logo">
+                    <img :src="config.appIcon" alt="logo">
                 </div>
                 <span class="font-black text-sm tracking-tight text-slate-800 text-nowrap">{{ config.appName }}</span>
             </div>

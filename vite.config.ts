@@ -16,6 +16,9 @@ export default defineConfig(async () => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      external: ['node:fs/promises', 'node:zlib']
+    }
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

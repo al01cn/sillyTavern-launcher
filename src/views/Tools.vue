@@ -34,10 +34,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { Wrench, ExternalLink } from 'lucide-vue-next';
 import { openUrl as open } from '@tauri-apps/plugin-opener';
 import config from '../lib/config';
+import { getCachedImageUrl } from '../lib/imageCache';
 
 interface ToolItem {
   name: string;
@@ -62,4 +63,23 @@ const openLink = async (url: string) => {
     window.open(url, '_blank');
   }
 };
+
+onMounted(async () => {
+  // 遍历所有工具并缓存图标
+  const toolsData = { ...tools.value };
+  
+  for (const category in toolsData) {
+    for (let i = 0; i < toolsData[category].length; i++) {
+      const tool = toolsData[category][i];
+      if (tool.icon) {
+        // 异步获取缓存的图片 URL
+        getCachedImageUrl(tool.icon).then(cachedUrl => {
+          tool.icon = cachedUrl;
+        }).catch(err => {
+          console.warn('Failed to cache icon for', tool.name, err);
+        });
+      }
+    }
+  }
+});
 </script>

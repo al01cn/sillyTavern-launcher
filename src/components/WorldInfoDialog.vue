@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getWorldInfo } from 'gstinfo'
 import { X, Loader2, BookOpen, Tags } from 'lucide-vue-next'

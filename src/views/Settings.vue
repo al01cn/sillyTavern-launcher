@@ -9,6 +9,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { toast } from 'vue-sonner';
 import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple } from '@phosphor-icons/vue';
+import globalConfig from '../lib/config'
+
+
 
 interface GithubProxyConfig {
   enable: boolean;
@@ -655,14 +658,14 @@ onMounted(async () => {
       <div v-if="activeTab === 'about'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
          <div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm flex flex-col items-center text-center space-y-4">
             <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
-               <img src="/tauri.svg" alt="Logo" class="w-12 h-12 opacity-80" />
+               <img :src="globalConfig.appIcon" alt="Logo" class="w-12 h-12 opacity-80" />
             </div>
             <div>
-               <h2 class="text-xl font-bold text-slate-800">Tavern Assistant</h2>
-               <p class="text-slate-500 text-sm mt-1">版本 0.1.0</p>
+               <h2 class="text-xl font-bold text-slate-800">{{ globalConfig.appName }}</h2>
+               <p class="text-slate-500 text-sm mt-1">版本 {{ globalConfig.appVersion }}</p>
             </div>
             <p class="text-slate-600 max-w-md text-sm leading-relaxed">
-               SillyTavern Launcher 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
+               {{ globalConfig.appName }} 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
             </p>
          </div>
       </div>

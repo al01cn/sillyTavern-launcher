@@ -398,7 +398,15 @@ fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, 
     // 3. Fallback to system npm
     let system_npm = if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" };
     // Check if system npm is available
-    if std::process::Command::new(system_npm).arg("-v").output().is_ok() {
+    let mut command = std::process::Command::new(system_npm);
+    command.arg("-v");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
+    if command.output().is_ok() {
         return Some((
             PathBuf::from(system_npm), 
             vec![
@@ -923,7 +931,15 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
     };
 
     if local_node_path.exists() {
-        if let Ok(output) = std::process::Command::new(&local_node_path).arg("-v").output() {
+        let mut command = std::process::Command::new(&local_node_path);
+        command.arg("-v");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        
+        if let Ok(output) = command.output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 tracing::info!("找到本地 Node.js: {}", version);
@@ -939,14 +955,30 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
     // Check system node
     let cmd = if cfg!(target_os = "windows") { "node" } else { "node" };
     
-    if let Ok(output) = std::process::Command::new(cmd).arg("-v").output() {
+    let mut command = std::process::Command::new(cmd);
+    command.arg("-v");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
+    if let Ok(output) = command.output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             
             let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
             let mut node_path = "system".to_string();
             
-            if let Ok(path_output) = std::process::Command::new(path_cmd).arg("node").output() {
+            let mut path_command = std::process::Command::new(path_cmd);
+            path_command.arg("node");
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                path_command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            
+            if let Ok(path_output) = path_command.output() {
                 if path_output.status.success() {
                     let path_str = String::from_utf8_lossy(&path_output.stdout);
                     if let Some(first_line) = path_str.lines().next() {
@@ -996,7 +1028,15 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         };
         
         if npm_cmd.exists() {
-             if let Ok(output) = std::process::Command::new(&npm_cmd).arg("-v").output() {
+            let mut command = std::process::Command::new(&npm_cmd);
+            command.arg("-v");
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            
+            if let Ok(output) = command.output() {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     tracing::info!("找到本地 NPM (cmd/bin): {}", version);
@@ -1046,14 +1086,30 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
     // Check system npm
     let cmd = if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" };
     
-    if let Ok(output) = std::process::Command::new(cmd).arg("-v").output() {
+    let mut command = std::process::Command::new(cmd);
+    command.arg("-v");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
+    if let Ok(output) = command.output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
             
             let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
             let mut npm_path = "system".to_string();
             
-            if let Ok(path_output) = std::process::Command::new(path_cmd).arg("npm").output() {
+            let mut path_command = std::process::Command::new(path_cmd);
+            path_command.arg("npm");
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                path_command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            
+            if let Ok(path_output) = path_command.output() {
                 if path_output.status.success() {
                     let path_str = String::from_utf8_lossy(&path_output.stdout);
                     if let Some(first_line) = path_str.lines().next() {
@@ -1291,10 +1347,11 @@ fn open_directory(app: AppHandle, dir_type: String, custom_path: Option<String>)
     
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(target_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(target_dir);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {
@@ -2796,10 +2853,11 @@ fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), S
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(config_path)
-            .spawn()
-            .map_err(|e| format!("打开失败: {}", e))?;
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(config_path);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.spawn().map_err(|e| format!("打开失败: {}", e))?;
     }
     #[cfg(target_os = "macos")]
     {
@@ -3159,10 +3217,11 @@ fn open_extension_folder(app: tauri::AppHandle, scope: String, version: String) 
     
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(&extensions_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(&extensions_dir);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {
@@ -3191,10 +3250,11 @@ fn open_specific_extension_folder(_app: tauri::AppHandle, dir_path: String) -> R
     
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(&extension_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(&extension_dir);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {

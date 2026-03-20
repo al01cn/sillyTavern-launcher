@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
-import { toast } from 'vue-sonner'
 import { PhUserSquare, PhArrowsClockwise, PhTrash, PhPlus, PhGlobe } from '@phosphor-icons/vue'
 import { ChevronLeft, ChevronRight, CheckSquare, Square, BookOpen } from 'lucide-vue-next'
 import { openCharacterCardDialog } from '../lib/useCharacterCardDialog'
