@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
-import { getCharacterInfo } from 'gstinfo'
 import { PhUserSquare, PhArrowsClockwise, PhTrash, PhPlus } from '@phosphor-icons/vue'
 import { ChevronLeft, ChevronRight, CheckSquare, Square } from 'lucide-vue-next'
-import { openCharacterCardDialog, openImportCharacterCardDialog } from '../lib/useCharacterCardDialog'
+import { openCharacterCardDialog } from '../lib/useCharacterCardDialog'
+import { openUploadCharacterCardDialog } from '../lib/useUploadCharacterCard'
 import { Dialog } from '../lib/useDialog'
 
 const activeTab = ref<'characters'>('characters')
@@ -77,75 +76,51 @@ const handleCardClick = (fileName: string, event: Event) => {
 
 const deleteSelected = async () => {
   if (selectedFiles.value.size === 0) return
-  if (!confirm(`确定要删除选中的 ${selectedFiles.value.size} 个角色卡吗？此操作不可恢复。`)) return
-  
-  loading.value = true
-  try {
-    await invoke('delete_character_cards', { fileNames: Array.from(selectedFiles.value) })
-    selectedFiles.value.clear()
-    isSelectMode.value = false
-    await loadCharacterCards()
-  } catch (e: any) {
-    errorMsg.value = `删除失败: ${e?.message || String(e)}`
-    loading.value = false
-  }
+  Dialog.warning({
+    title: '确认删除',
+    msg: `确定要删除选中的 ${selectedFiles.value.size} 个角色卡吗？此操作不可恢复。`,
+    confirmText: '删除',
+    cancelText: '取消',
+    onConfirm: async () => {
+      loading.value = true
+      try {
+        await invoke('delete_character_cards', { fileNames: Array.from(selectedFiles.value) })
+        selectedFiles.value.clear()
+        isSelectMode.value = false
+        await loadCharacterCards()
+      } catch (e: any) {
+        errorMsg.value = `删除失败: ${e?.message || String(e)}`
+        loading.value = false
+      }
+    }
+  })
 }
 
 const deleteSingle = async (fileName: string, event: Event) => {
   event.stopPropagation()
-  if (!confirm(`确定要删除角色卡 "${fileName}" 吗？此操作不可恢复。`)) return
-  
-  loading.value = true
-  try {
-    await invoke('delete_character_cards', { fileNames: [fileName] })
-    await loadCharacterCards()
-  } catch (e: any) {
-    errorMsg.value = `删除失败: ${e?.message || String(e)}`
-    loading.value = false
-  }
-}
-
-const importCard = async () => {
-  try {
-    const selected = await open({
-      multiple: false,
-      filters: [{
-        name: 'Image',
-        extensions: ['png']
-      }]
-    })
-    
-    if (selected) {
+  Dialog.warning({
+    title: '确认删除',
+    msg: `确定要删除角色卡 "${fileName}" 吗？此操作不可恢复。`,
+    confirmText: '删除',
+    cancelText: '取消',
+    onConfirm: async () => {
       loading.value = true
-      // 1. 读取本地文件
-      const bytes = await invoke<number[]>('read_local_file', { path: selected })
-      const u8 = new Uint8Array(bytes)
-      
-      // 2. 尝试解析角色卡信息
       try {
-        const info = await getCharacterInfo(u8)
-        if (!info || !info.name) {
-          throw new Error('未获取到有效的角色卡信息')
-        }
-        
-        // 3. 解析成功，打开添加角色卡确认弹窗
-        const fileName = selected.split(/[/\\]/).pop() || 'unknown.png'
-        openImportCharacterCardDialog(selected, fileName)
-      } catch (err: any) {
-        Dialog.error({
-          title: '导入失败',
-          context: '该图片不包含有效的角色卡数据（V2/V3规范），请选择正确的角色卡图片。'
-        })
+        await invoke('delete_character_cards', { fileNames: [fileName] })
+        await loadCharacterCards()
+      } catch (e: any) {
+        errorMsg.value = `删除失败: ${e?.message || String(e)}`
+        loading.value = false
       }
     }
-  } catch (e: any) {
-    Dialog.error({
-      title: '错误',
-      context: `读取文件失败: ${e?.message || String(e)}`
-    })
-  } finally {
-    loading.value = false
-  }
+  })
+}
+
+const importCard = () => {
+  openUploadCharacterCardDialog(() => {
+    // 成功后重新加载角色卡
+    loadCharacterCards()
+  })
 }
 
 // 监听弹窗导入成功事件（可以利用自定义事件或直接通过重新加载数据来实现）

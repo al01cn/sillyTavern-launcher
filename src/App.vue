@@ -8,6 +8,7 @@ import GlobalDialog from './components/GlobalDialog.vue';
 import InstallDialog from './components/InstallDialog.vue';
 import InstallExtensionDialog from './components/InstallExtensionDialog.vue';
 import CharacterCardDialog from './components/CharacterCardDialog.vue';
+import UploadCharacterCardDialog from './components/UploadCharacterCardDialog.vue';
 import { initConsoleState, consoleStatus } from './lib/consoleState';
 
 onMounted(async () => {
@@ -38,6 +39,8 @@ onMounted(async () => {
       <!-- 扩展安装框 -->
       <InstallExtensionDialog />
       <CharacterCardDialog />
+      <!-- 角色卡导入框 -->
+      <UploadCharacterCardDialog />
     </template>
     <Toaster />
   </Oheader>
