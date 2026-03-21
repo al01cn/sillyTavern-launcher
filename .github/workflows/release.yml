@@ -19,12 +19,16 @@ jobs:
       matrix:
         include:
           - platform: "windows-latest"
+            rust_target: ""
             args: ""
           - platform: "macos-latest"
+            rust_target: "aarch64-apple-darwin"
             args: "--target aarch64-apple-darwin"
-          - platform: "macos-13"
+          - platform: "macos-latest"
+            rust_target: "x86_64-apple-darwin"
             args: "--target x86_64-apple-darwin"
           - platform: "ubuntu-22.04"
+            rust_target: ""
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -45,7 +49,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust_target }}
 
       # Linux (Ubuntu) 专属系统依赖
       - name: Install dependencies (ubuntu only)
