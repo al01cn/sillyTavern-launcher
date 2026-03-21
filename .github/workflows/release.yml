@@ -5,42 +5,14 @@ on:
     branches:
       - "GUI"
     paths:
-      - "package.json" # 限制：只有当由您主动推送了带有修改过 package.json（也就是修改了版本号等信息）才会触发构建
-  workflow_dispatch: # 您也可以依然在网页上手动点击运行
+      - "package.json"
+  workflow_dispatch:
 
-# 强制所有 JavaScript Actions 使用 Node.js 24 运行时，消除 Node.js 20 弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # 预处理任务：如果已存在同版本的 Release，则强制删除（实现覆盖效果）
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check and Delete Existing Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 获取当前 package.json 中的版本号
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v$VERSION"
-          echo "Checking for existing release with tag: $TAG"
-
-          # 检查并删除现有 Release
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Found existing release for $TAG. Deleting..."
-            # --yes 跳过确认，--cleanup-tag 同时删除关联的 git tag
-            gh release delete "$TAG" --yes --cleanup-tag
-            echo "Successfully deleted existing release and tag."
-          else
-            echo "No existing release found for $TAG. Proceeding normally."
-          fi
-
   build:
-    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -60,14 +32,14 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 60
+
     permissions:
-      contents: write # 必须开启 write 权限才能创建 Release
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 使用 Bun 替代 Node.js
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -78,7 +50,6 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
-      # Linux (Ubuntu) 专属系统依赖
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -88,37 +59,30 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      # 执行您的同步脚本
       - name: Sync Version
         run: bun run sync-version
 
-      # 从「UPDATELOGS.md」中提取当前版本对应的更新内容
       - name: Extract Changelog
         id: changelog
         shell: bash
         run: |
-          # 读取 package.json 中的版本号
           VERSION=$(node -p "require('./package.json').version")
           echo "Current version: $VERSION"
 
-          # 从更新日志中提取对应版本区块
-          # 匹配 ## [x.y.z] 开头的区块，提取直到下一个 ## [ 或文件末尾  
           BODY=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" UPDATELOGS.md)
 
           if [ -z "$BODY" ]; then
             BODY="Please download the corresponding installation package according to your system. The client can also upgrade seamlessly!"
-            echo "⚠️ No version [$VERSION] record found in the update log, using default description."
+            echo "⚠️ No version [$VERSION] record found in the update log."
           else
-            echo "✅ Successfully extracted update log for version [$VERSION]."
+            echo "✅ Changelog extracted."
           fi
 
-          # 输出（多行内容需要使用 heredoc 格式）
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "body<<$EOF" >> "$GITHUB_OUTPUT"
           echo "$BODY" >> "$GITHUB_OUTPUT"
           echo "$EOF" >> "$GITHUB_OUTPUT"
 
-      # 使用官方 Tauri Action，它会自动将跨平台的 updater 产物合并成 latest.json
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -131,5 +95,5 @@ jobs:
           releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true # 显式启用更新包信息生成(latest.json)
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
