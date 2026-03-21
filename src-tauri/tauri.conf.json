@@ -60,7 +60,7 @@
       },
       "nsis": {
         "installMode": "both",
-        "startMenuFolder": "SillyTavern Launcher",
+        "startMenuFolder": "SillyTavern Launcher GUI",
         "installerIcon": "icons/icon.ico",
         "displayLanguageSelector": true,
         "installerHooks": "installer/hooks.nsh",

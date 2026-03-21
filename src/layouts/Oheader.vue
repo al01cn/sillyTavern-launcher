@@ -8,7 +8,7 @@ import { installState } from '../lib/useInstall';
 import { Dialog } from '../lib/useDialog';
 import { consoleStatus } from '../lib/consoleState';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const appWindow = getCurrentWindow();
 let unlistenClose: (() => void) | null = null;
 
@@ -16,7 +16,7 @@ const checkCanClose = () => {
     if (installState.show && ['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)) {
         Dialog.warning({
             title: t('common.warning'),
-            msg: '正在下载或删除版本，请等待完成',
+            msg: locale.value === 'zh-CN' ? '正在下载或删除版本，请等待完成' : 'Downloading or deleting version, please wait',
             showCancel: false,
             confirmText: t('common.iKnow')
         });
@@ -57,7 +57,9 @@ onUnmounted(() => {
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white">
                     <img :src="config.appIcon" alt="logo">
                 </div>
-                <span class="font-black text-sm tracking-tight text-slate-800 dark:text-slate-200 text-nowrap">{{ config.appName }}</span>
+                <span class="font-black text-sm tracking-tight text-slate-800 dark:text-slate-200 text-nowrap">
+                    {{ (locale === 'zh-CN') ? config.appName : config.appNameEn }}
+                </span>
             </div>
 
             <div class="flex items-center gap-1">

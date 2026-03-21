@@ -21,7 +21,7 @@
   "dependencies": {
     "@phosphor-icons/vue": "^2.2.1",
     "@tailwindcss/vite": "^4.2.1",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-http": "^2.5.7",
@@ -43,7 +43,7 @@
     "@iconify-json/mdi": "^1.2.3",
     "@iconify-json/simple-icons": "^1.2.74",
     "@iconify/vue": "^5.0.0",
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.10.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "daisyui": "^5.5.19",
     "typescript": "~5.6.2",

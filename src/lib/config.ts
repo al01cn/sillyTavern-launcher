@@ -3,7 +3,7 @@ import { PhOpenAiLogo, PhGoogleLogo } from '@phosphor-icons/vue'
 import logo from '../assets/logo.svg'
 
 export default {
-    appName: '酒馆启动器',
+    appName: '酒馆启动器GUI',
     appNameEn: "SillyTavern Launcher GUI",
     appVersion: pkg.version,
     appDescription: pkg.description,
