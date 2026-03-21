@@ -13,7 +13,34 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # 预处理任务：如果已存在同版本的 Release，则强制删除（实现覆盖效果）
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check and Delete Existing Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 获取当前 package.json 中的版本号
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "Checking for existing release with tag: $TAG"
+
+          # 检查并删除现有 Release
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Found existing release for $TAG. Deleting..."
+            # --yes 跳过确认，--cleanup-tag 同时删除关联的 git tag
+            gh release delete "$TAG" --yes --cleanup-tag
+            echo "Successfully deleted existing release and tag."
+          else
+            echo "No existing release found for $TAG. Proceeding normally."
+          fi
+
   build:
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
