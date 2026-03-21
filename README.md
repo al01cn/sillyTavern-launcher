@@ -52,9 +52,9 @@ SillyTavern-Launcher/
 
 ### 环境准备
 
-- [Node.js](https://nodejs.org/) (或 [Bun](https://bun.sh/) - 强烈推荐)
-- [Rust](https://www.rust-lang.org/) (包含 Cargo)
-- Tauri 运行所需的系统依赖 (请参考 [Tauri 官方文档](https://v2.tauri.app/start/prerequisites/))
+- [Node.js](https://nodejs.org/zh-cn) (或 [Bun](https://bun.sh/) - 强烈推荐)
+- [Rust](https://www.rust-lang.org/zh-CN/) (包含 Cargo)
+- Tauri 运行所需的系统依赖 (请参考 [Tauri 官方文档](https://v2.tauri.app/zh-cn/start/prerequisites/))
 
 ### 安装依赖
 

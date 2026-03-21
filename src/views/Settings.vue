@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 import { toast } from 'vue-sonner';
 import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple } from '@phosphor-icons/vue';
 import globalConfig from '../lib/config'
+import { checkUpdate } from '../lib/updater'
 
 
 
@@ -59,15 +60,23 @@ const loading = ref(false);
 const proxyLoading = ref(false);
 const proxyLastFetchTimeDisplay = ref('');
 let isSyncing = false;
+const checkingUpdate = ref(false);
+
+const handleCheckUpdate = async () => {
+  if (checkingUpdate.value) return;
+  checkingUpdate.value = true;
+  await checkUpdate(true);
+  checkingUpdate.value = false;
+};
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+  return new Date(dateString).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 const npmRegistries: NpmRegistry[] = [
@@ -142,17 +151,17 @@ const loadConfig = async () => {
 
       if (isDifferent) {
         // 避免触发 watch 的自动保存
-        isSyncing = true; 
+        isSyncing = true;
         config.value = { ...config.value, ...res };
-        
+
         // 更新缓存并保留其他模块追加的数据
         const currentCachedStr = localStorage.getItem('app_settings_config_cache');
         let mergedConfig = { ...res };
         if (currentCachedStr) {
-            try {
-                const cached = JSON.parse(currentCachedStr);
-                mergedConfig = { ...cached, ...res };
-            } catch(e) {}
+          try {
+            const cached = JSON.parse(currentCachedStr);
+            mergedConfig = { ...cached, ...res };
+          } catch (e) { }
         }
         localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
       }
@@ -175,18 +184,18 @@ const loadConfig = async () => {
 const saveConfig = async () => {
   try {
     await invoke('save_app_config', { config: config.value });
-    
+
     // 保存成功后同时更新本地缓存，合并现有数据以免覆盖其他模块追加的数据(如 sillytavern.version)
     const cachedStr = localStorage.getItem('app_settings_config_cache');
     let mergedConfig = { ...config.value };
     if (cachedStr) {
-        try {
-            const cached = JSON.parse(cachedStr);
-            mergedConfig = { ...cached, ...config.value };
-        } catch(e) {}
+      try {
+        const cached = JSON.parse(cachedStr);
+        mergedConfig = { ...cached, ...config.value };
+      } catch (e) { }
     }
     localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
-    
+
     // toast.success('设置已保存'); // Remove toast for real-time save to avoid spam
     console.log('Config saved');
   } catch (error) {
@@ -209,7 +218,7 @@ const fetchProxies = async (forceUpdate = false) => {
         if (lastFetchTime) {
           proxyLastFetchTimeDisplay.value = formatDate(new Date(Number(lastFetchTime)).toISOString());
         }
-        
+
         // 如果不是强制刷新，并且距离上次获取还没超过3天，则不再请求接口
         if (!forceUpdate && lastFetchTime && (now - Number(lastFetchTime) < THREE_DAYS_MS)) {
           return;
@@ -224,13 +233,13 @@ const fetchProxies = async (forceUpdate = false) => {
     proxyLoading.value = true;
     const res = await invoke<ProxyItem[]>('fetch_github_proxies');
     const sortedProxies = res.sort((a, b) => a.latency - b.latency);
-    
+
     const fetchedString = JSON.stringify(sortedProxies);
     if (cachedProxies !== fetchedString) {
       proxies.value = sortedProxies;
       localStorage.setItem('app_settings_proxies_cache', fetchedString);
     }
-    
+
     localStorage.setItem('app_settings_proxies_last_fetch', now.toString());
     proxyLastFetchTimeDisplay.value = formatDate(new Date(now).toISOString());
     // toast.success('获取加速列表成功'); // Remove toast on auto-fetch
@@ -254,11 +263,11 @@ const checkNode = async () => {
     if (cachedNode) {
       try {
         nodeInfo.value = JSON.parse(cachedNode);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     const res = await invoke<NodeInfo>('check_nodejs');
-    
+
     // 如果与缓存不一致，则更新缓存和状态
     if (JSON.stringify(res) !== JSON.stringify(nodeInfo.value)) {
       nodeInfo.value = res;
@@ -276,7 +285,7 @@ const checkNpm = async () => {
     if (cachedNpm) {
       try {
         npmInfo.value = JSON.parse(cachedNpm);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     const res = await invoke<NpmInfo>('check_npm');
@@ -295,7 +304,7 @@ const installNode = async () => {
   if (installingNode.value) return;
   installingNode.value = true;
   nodeProgress.value = { status: 'starting', progress: 0, log: '准备安装...' };
-  
+
   try {
     await invoke('install_nodejs');
     toast.success('Node.js 安装成功');
@@ -336,27 +345,21 @@ onMounted(async () => {
 
     <!-- Tabs -->
     <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 shrink-0">
-      <button
-        @click="activeTab = 'general'"
-        :class="[
-          'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
-          activeTab === 'general' 
-            ? 'bg-white text-slate-900 shadow-sm' 
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-        ]"
-      >
+      <button @click="activeTab = 'general'" :class="[
+        'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
+        activeTab === 'general'
+          ? 'bg-white text-slate-900 shadow-sm'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+      ]">
         <PhPalette :size="16" weight="duotone" />
         一般设置
       </button>
-      <button
-        @click="activeTab = 'about'"
-        :class="[
-          'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
-          activeTab === 'about' 
-            ? 'bg-white text-slate-900 shadow-sm' 
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-        ]"
-      >
+      <button @click="activeTab = 'about'" :class="[
+        'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
+        activeTab === 'about'
+          ? 'bg-white text-slate-900 shadow-sm'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+      ]">
         <PhInfo :size="16" weight="duotone" />
         关于
       </button>
@@ -364,23 +367,24 @@ onMounted(async () => {
 
     <!-- Content -->
     <div class="flex-1 overflow-y-auto px-1 pb-10 min-h-0 relative">
-      
+
       <!-- Loading State -->
-      <div v-if="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/50 backdrop-blur-sm z-10">
+      <div v-if="loading"
+        class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/50 backdrop-blur-sm z-10">
         <PhArrowsClockwise :size="48" class="animate-spin mb-4 text-blue-500/80" weight="duotone" />
         <p class="text-sm font-medium text-slate-500 animate-pulse">正在加载配置...</p>
       </div>
 
       <!-- General Settings -->
       <div v-if="activeTab === 'general'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        
+
         <!-- Interface Settings -->
         <section class="space-y-4">
           <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <PhPalette :size="20" class="text-blue-500" weight="duotone" />
             界面设置
           </h2>
-          
+
           <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
             <!-- Language -->
             <div class="flex items-center justify-between">
@@ -393,10 +397,8 @@ onMounted(async () => {
                   <div class="text-xs text-slate-500">选择应用程序显示的语言</div>
                 </div>
               </div>
-              <select 
-                v-model="config.lang" 
-                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all"
-              >
+              <select v-model="config.lang"
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all">
                 <option value="zh-CN">简体中文</option>
                 <option value="en-US">English</option>
               </select>
@@ -415,10 +417,8 @@ onMounted(async () => {
                   <div class="text-xs text-slate-500">切换明亮或深夜模式</div>
                 </div>
               </div>
-              <select 
-                v-model="config.theme" 
-                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all"
-              >
+              <select v-model="config.theme"
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[120px] outline-none transition-all">
                 <option value="light">明亮</option>
                 <option value="dark">深夜</option>
               </select>
@@ -438,7 +438,9 @@ onMounted(async () => {
               </div>
               <label class="inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="config.rememberWindowPosition" class="sr-only peer">
-                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div
+                  class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                </div>
               </label>
             </div>
           </div>
@@ -450,7 +452,7 @@ onMounted(async () => {
             <PhPackage :size="20" class="text-green-600" weight="duotone" />
             NodeJs 设置
           </h2>
-          
+
           <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -473,28 +475,26 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
-              
+
               <div v-if="!isNodeVersionValid || nodeInfo.source === 'local'" class="flex items-center gap-2">
-                 <button 
-                    @click="installNode" 
-                    :disabled="installingNode"
-                    class="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                 >
-                    <PhArrowsClockwise v-if="installingNode" :size="14" class="animate-spin" />
-                    <PhDownloadSimple v-else :size="14" />
-                    {{ installingNode ? '安装中...' : (nodeInfo.version ? '重新安装' : '立即安装') }}
-                 </button>
+                <button @click="installNode" :disabled="installingNode"
+                  class="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
+                  <PhArrowsClockwise v-if="installingNode" :size="14" class="animate-spin" />
+                  <PhDownloadSimple v-else :size="14" />
+                  {{ installingNode ? '安装中...' : (nodeInfo.version ? '重新安装' : '立即安装') }}
+                </button>
               </div>
             </div>
 
             <div v-if="installingNode" class="space-y-2 pt-2 border-t border-slate-100">
-               <div class="flex justify-between text-xs text-slate-500">
-                  <span>{{ nodeProgress.log }}</span>
-                  <span>{{ Math.round(nodeProgress.progress * 100) }}%</span>
-               </div>
-               <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div class="bg-green-500 h-1.5 rounded-full transition-all duration-300" :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
-               </div>
+              <div class="flex justify-between text-xs text-slate-500">
+                <span>{{ nodeProgress.log }}</span>
+                <span>{{ Math.round(nodeProgress.progress * 100) }}%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                  :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
+              </div>
             </div>
 
             <div class="w-full h-px bg-slate-100"></div>
@@ -533,18 +533,15 @@ onMounted(async () => {
                   <div class="text-xs text-slate-500">选择合适的镜像源以加速依赖安装</div>
                 </div>
               </div>
-              <select 
-                v-model="config.npmRegistry" 
-                @change="saveConfig"
-                class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-48 p-2"
-              >
+              <select v-model="config.npmRegistry" @change="saveConfig"
+                class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-48 p-2">
                 <option v-for="registry in npmRegistries" :key="registry.url" :value="registry.url">
                   {{ registry.name }}
                 </option>
               </select>
             </div>
             <div class="text-[10px] text-slate-400 pl-11">
-               当前地址: {{ config.npmRegistry }}
+              当前地址: {{ config.npmRegistry }}
             </div>
           </div>
         </section>
@@ -555,7 +552,7 @@ onMounted(async () => {
             <PhGithubLogo :size="20" class="text-slate-700" weight="duotone" />
             Github 加速设置
           </h2>
-          
+
           <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
             <!-- Toggle -->
             <div class="flex items-center justify-between">
@@ -570,15 +567,17 @@ onMounted(async () => {
               </div>
               <label class="inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="config.githubProxy.enable" class="sr-only peer">
-                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div
+                  class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                </div>
               </label>
             </div>
 
             <!-- Current URL Display -->
-             <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <div class="text-sm font-medium text-slate-500 whitespace-nowrap">当前地址:</div>
-                <div class="text-sm text-slate-800 font-mono truncate select-all">{{ config.githubProxy.url }}</div>
-             </div>
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div class="text-sm font-medium text-slate-500 whitespace-nowrap">当前地址:</div>
+              <div class="text-sm text-slate-800 font-mono truncate select-all">{{ config.githubProxy.url }}</div>
+            </div>
 
             <div class="w-full h-px bg-slate-100"></div>
 
@@ -586,67 +585,61 @@ onMounted(async () => {
             <div class="flex items-center justify-between pt-2">
               <div class="flex items-center gap-3">
                 <h3 class="text-sm font-medium text-slate-700">加速节点列表</h3>
-                <span v-if="proxyLastFetchTimeDisplay" class="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 flex items-center gap-1">
+                <span v-if="proxyLastFetchTimeDisplay"
+                  class="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 flex items-center gap-1">
                   上次同步: {{ proxyLastFetchTimeDisplay }}
                 </span>
               </div>
-              <button 
-                @click="fetchProxies(true)" 
-                :disabled="proxyLoading"
-                class="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <PhArrowsClockwise :class="{'animate-spin': proxyLoading}" :size="14" />
+              <button @click="fetchProxies(true)" :disabled="proxyLoading"
+                class="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <PhArrowsClockwise :class="{ 'animate-spin': proxyLoading }" :size="14" />
                 {{ proxyLoading ? '测速中...' : '刷新列表' }}
               </button>
             </div>
 
             <!-- Proxy List -->
             <div v-if="proxies.length > 0" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-              <div 
-                v-for="proxy in proxies" 
-                :key="proxy.url"
-                @click="selectProxy(proxy.url)"
-                :class="[
-                  'flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm',
-                  config.githubProxy.url === proxy.url 
-                    ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200' 
-                    : 'bg-white border-slate-100 hover:border-slate-300'
-                ]"
-              >
+              <div v-for="proxy in proxies" :key="proxy.url" @click="selectProxy(proxy.url)" :class="[
+                'flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm',
+                config.githubProxy.url === proxy.url
+                  ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200'
+                  : 'bg-white border-slate-100 hover:border-slate-300'
+              ]">
                 <div class="flex items-center gap-3 overflow-hidden">
-                   <div :class="[
-                     'w-4 h-4 rounded-full flex items-center justify-center shrink-0',
-                     config.githubProxy.url === proxy.url ? 'text-blue-600' : 'text-transparent'
-                   ]">
-                     <PhCheck :size="12" weight="bold" />
-                   </div>
-                   <div class="text-sm font-mono truncate text-slate-600">{{ proxy.url }}</div>
+                  <div :class="[
+                    'w-4 h-4 rounded-full flex items-center justify-center shrink-0',
+                    config.githubProxy.url === proxy.url ? 'text-blue-600' : 'text-transparent'
+                  ]">
+                    <PhCheck :size="12" weight="bold" />
+                  </div>
+                  <div class="text-sm font-mono truncate text-slate-600">{{ proxy.url }}</div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                   <span :class="[
                     'text-xs font-medium px-2 py-0.5 rounded',
-                    proxy.latency < 200 ? 'bg-green-100 text-green-700' : 
-                    proxy.latency < 500 ? 'bg-yellow-100 text-yellow-700' : 
-                    'bg-red-100 text-red-700'
+                    proxy.latency < 200 ? 'bg-green-100 text-green-700' :
+                      proxy.latency < 500 ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
                   ]">
                     {{ proxy.latency }}ms
                   </span>
                 </div>
               </div>
             </div>
-            
-            <div v-else-if="!proxyLoading" class="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+
+            <div v-else-if="!proxyLoading"
+              class="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
               点击刷新列表获取最新的 Github 加速节点
             </div>
-            
+
             <div v-else class="py-8 flex justify-center">
-               <div class="animate-pulse flex space-x-4 w-full px-4">
-                 <div class="flex-1 space-y-3 py-1">
-                   <div class="h-10 bg-slate-100 rounded"></div>
-                   <div class="h-10 bg-slate-100 rounded"></div>
-                   <div class="h-10 bg-slate-100 rounded"></div>
-                 </div>
-               </div>
+              <div class="animate-pulse flex space-x-4 w-full px-4">
+                <div class="flex-1 space-y-3 py-1">
+                  <div class="h-10 bg-slate-100 rounded"></div>
+                  <div class="h-10 bg-slate-100 rounded"></div>
+                  <div class="h-10 bg-slate-100 rounded"></div>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -656,19 +649,28 @@ onMounted(async () => {
 
       <!-- About Settings -->
       <div v-if="activeTab === 'about'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-         <div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm flex flex-col items-center text-center space-y-4">
-            <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
-               <img :src="globalConfig.appIcon" alt="Logo" class="w-12 h-12 opacity-80" />
-            </div>
+        <div
+          class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm flex flex-col items-center text-center space-y-4">
+          <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
+            <img :src="globalConfig.appIcon" alt="Logo" class="w-12 h-12 opacity-80" />
+          </div>
             <div>
-               <h2 class="text-xl font-bold text-slate-800">{{ globalConfig.appName }}</h2>
-               <p class="text-slate-500 text-sm mt-1">版本 {{ globalConfig.appVersion }}</p>
+              <h2 class="text-xl font-bold text-slate-800">{{ globalConfig.appName }}</h2>
+              <p class="text-slate-500 text-sm mt-1">版本 {{ globalConfig.appVersion }}</p>
             </div>
-            <p class="text-slate-600 max-w-md text-sm leading-relaxed">
-               {{ globalConfig.appName }} 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
+            <button 
+              @click="handleCheckUpdate" 
+              :disabled="checkingUpdate"
+              class="mt-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <PhArrowsClockwise :class="{'animate-spin': checkingUpdate}" :size="16" weight="bold" />
+              {{ checkingUpdate ? '正在检查...' : '检查更新' }}
+            </button>
+            <p class="text-slate-600 max-w-md text-sm leading-relaxed mt-4">
+              {{ globalConfig.appName }} 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
             </p>
-         </div>
-      </div>
+          </div>
+        </div>
 
     </div>
   </div>
@@ -678,9 +680,11 @@ onMounted(async () => {
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
   border-radius: 20px;

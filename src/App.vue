@@ -12,9 +12,13 @@ import UploadCharacterCardDialog from './components/UploadCharacterCardDialog.vu
 import WorldInfoDialog from './components/WorldInfoDialog.vue';
 import UploadWorldInfoDialog from './components/UploadWorldInfoDialog.vue';
 import { initConsoleState, consoleStatus } from './lib/consoleState';
-
+import { checkUpdate } from './lib/updater';
 onMounted(async () => {
   await initConsoleState();
+  
+  // 检查自动更新
+  checkUpdate().catch(console.error);
+
   // 检查是否已经在运行
   try {
     const isRunning = await invoke<boolean>('check_sillytavern_status');

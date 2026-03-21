@@ -29,6 +29,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "UPDATE_ME_WITH_YOUR_PUBLIC_KEY",
+      "endpoints": [
+        "https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
@@ -40,12 +48,21 @@
       "icons/icon.ico"
     ],
     "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
       "nsis": {
         "displayLanguageSelector": true,
-        "languages": ["SimpChinese", "English"]
+        "languages": [
+          "SimpChinese",
+          "English"
+        ]
       },
       "wix": {
-        "language": ["zh-CN", "en-US"]
+        "language": [
+          "zh-CN",
+          "en-US"
+        ]
       }
     }
   }
