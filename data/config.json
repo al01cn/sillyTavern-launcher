@@ -1,5 +1,5 @@
 {
-  "lang": "en-US",
+  "lang": "zh-CN",
   "theme": "auto",
   "rememberWindowPosition": true,
   "windowPosition": {
@@ -11,7 +11,8 @@
     "url": "https://ghfast.top/"
   },
   "sillytavern": {
-    "version": "1.16.0"
+    "version": "1.16.0",
+    "useGlobalConfig": true
   },
   "npmRegistry": "https://registry.npmmirror.com/"
 }

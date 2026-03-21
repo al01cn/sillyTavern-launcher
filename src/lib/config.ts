@@ -7,11 +7,12 @@ export default {
     appNameEn: "SillyTavern Launcher GUI",
     appVersion: pkg.version,
     appDescription: pkg.description,
-    appHomepage:pkg.homepage,
+    appDescriptionEn: pkg.descriptionEn,
+    appHomepage: pkg.homepage,
     appIcon: logo,
     git: {
-        github: "",
-        gitee: ""
+        github: "https://github.com/al01cn/sillyTavern-launcher",
+        gitee: "https://gitee.com/al01/sillytavern-launcher"
     },
     tools: {
         "资源/工具": [

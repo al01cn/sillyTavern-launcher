@@ -8,6 +8,7 @@ import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { openUrl as open } from '@tauri-apps/plugin-opener';
 import { toast } from 'vue-sonner';
 import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple } from '@phosphor-icons/vue';
 import globalConfig from '../lib/config'
@@ -372,6 +373,13 @@ onMounted(async () => {
     }
   });
 });
+
+const openLink = (url: string) => {
+  open(url).catch((err: any) => {
+    console.error('Failed to open URL:', err);
+    toast.error(t('settings.loadFailed'));
+  });
+};
 </script>
 
 <template>
@@ -700,8 +708,34 @@ onMounted(async () => {
             {{ checkingUpdate ? t('settings.checking') : t('settings.checkUpdate') }}
           </button>
           <p class="text-slate-600 dark:text-slate-400 max-w-md text-sm leading-relaxed mt-4">
-            {{ globalConfig.appDescription }}
+            {{ (locale === 'zh-CN') ? globalConfig.appDescription : globalConfig.appDescriptionEn }}
           </p>
+
+          <div class="max-w-md w-full mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 flex flex-col items-center gap-2">
+            <div class="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-sm">
+              <PhInfo :size="18" weight="fill" />
+              {{ locale === 'zh-CN' ? '重要提醒' : 'Important Notice' }}
+            </div>
+            <p class="text-xs text-amber-700 dark:text-amber-500/90 leading-relaxed text-center">
+              {{ locale === 'zh-CN' 
+                ? '本软件完全免费且开源。如果您是通过付费、打赏或在各平台（如某宝、某鱼等）购买到的，请立即申请退款并举报相应商家。' 
+                : 'This software is completely free and open-source. If you paid for this or bought it from any marketplace, please request a refund immediately and report the seller.' 
+              }}
+            </p>
+          </div>
+
+          <div class="flex gap-4 mt-6 pt-6 border-t border-slate-100 dark:border-slate-700 w-full justify-center">
+            <button @click="openLink(globalConfig.git.github)"
+              class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50 cursor-pointer">
+              <PhGithubLogo :size="18" weight="duotone" />
+              GitHub
+            </button>
+            <button @click="openLink(globalConfig.git.gitee)"
+              class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50 cursor-pointer">
+              <PhGlobe :size="18" weight="duotone" />
+              Gitee
+            </button>
+          </div>
         </div>
       </div>
 

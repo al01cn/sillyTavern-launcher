@@ -89,16 +89,16 @@ jobs:
 
       # 使用官方 Tauri Action，它会自动将跨平台的 updater 产物合并成 latest.json
       - name: Build and Release Tauri App
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tauri V2 要求使用下方环境变数名（映射到您的 secret）
           TAURI_SIGNER_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNER_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          tagName: "v__VERSION__" # tauri-action 的魔法占位符：自动从编译后的 tauri.conf 读取您的包版本
+          tagName: "v__VERSION__"
           releaseName: "SillyTavern Launcher GUI v__VERSION__"
           releaseBody: ${{ steps.changelog.outputs.body }}
-          releaseDraft: false # 默认创建正式发布，您可以选择 true 预览
+          releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true # 显式启用更新包信息生成(latest.json)
           args: ${{ matrix.args }}
