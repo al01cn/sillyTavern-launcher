@@ -1,4 +1,49 @@
+# =========================
+# Node & Dependencies
+# =========================
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# =========================
+# Build & Output
+# =========================
+dist/
+dist-ssr/
+build/
+coverage/
+*.tsbuildinfo
+
+# =========================
+# System & OS Files
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# =========================
+# IDEs & Editors
+# =========================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.eclipse/
+*.suo
+*.sln
+*.sw?
+*.ntvs*
+*.njsproj
+
+# =========================
 # Logs
+# =========================
 logs
 *.log
 npm-debug.log*
@@ -7,22 +52,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# =========================
+# Environment Variables
+# =========================
+.env.local
+.env.*.local
 *.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# =========================
+# Tauri & Keys
+# =========================
+*.key
+*.key.pub
+updater.key
+updater.key.pub
+
+# =========================
+# App Specific Data (SillyTavern)
+# =========================
 data/logs/*
 data/sillytavern/*
 data/node/*
-data/st_data/*
+data/st_data/*

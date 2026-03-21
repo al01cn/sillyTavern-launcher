@@ -1,0 +1,71 @@
+name: Build and Release Tauri App
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-13'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write # 必须开启 write 权限才能创建 Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 使用 Bun 替代 Node.js
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+
+      # Linux (Ubuntu) 专属系统依赖
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: bun install
+
+      # 执行您的同步脚本
+      - name: Sync Version
+        run: bun run sync-version
+
+      # 使用官方 Tauri Action，它会自动将跨平台的 updater 产物合并成 latest.json
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri V2 要求使用下方环境变数名（映射到您的 secret）
+          TAURI_SIGNER_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNER_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }} # 使用推上来的 tag 名称
+          releaseName: "SillyTavern Launcher GUI ${{ github.ref_name }}"
+          releaseBody: "请根据您的系统下载对应的安装包。客户端也可直接无缝静默升级！"
+          releaseDraft: false # 默认创建正式发布，您可以选择 true 预览
+          prerelease: false
+          args: ${{ matrix.args }}
+
