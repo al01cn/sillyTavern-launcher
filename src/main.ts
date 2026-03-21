@@ -3,6 +3,19 @@ import 'vue-sonner/style.css'
 import './style.css'
 import App from './App.vue'
 import router from './router'
+import i18n from './lang'
+import { initTheme } from './lib/theme'
+
+// 先创建应用
+const app = createApp(App)
+app.use(router)
+app.use(i18n)
+
+// 在挂载前初始化主题
+initTheme()
+
+// 挂载应用
+app.mount('#app')
 
 if (import.meta.env.PROD) {
   // 禁用右键菜单
@@ -25,7 +38,3 @@ if (import.meta.env.PROD) {
     }
   })
 }
-
-const app = createApp(App)
-app.use(router)
-app.mount('#app')

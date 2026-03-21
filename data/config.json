@@ -1,14 +1,14 @@
 {
-  "lang": "zh-CN",
-  "theme": "light",
+  "lang": "en-US",
+  "theme": "auto",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 516,
-    "y": 206
+    "x": 496,
+    "y": 259
   },
   "githubProxy": {
     "enable": true,
-    "url": "https://gh.llkk.cc"
+    "url": "https://ghfast.top/"
   },
   "sillytavern": {
     "version": "1.16.0"

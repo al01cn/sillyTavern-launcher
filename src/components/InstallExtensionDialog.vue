@@ -7,6 +7,9 @@ import { X, UploadCloud, FileArchive, CheckCircle2, AlertTriangle, Loader2 } fro
 import { toast } from 'vue-sonner';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const scope = ref<'user' | 'global'>('user');
 const isDragging = ref(false);
@@ -62,7 +65,7 @@ const setupDragDrop = async () => {
                 if (zipPaths.length > 0) {
                     handleFilesSelected(zipPaths);
                 } else {
-                    toast.error('请上传 .zip 格式的扩展压缩包');
+                    toast.error(t('resources.uploadPngError').replace('.png', '.zip'));
                 }
             }
         } else if (event.payload.type === 'enter') {
@@ -147,7 +150,7 @@ const install = async () => {
     if (validFiles.length === 0 || isInstalling.value || isAnyVerifying.value) return;
     
     if (scope.value === 'global' && !installExtensionState.version) {
-        toast.error('未选择酒馆版本，无法安装全局扩展');
+        toast.error(t('extensions.selectVersionWarning'));
         return;
     }
     
@@ -173,7 +176,7 @@ const install = async () => {
     isInstalling.value = false;
 
     if (successCount > 0) {
-        toast.success(`成功安装 ${successCount} 个扩展`);
+        toast.success(t('resources.installSuccessCount', { count: successCount }));
         if (installExtensionState.onSuccess) {
             installExtensionState.onSuccess();
         }
@@ -185,7 +188,7 @@ const install = async () => {
             }, 1000);
         }
     } else {
-        toast.error('安装扩展失败，请查看详细信息');
+        toast.error(t('resources.importFailedMsg', { type: t('extensions.title') }));
     }
 };
 
@@ -206,7 +209,7 @@ const install = async () => {
         ]">
             <!-- Header -->
             <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-800">安装扩展</h3>
+                <h3 class="text-lg font-bold text-slate-800">{{ t('extensions.installExtension') }}</h3>
                 <button 
                     @click="!isInstalling && closeInstallExtensionDialog()"
                     :disabled="isInstalling"
@@ -220,7 +223,7 @@ const install = async () => {
             <div class="p-6 space-y-6">
                 <!-- Location Selector -->
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-2">安装位置</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.installLocation') }}</label>
                     <div class="flex p-1 bg-slate-100 rounded-xl">
                         <button 
                             @click="scope = 'user'"
@@ -229,7 +232,7 @@ const install = async () => {
                                 scope === 'user' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                             ]"
                         >
-                            当前用户
+                            {{ t('resources.currentUserScope') }}
                         </button>
                         <button 
                             @click="scope = 'global'"
@@ -238,17 +241,17 @@ const install = async () => {
                                 scope === 'global' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                             ]"
                         >
-                            全局 (所有用户)
+                            {{ t('resources.globalScope') }}
                         </button>
                     </div>
                     <p class="text-xs text-slate-500 mt-2 ml-1">
-                        {{ scope === 'user' ? '扩展将安装在当前用户的目录下，仅当前用户可用。' : '扩展将安装在酒馆核心目录中，对所有用户生效。' }}
+                        {{ scope === 'user' ? t('resources.currentUserScopeDesc') : t('resources.globalScopeDesc') }}
                     </p>
                 </div>
 
                 <!-- Empty / Dragging State -->
                 <div v-if="selectedFiles.length === 0 || isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">扩展包 (.zip)</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.extensionPackage') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
@@ -261,15 +264,15 @@ const install = async () => {
                             <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 mb-3">
                                 <UploadCloud class="w-6 h-6" />
                             </div>
-                            <p class="text-slate-700 font-medium">点击选择或拖拽文件到此处</p>
-                            <p class="text-slate-400 text-xs mt-1">支持选择多个 .zip 格式的扩展包</p>
+                            <p class="text-slate-700 font-medium">{{ t('resources.clickOrDrag') }}</p>
+                            <p class="text-slate-400 text-xs mt-1">{{ t('resources.supportMultipleExtensions') }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Single File UI -->
                 <div v-else-if="selectedFiles.length === 1 && !isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">扩展包 (.zip)</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.extensionPackage') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
@@ -282,7 +285,7 @@ const install = async () => {
                                 <FileArchive class="w-6 h-6" />
                             </div>
                             <p class="text-slate-700 font-medium truncate max-w-[250px]">{{ selectedFiles[0].name }}</p>
-                            <p class="text-blue-500 text-xs mt-1">点击重新选择</p>
+                            <p class="text-blue-500 text-xs mt-1">{{ t('resources.clickToReselect') }}</p>
                         </div>
                     </div>
 
@@ -293,13 +296,13 @@ const install = async () => {
                     ]">
                         <div v-if="selectedFiles[0].status === 'verifying'" class="flex items-center gap-3 text-slate-500">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在验证扩展包...</span>
+                            <span class="text-sm font-medium">{{ t('resources.verifyingExtension') }}</span>
                         </div>
                         
                         <div v-else-if="selectedFiles[0].status === 'invalid'" class="flex items-start gap-3 text-red-600">
                             <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">无效的扩展包</p>
+                                <p class="text-sm font-bold">{{ t('extensions.invalidExtension') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
@@ -307,29 +310,29 @@ const install = async () => {
                         <div v-else-if="selectedFiles[0].status === 'error'" class="flex items-start gap-3 text-red-600">
                             <X class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">安装失败</p>
+                                <p class="text-sm font-bold">{{ t('common.failed') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
 
                         <div v-else-if="selectedFiles[0].status === 'installing'" class="flex items-center gap-3 text-blue-600">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在安装扩展...</span>
+                            <span class="text-sm font-medium">{{ t('resources.installingExtension') }}</span>
                         </div>
 
                         <div v-else-if="selectedFiles[0].status === 'success'" class="flex items-center gap-3 text-emerald-600">
                             <CheckCircle2 class="w-5 h-5" />
-                            <span class="text-sm font-medium">安装成功</span>
+                            <span class="text-sm font-medium">{{ t('common.success') }}</span>
                         </div>
                         
                         <div v-else-if="selectedFiles[0].status === 'valid' && selectedFiles[0].manifestInfo" class="flex items-start gap-3 text-emerald-700">
                             <CheckCircle2 class="w-5 h-5 shrink-0 mt-0.5" />
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-bold">有效的扩展</p>
+                                <p class="text-sm font-bold">{{ t('resources.validExtension') }}</p>
                                 <div class="mt-2 space-y-1 text-xs opacity-90">
-                                    <p v-if="selectedFiles[0].manifestInfo.display_name"><span class="font-semibold">名称：</span>{{ selectedFiles[0].manifestInfo.display_name }}</p>
-                                    <p v-if="selectedFiles[0].manifestInfo.version"><span class="font-semibold">版本：</span>{{ selectedFiles[0].manifestInfo.version }}</p>
-                                    <p v-if="selectedFiles[0].manifestInfo.author"><span class="font-semibold">作者：</span>{{ selectedFiles[0].manifestInfo.author }}</p>
+                                    <p v-if="selectedFiles[0].manifestInfo.display_name"><span class="font-semibold">{{ t('resources.extensionName') }}：</span>{{ selectedFiles[0].manifestInfo.display_name }}</p>
+                                    <p v-if="selectedFiles[0].manifestInfo.version"><span class="font-semibold">{{ t('resources.extensionVersion') }}：</span>{{ selectedFiles[0].manifestInfo.version }}</p>
+                                    <p v-if="selectedFiles[0].manifestInfo.author"><span class="font-semibold">{{ t('resources.extensionAuthor') }}：</span>{{ selectedFiles[0].manifestInfo.author }}</p>
                                 </div>
                             </div>
                         </div>
@@ -339,9 +342,9 @@ const install = async () => {
                 <!-- Multiple Files UI -->
                 <div v-else-if="selectedFiles.length > 1 && !isDragging" class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <label class="block text-sm font-bold text-slate-700">已选择 {{ selectedFiles.length }} 个扩展包</label>
+                        <label class="block text-sm font-bold text-slate-700">{{ t('resources.selectedExtensions', { count: selectedFiles.length }) }}</label>
                         <button @click="selectFile" :disabled="isInstalling" class="text-xs text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50">
-                            重新选择
+                            {{ t('resources.reselect') }}
                         </button>
                     </div>
                     
@@ -374,27 +377,27 @@ const install = async () => {
                             <div class="shrink-0 ml-3 flex items-center justify-end min-w-[70px]">
                                 <div v-if="file.status === 'verifying'" class="flex items-center gap-1.5 text-slate-400 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>验证中</span>
+                                    <span>{{ t('resources.verifying') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 text-xs" title="无效的扩展包">
+                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 text-xs" :title="t('extensions.invalidExtension')">
                                     <AlertTriangle class="w-3.5 h-3.5" />
-                                    <span>无效</span>
+                                    <span>{{ t('resources.invalid') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'valid'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>待安装</span>
+                                    <span>{{ t('resources.pending') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'installing'" class="flex items-center gap-1.5 text-blue-500 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>安装中</span>
+                                    <span>{{ t('resources.importing') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'success'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>成功</span>
+                                    <span>{{ t('resources.importSuccess') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'error'" class="flex items-center gap-1.5 text-red-500 text-xs" :title="file.errorMsg">
                                     <X class="w-3.5 h-3.5" />
-                                    <span>失败</span>
+                                    <span>{{ t('common.failed') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -409,7 +412,7 @@ const install = async () => {
                     :disabled="isInstalling"
                     class="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50 text-sm"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button 
                     @click="install"
@@ -422,7 +425,7 @@ const install = async () => {
                     ]"
                 >
                     <Loader2 v-if="isInstalling" class="w-4 h-4 animate-spin" />
-                    <span>{{ isInstalling ? '安装中...' : '开始安装' }}</span>
+                    <span>{{ isInstalling ? t('resources.installing') : t('resources.startInstalling') }}</span>
                 </button>
             </div>
         </div>

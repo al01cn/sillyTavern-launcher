@@ -8,6 +8,9 @@ import { toast } from 'vue-sonner';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCharacterInfo } from 'gstinfo';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const isDragging = ref(false);
 const isImporting = ref(false);
@@ -54,7 +57,7 @@ const setupDragDrop = async () => {
                 if (pngPaths.length > 0) {
                     handleFilesSelected(pngPaths);
                 } else {
-                    toast.error('请上传 .png 格式的角色卡图片');
+                    toast.error(t('resources.uploadPngError'));
                 }
             }
         } else if (event.payload.type === 'enter') {
@@ -93,7 +96,7 @@ const handleFilesSelected = async (filePaths: string[]) => {
             
             const info = await getCharacterInfo(u8);
             if (!info || !info.name) {
-                throw new Error('该图片不包含有效的角色卡数据');
+                throw new Error(t('resources.noValidCardData'));
             }
             
             file.characterName = info.name;
@@ -162,7 +165,7 @@ const importCards = async () => {
     isImporting.value = false;
 
     if (successCount > 0) {
-        toast.success(`成功导入 ${successCount} 个角色卡`);
+        toast.success(t('resources.importSuccessMsg', { count: successCount, type: t('resources.characterCard') }));
         window.dispatchEvent(new Event('character-card-imported'));
         if (uploadCharacterCardState.onSuccess) {
             uploadCharacterCardState.onSuccess();
@@ -174,7 +177,7 @@ const importCards = async () => {
             }, 1000);
         }
     } else {
-        toast.error('导入角色卡失败，请查看详细信息');
+        toast.error(t('resources.importFailedMsg', { type: t('resources.characterCard') }));
     }
 };
 
@@ -190,16 +193,16 @@ const importCards = async () => {
 
         <!-- Modal Content -->
         <div :class="[
-            'modal-content relative bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transition-all duration-300 transform flex flex-col',
+            'modal-content relative bg-white dark:bg-slate-800 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all duration-300 transform flex flex-col',
             uploadCharacterCardState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
         ]">
             <!-- Header -->
-            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-800">添加角色卡</h3>
+            <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">{{ t('resources.uploadCardTitle') }}</h3>
                 <button 
                     @click="!isImporting && closeUploadCharacterCardDialog()"
                     :disabled="isImporting"
-                    class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors disabled:opacity-50"
+                    class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
                 >
                     <X class="w-5 h-5" />
                 </button>
@@ -209,86 +212,86 @@ const importCards = async () => {
             <div class="p-6 space-y-6">
                 <!-- Empty / Dragging State -->
                 <div v-if="selectedFiles.length === 0 || isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">角色卡图片 (.png)</label>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{{ t('resources.cardImageFile') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
                             'border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer relative overflow-hidden',
-                            isDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300',
+                            isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500',
                             isImporting ? 'pointer-events-none opacity-60' : ''
                         ]"
                     >
                         <div class="flex flex-col items-center pointer-events-none">
-                            <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 mb-3">
+                            <div class="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3">
                                 <UploadCloud class="w-6 h-6" />
                             </div>
-                            <p class="text-slate-700 font-medium">点击选择或拖拽文件到此处</p>
-                            <p class="text-slate-400 text-xs mt-1">支持选择多个 .png 格式的角色卡图片</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium">{{ t('resources.clickOrDrag') }}</p>
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mt-1">{{ t('resources.supportMultipleCards') }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Single File UI -->
                 <div v-else-if="selectedFiles.length === 1 && !isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">角色卡图片 (.png)</label>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{{ t('resources.cardImageFile') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
-                            'border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer relative overflow-hidden border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300',
+                            'border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer relative overflow-hidden border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500',
                             isImporting ? 'pointer-events-none opacity-60' : ''
                         ]"
                     >
                         <div class="flex flex-col items-center pointer-events-none">
-                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 mb-3">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-400 mb-3">
                                 <FileImage class="w-6 h-6" />
                             </div>
-                            <p class="text-slate-700 font-medium truncate max-w-[250px]">{{ selectedFiles[0].name }}</p>
-                            <p class="text-blue-500 text-xs mt-1">点击重新选择</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[250px]">{{ selectedFiles[0].name }}</p>
+                            <p class="text-blue-500 dark:text-blue-400 text-xs mt-1">{{ t('resources.clickToReselect') }}</p>
                         </div>
                     </div>
 
                     <!-- Validation Result -->
                     <div class="mt-6 rounded-xl p-4 transition-all" :class="[
-                        selectedFiles[0].status === 'verifying' || selectedFiles[0].status === 'importing' ? 'bg-slate-50' : 
-                        selectedFiles[0].status === 'invalid' || selectedFiles[0].status === 'error' ? 'bg-red-50' : 'bg-emerald-50'
+                        selectedFiles[0].status === 'verifying' || selectedFiles[0].status === 'importing' ? 'bg-slate-50 dark:bg-slate-700/50' : 
+                        selectedFiles[0].status === 'invalid' || selectedFiles[0].status === 'error' ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'
                     ]">
-                        <div v-if="selectedFiles[0].status === 'verifying'" class="flex items-center gap-3 text-slate-500">
+                        <div v-if="selectedFiles[0].status === 'verifying'" class="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在验证角色卡...</span>
+                            <span class="text-sm font-medium">{{ t('resources.verifyingCard') }}</span>
                         </div>
                         
-                        <div v-else-if="selectedFiles[0].status === 'invalid'" class="flex items-start gap-3 text-red-600">
+                        <div v-else-if="selectedFiles[0].status === 'invalid'" class="flex items-start gap-3 text-red-600 dark:text-red-400">
                             <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">无效的角色卡</p>
+                                <p class="text-sm font-bold">{{ t('resources.invalidCard') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
 
-                        <div v-else-if="selectedFiles[0].status === 'error'" class="flex items-start gap-3 text-red-600">
+                        <div v-else-if="selectedFiles[0].status === 'error'" class="flex items-start gap-3 text-red-600 dark:text-red-400">
                             <X class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">导入失败</p>
+                                <p class="text-sm font-bold">{{ t('resources.importFailed') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
 
-                        <div v-else-if="selectedFiles[0].status === 'importing'" class="flex items-center gap-3 text-blue-600">
+                        <div v-else-if="selectedFiles[0].status === 'importing'" class="flex items-center gap-3 text-blue-600 dark:text-blue-400">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在导入...</span>
+                            <span class="text-sm font-medium">{{ t('resources.importing') }}...</span>
                         </div>
 
-                        <div v-else-if="selectedFiles[0].status === 'success'" class="flex items-center gap-3 text-emerald-600">
+                        <div v-else-if="selectedFiles[0].status === 'success'" class="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
                             <CheckCircle2 class="w-5 h-5" />
-                            <span class="text-sm font-medium">导入成功</span>
+                            <span class="text-sm font-medium">{{ t('resources.importSuccess') }}</span>
                         </div>
                         
-                        <div v-else-if="selectedFiles[0].status === 'valid'" class="flex items-start gap-3 text-emerald-700">
+                        <div v-else-if="selectedFiles[0].status === 'valid'" class="flex items-start gap-3 text-emerald-700 dark:text-emerald-400">
                             <CheckCircle2 class="w-5 h-5 shrink-0 mt-0.5" />
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-bold">有效的角色卡</p>
+                                <p class="text-sm font-bold">{{ t('resources.validCard') }}</p>
                                 <div class="mt-2 space-y-1 text-xs opacity-90">
-                                    <p v-if="selectedFiles[0].characterName"><span class="font-semibold">角色名称：</span>{{ selectedFiles[0].characterName }}</p>
+                                    <p v-if="selectedFiles[0].characterName"><span class="font-semibold">{{ t('resources.characterName') }}：</span>{{ selectedFiles[0].characterName }}</p>
                                 </div>
                             </div>
                         </div>
@@ -298,28 +301,28 @@ const importCards = async () => {
                 <!-- Multiple Files UI -->
                 <div v-else-if="selectedFiles.length > 1 && !isDragging" class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <label class="block text-sm font-bold text-slate-700">已选择 {{ selectedFiles.length }} 张图片</label>
-                        <button @click="selectFile" :disabled="isImporting" class="text-xs text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50">
-                            重新选择
+                        <label class="block text-sm font-bold text-slate-700 dark:text-slate-300">{{ t('resources.selectedImages', { count: selectedFiles.length }) }}</label>
+                        <button @click="selectFile" :disabled="isImporting" class="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 font-medium disabled:opacity-50">
+                            {{ t('resources.reselect') }}
                         </button>
                     </div>
                     
                     <div class="max-h-[240px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                         <div v-for="file in selectedFiles" :key="file.id" 
-                            class="bg-slate-50 rounded-xl p-3 flex items-center justify-between border border-slate-100"
+                            class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 flex items-center justify-between border border-slate-100 dark:border-slate-600"
                         >
                             <div class="flex items-center gap-3 min-w-0 flex-1">
-                                <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 shrink-0">
+                                <div class="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0">
                                     <FileImage class="w-4 h-4" />
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-bold text-slate-700 truncate" :title="file.characterName || file.name">
+                                    <p class="text-sm font-bold text-slate-700 dark:text-slate-300 truncate" :title="file.characterName || file.name">
                                         {{ file.characterName || file.name }}
                                     </p>
-                                    <p class="text-[10px] text-red-500 truncate" v-if="file.status === 'invalid' || file.status === 'error'" :title="file.errorMsg">
+                                    <p class="text-[10px] text-red-500 dark:text-red-400 truncate" v-if="file.status === 'invalid' || file.status === 'error'" :title="file.errorMsg">
                                         {{ file.errorMsg }}
                                     </p>
-                                    <p class="text-[10px] text-slate-400 truncate" v-else>
+                                    <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate" v-else>
                                         {{ file.name }}
                                     </p>
                                 </div>
@@ -327,29 +330,29 @@ const importCards = async () => {
                             
                             <!-- Status Indicator -->
                             <div class="shrink-0 ml-3 flex items-center justify-end min-w-[70px]">
-                                <div v-if="file.status === 'verifying'" class="flex items-center gap-1.5 text-slate-400 text-xs">
+                                <div v-if="file.status === 'verifying'" class="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>验证中</span>
+                                    <span>{{ t('resources.verifying') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 text-xs" title="无效的图片">
+                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 dark:text-red-400 text-xs" :title="t('resources.invalid')">
                                     <AlertTriangle class="w-3.5 h-3.5" />
-                                    <span>无效</span>
+                                    <span>{{ t('resources.invalid') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'valid'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
+                                <div v-else-if="file.status === 'valid'" class="flex items-center gap-1.5 text-emerald-500 dark:text-emerald-400 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>待导入</span>
+                                    <span>{{ t('resources.pending') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'importing'" class="flex items-center gap-1.5 text-blue-500 text-xs">
+                                <div v-else-if="file.status === 'importing'" class="flex items-center gap-1.5 text-blue-500 dark:text-blue-400 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>导入中</span>
+                                    <span>{{ t('resources.importing') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'success'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
+                                <div v-else-if="file.status === 'success'" class="flex items-center gap-1.5 text-emerald-500 dark:text-emerald-400 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>成功</span>
+                                    <span>{{ t('resources.importSuccess') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'error'" class="flex items-center gap-1.5 text-red-500 text-xs" :title="file.errorMsg">
+                                <div v-else-if="file.status === 'error'" class="flex items-center gap-1.5 text-red-500 dark:text-red-400 text-xs" :title="file.errorMsg">
                                     <X class="w-3.5 h-3.5" />
-                                    <span>失败</span>
+                                    <span>{{ t('resources.importFailed') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -358,13 +361,13 @@ const importCards = async () => {
             </div>
 
             <!-- Footer -->
-            <div class="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+            <div class="p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
                 <button 
                     @click="closeUploadCharacterCardDialog"
                     :disabled="isImporting"
-                    class="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50 text-sm"
+                    class="px-5 py-2.5 rounded-xl font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 text-sm"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button 
                     @click="importCards"
@@ -377,7 +380,7 @@ const importCards = async () => {
                     ]"
                 >
                     <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
-                    <span>{{ isImporting ? '导入中...' : '开始导入' }}</span>
+                    <span>{{ isImporting ? t('resources.importing') + '...' : t('resources.startImport') }}</span>
                 </button>
             </div>
         </div>

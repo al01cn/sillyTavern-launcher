@@ -4,6 +4,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { getWorldInfo } from 'gstinfo'
 import { X, Loader2, BookOpen, Tags } from 'lucide-vue-next'
 import { worldInfoDialogState, closeWorldInfoDialog } from '../lib/useWorldInfoDialog'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -81,24 +84,25 @@ const entries = computed<WorldEntry[]>(() => {
   })
 })
 
-const positionMap: Record<string, string> = {
-  'before_char': '角色定义前',
-  'after_char': '角色定义后',
-  '0': '角色定义前',
-  '1': '角色定义后',
-  '2': '作者留言后',
-  'before_example': '示例对话前',
-  'after_example': '示例对话后',
-  'before_prompt': '系统提示词前',
-  'after_prompt': '系统提示词后',
-  'before_author': '作者留言前',
-  'after_author': '作者留言后',
-  'at_depth': '指定深度',
-}
-
 const translatePosition = (pos: string) => {
   if (!pos) return '—'
   const key = String(pos).toLowerCase()
+  
+  const positionMap: Record<string, string> = {
+    'before_char': t('resources.positionBeforeChar'),
+    'after_char': t('resources.positionAfterChar'),
+    '0': t('resources.positionBeforeChar'),
+    '1': t('resources.positionAfterChar'),
+    '2': t('resources.positionAfterAN'),
+    'before_example': t('resources.positionBeforeExample'),
+    'after_example': t('resources.positionAfterExample'),
+    'before_prompt': t('resources.positionBeforePrompt'),
+    'after_prompt': t('resources.positionAfterPrompt'),
+    'before_author': t('resources.positionBeforeAuthor'),
+    'after_author': t('resources.positionAfterAN'),
+    'at_depth': t('resources.positionAtDepth'),
+  }
+  
   return positionMap[key] || pos
 }
 
@@ -115,7 +119,7 @@ const loadData = async (fileName: string) => {
     info.value = parsed
     console.log(info.value)
   } catch (e: any) {
-    errorMsg.value = `加载世界书文件失败: ${e?.message || String(e)}`
+    errorMsg.value = `${t('resources.loadFailed')}: ${e?.message || String(e)}`
   } finally {
     loading.value = false
   }
@@ -156,7 +160,7 @@ watch(
         <button
           @click="closeWorldInfoDialog"
           class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          title="关闭"
+          :title="t('common.close')"
         >
           <X class="w-5 h-5" />
         </button>
@@ -167,7 +171,7 @@ watch(
         <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
           <div class="flex flex-col items-center gap-3">
             <Loader2 class="w-8 h-8 text-blue-500 animate-spin" />
-            <span class="text-sm font-medium text-slate-500">正在解析世界书...</span>
+            <span class="text-sm font-medium text-slate-500">{{ t('resources.parsingWorld') }}</span>
           </div>
         </div>
 
@@ -182,7 +186,7 @@ watch(
           <div v-if="description" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div class="text-sm font-medium text-slate-500 mb-2 flex items-center gap-2">
               <BookOpen class="w-4 h-4" />
-              描述
+              {{ t('resources.description') }}
             </div>
             <div class="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">{{ description }}</div>
           </div>
@@ -192,10 +196,10 @@ watch(
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Tags class="w-5 h-5 text-purple-500" />
-                词条列表
+                {{ t('resources.entryList') }}
               </h3>
               <span class="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                共 {{ entries.length }} 条
+                {{ t('resources.totalEntries', { count: entries.length }) }}
               </span>
             </div>
 
@@ -210,11 +214,11 @@ watch(
                     <div class="text-xs font-semibold text-slate-800 truncate">
                       #{{ idx + 1 }}
                       <span class="text-slate-500 font-medium">
-                        {{ entry.keys.length ? entry.keys.join(', ') : '（无 keys）' }}
+                        {{ entry.keys.length ? entry.keys.join(', ') : t('resources.noKeys') }}
                       </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">
-                      {{ entry.comment || '无 comment' }}
+                      {{ entry.comment || t('resources.noComment') }}
                     </div>
                   </div>
                   <span
@@ -227,33 +231,33 @@ watch(
                           : 'bg-slate-50 text-slate-500 border-slate-200'
                     ]"
                   >
-                    {{ entry.enabled === null ? '未知' : (entry.enabled ? '已启用' : '已禁用') }}
+                    {{ entry.enabled === null ? t('resources.unknownStatus') : (entry.enabled ? t('resources.enabled') : t('resources.disabled')) }}
                   </span>
                 </summary>
 
                 <div class="p-3 border-t border-slate-200">
                   <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
                     <div class="truncate">
-                      <span class="font-semibold">位置：</span>
+                      <span class="font-semibold">{{ t('resources.position') }}：</span>
                       <span>{{ translatePosition(entry.position) }}</span>
                     </div>
                     <div class="truncate">
-                      <span class="font-semibold">插入顺序：</span>
+                      <span class="font-semibold">{{ t('resources.insertionOrder') }}：</span>
                       <span>{{ entry.insertionOrder ?? '—' }}</span>
                     </div>
                   </div>
 
                   <div class="mt-2 text-[11px] text-slate-600">
-                    <span class="font-semibold">关键词：</span>
+                    <span class="font-semibold">{{ t('resources.keywords') }}：</span>
                     <span>{{ entry.keys.length ? entry.keys.join(', ') : '—' }}</span>
                   </div>
 
                   <div class="mt-2 text-[11px] text-slate-600">
-                    <span class="font-semibold">备注：</span>
+                    <span class="font-semibold">{{ t('resources.comment') }}：</span>
                     <span>{{ entry.comment || '—' }}</span>
                   </div>
 
-                  <div class="mt-2 text-[11px] text-slate-600 font-semibold">内容：</div>
+                  <div class="mt-2 text-[11px] text-slate-600 font-semibold">{{ t('resources.content') }}：</div>
                   <div class="mt-1 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                     {{ entry.content || '—' }}
                   </div>
@@ -263,7 +267,7 @@ watch(
             
             <div v-else class="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
               <BookOpen class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <div class="text-slate-500 font-medium">暂无词条内容</div>
+              <div class="text-slate-500 font-medium">{{ t('resources.noEntries') }}</div>
             </div>
           </div>
         </div>

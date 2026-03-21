@@ -3,6 +3,9 @@ import { ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'vue-sonner';
 import { PhFileCode, PhGlobe, PhLockKey, PhBrowser, PhListNumbers } from '@phosphor-icons/vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const loading = ref(true);
 const version = ref<string>('');
@@ -158,7 +161,7 @@ const loadConfig = async () => {
     }
 
     if (!currentVersionName) {
-      configError.value = '未选择酒馆版本，请先在"版本"页面选择或安装一个版本。';
+      configError.value = t('tavern.noVersionSelected');
       loading.value = false;
       return;
     }
@@ -212,7 +215,7 @@ const loadConfig = async () => {
 
   } catch (error: any) {
     console.error('Failed to load tavern config:', error);
-    configError.value = typeof error === 'string' ? error : '加载配置文件失败，可能是版本未安装或配置丢失。';
+    configError.value = typeof error === 'string' ? error : t('tavern.loadConfigFailed');
   } finally {
     loading.value = false;
   }
@@ -233,7 +236,7 @@ const saveConfig = async () => {
     });
   } catch (error) {
     console.error('Failed to save tavern config:', error);
-    toast.error('保存配置失败');
+    toast.error(t('tavern.saveFailed'));
   } finally {
     saveInProgress.value = false;
     if (saveQueued.value) {
@@ -258,7 +261,7 @@ const openConfigFile = async () => {
     await invoke('open_sillytavern_config_file', { version: version.value });
   } catch (error) {
     console.error('Failed to open config file:', error);
-    toast.error('无法打开配置文件');
+    toast.error(t('tavern.cannotOpenFile'));
   }
 };
 
@@ -344,17 +347,17 @@ onMounted(() => {
   <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-6 px-1 shrink-0">
       <div>
-        <h1 class="text-2xl font-bold">酒馆配置</h1>
-        <p class="text-slate-500 text-sm mt-1">管理当前版本 ({{ version || '未选择' }}) 的 config.yaml 选项</p>
+        <h1 class="text-2xl font-bold dark:text-slate-100">{{ t('tavern.title') }}</h1>
+        <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">{{ t('tavern.subtitle') }} ({{ version || t('tavern.notSelected') }})</p>
       </div>
       <button
         @click="openConfigFile"
-        class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm text-sm font-medium"
+        class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm text-sm font-medium"
         :disabled="!version || !!configError"
         :class="{ 'opacity-50 cursor-not-allowed': !version || !!configError }"
       >
         <PhFileCode :size="18" weight="duotone" />
-        打开配置文件
+        {{ t('tavern.openConfigFile') }}
       </button>
     </div>
 
@@ -364,14 +367,14 @@ onMounted(() => {
       <!-- Loading State -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20">
         <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="text-sm font-medium text-slate-500">正在读取配置文件...</p>
+        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('tavern.readingConfig') }}</p>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="configError" class="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-start gap-3">
+      <div v-else-if="configError" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-100 dark:border-red-800 flex items-start gap-3">
         <div class="mt-0.5">⚠️</div>
         <div>
-          <h3 class="font-semibold">无法加载配置</h3>
+          <h3 class="font-semibold">{{ t('tavern.cannotLoadConfig') }}</h3>
           <p class="text-sm opacity-90 mt-1">{{ configError }}</p>
         </div>
       </div>
@@ -381,41 +384,41 @@ onMounted(() => {
         
         <!-- Network Settings -->
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhGlobe :size="20" class="text-blue-500" weight="duotone" />
-            网络与访问
+            {{ t('tavern.networkAndAccess') }}
           </h2>
           
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <!-- Port -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-400">
                   <PhListNumbers :size="18" weight="duotone" />
                 </div>
                 <div>
-                  <div class="font-medium text-slate-700">服务端口</div>
-                  <div class="text-xs text-slate-500">酒馆运行的本地端口号 (默认: 8000)</div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.serverPort') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.serverPortDesc') }}</div>
                 </div>
               </div>
               <input 
                 type="number" 
                 v-model="tavernConfig.port"
-                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 w-24 outline-none transition-all"
+                class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 w-24 outline-none transition-all"
               />
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <!-- Listen (Host) -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500">
+                <div class="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-500 dark:text-green-400">
                   <PhGlobe :size="18" weight="duotone" />
                 </div>
                 <div>
-                  <div class="font-medium text-slate-700">允许局域网访问 (Listen)</div>
-                  <div class="text-xs text-slate-500">开启后局域网内的其他设备可以访问酒馆</div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.allowLanAccess') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.allowLanAccessDesc') }}</div>
                 </div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
@@ -424,41 +427,41 @@ onMounted(() => {
               </label>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="space-y-3">
-              <div class="font-medium text-slate-700 text-sm">监听地址</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.listenAddress') }}</div>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500 w-14">IPv4</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 w-14">IPv4</span>
                 <input
                   type="text"
                   v-model="tavernConfig.listenAddress.ipv4"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-all"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-all"
                 />
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500 w-14">IPv6</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 w-14">IPv6</span>
                 <input
                   type="text"
                   v-model="tavernConfig.listenAddress.ipv6"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-all"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-all"
                 />
               </div>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="space-y-3">
-              <div class="font-medium text-slate-700 text-sm">协议开关</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.protocolSwitch') }}</div>
               <div class="flex items-center justify-between">
-                <div class="text-sm text-slate-600">启用 IPv4</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.enableIPv4') }}</div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" v-model="tavernConfig.protocol.ipv4" class="sr-only peer">
                   <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                 </label>
               </div>
               <div class="flex items-center justify-between">
-                <div class="text-sm text-slate-600">启用 IPv6</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.enableIPv6') }}</div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" v-model="tavernConfig.protocol.ipv6" class="sr-only peer">
                   <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
@@ -470,21 +473,21 @@ onMounted(() => {
 
         <!-- Security Settings -->
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhLockKey :size="20" class="text-purple-500" weight="duotone" />
-            安全白名单
+            {{ t('tavern.securityWhitelist') }}
           </h2>
           
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <!-- Whitelist Mode -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500">
+                <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
                   <PhLockKey :size="18" weight="duotone" />
                 </div>
                 <div>
-                  <div class="font-medium text-slate-700">启用白名单</div>
-                  <div class="text-xs text-slate-500">仅允许白名单内的IP地址访问</div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.enableWhitelist') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.enableWhitelistDesc') }}</div>
                 </div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
@@ -493,17 +496,17 @@ onMounted(() => {
               </label>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <!-- Whitelist IPs -->
             <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.whitelistMode }">
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">白名单 IP 列表</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.whitelistIPs') }}</div>
                 <button 
                   @click="addWhitelistItem"
-                  class="text-xs text-purple-600 hover:text-purple-700 font-medium px-2 py-1 bg-purple-50 rounded-md transition-colors"
+                  class="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium px-2 py-1 bg-purple-50 dark:bg-purple-900/30 rounded-md transition-colors"
                 >
-                  + 添加 IP
+                  + {{ t('tavern.addIP') }}
                 </button>
               </div>
               
@@ -511,35 +514,35 @@ onMounted(() => {
                 <input 
                   type="text" 
                   v-model="tavernConfig.whitelist[index]"
-                  placeholder="例如: 192.168.1.100"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.ipPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2 outline-none transition-all"
                 />
                 <button 
                   @click="removeWhitelistItem(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
               </div>
               <div v-if="tavernConfig.whitelist.length === 0" class="text-xs text-slate-400 italic">
-                列表为空，请添加允许的IP地址
+                {{ t('tavern.emptyList') }}
               </div>
             </div>
           </div>
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhLockKey :size="20" class="text-indigo-500" weight="duotone" />
-            基础认证
+            {{ t('tavern.basicAuth') }}
           </h2>
 
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3 shadow-sm">
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-medium text-slate-700">启用基础认证</div>
-                <div class="text-xs text-slate-500">开启后访问需要用户名和密码</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.enableBasicAuth') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.enableBasicAuthDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.basicAuthMode" class="sr-only peer">
@@ -548,8 +551,8 @@ onMounted(() => {
             </div>
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-medium text-slate-700">启用用户账户</div>
-                <div class="text-xs text-slate-500">开启后支持独立用户登录</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.enableUserAccounts') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.enableUserAccountsDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.enableUserAccounts" class="sr-only peer">
@@ -558,8 +561,8 @@ onMounted(() => {
             </div>
             <div class="flex items-center justify-between" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.enableUserAccounts }">
               <div>
-                <div class="font-medium text-slate-700">低调登录模式</div>
-                <div class="text-xs text-slate-500">隐藏显式登录入口</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.discreetLogin') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.discreetLoginDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.enableDiscreetLogin" class="sr-only peer">
@@ -568,45 +571,45 @@ onMounted(() => {
             </div>
             <div class="flex items-center justify-between" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.enableUserAccounts }">
               <div>
-                <div class="font-medium text-slate-700">按用户基础认证</div>
-                <div class="text-xs text-slate-500">每个用户使用独立基础认证</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.perUserBasicAuth') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.perUserBasicAuthDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.perUserBasicAuth" class="sr-only peer">
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
               </label>
             </div>
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
             <div class="space-y-2" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.basicAuthMode }">
-              <div class="font-medium text-slate-700 text-sm">用户名</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.username') }}</div>
               <input
                 type="text"
                 v-model="tavernConfig.basicAuthUser.username"
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none transition-all"
+                class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none transition-all"
               />
             </div>
             <div class="space-y-2" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.basicAuthMode }">
-              <div class="font-medium text-slate-700 text-sm">密码</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.password') }}</div>
               <input
                 type="text"
                 v-model="tavernConfig.basicAuthUser.password"
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none transition-all"
+                class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none transition-all"
               />
             </div>
           </div>
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhGlobe :size="20" class="text-cyan-500" weight="duotone" />
-            CORS 配置
+            {{ t('tavern.corsConfig') }}
           </h2>
 
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-medium text-slate-700">启用 CORS</div>
-                <div class="text-xs text-slate-500">控制跨域请求来源</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.enableCors') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.enableCorsDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.cors.enabled" class="sr-only peer">
@@ -614,16 +617,16 @@ onMounted(() => {
               </label>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.cors.enabled }">
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">允许来源 Origin</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.allowedOrigins') }}</div>
                 <button
                   @click="addCorsOrigin"
-                  class="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 bg-cyan-50 rounded-md transition-colors"
+                  class="text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium px-2 py-1 bg-cyan-50 dark:bg-cyan-900/30 rounded-md transition-colors"
                 >
-                  + 添加来源
+                  + {{ t('tavern.addOrigin') }}
                 </button>
               </div>
 
@@ -631,27 +634,27 @@ onMounted(() => {
                 <input
                   type="text"
                   v-model="tavernConfig.cors.origin[index]"
-                  placeholder="例如: https://example.com"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.originPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
                 />
                 <button
                   @click="removeCorsOrigin(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
               </div>
 
-              <div class="w-full h-px bg-slate-100"></div>
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">允许方法 Methods</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.allowedMethods') }}</div>
                 <button
                   @click="addCorsMethod"
-                  class="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 bg-cyan-50 rounded-md transition-colors"
+                  class="text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium px-2 py-1 bg-cyan-50 dark:bg-cyan-900/30 rounded-md transition-colors"
                 >
-                  + 添加方法
+                  + {{ t('tavern.addMethod') }}
                 </button>
               </div>
 
@@ -659,27 +662,27 @@ onMounted(() => {
                 <input
                   type="text"
                   v-model="tavernConfig.cors.methods[index]"
-                  placeholder="例如: OPTIONS"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.methodPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
                 />
                 <button
                   @click="removeCorsMethod(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
               </div>
 
-              <div class="w-full h-px bg-slate-100"></div>
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">允许请求头 Allowed Headers</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.allowedHeaders') }}</div>
                 <button
                   @click="addCorsAllowedHeader"
-                  class="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 bg-cyan-50 rounded-md transition-colors"
+                  class="text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium px-2 py-1 bg-cyan-50 dark:bg-cyan-900/30 rounded-md transition-colors"
                 >
-                  + 添加请求头
+                  + {{ t('tavern.addHeader') }}
                 </button>
               </div>
 
@@ -687,27 +690,27 @@ onMounted(() => {
                 <input
                   type="text"
                   v-model="tavernConfig.cors.allowedHeaders[index]"
-                  placeholder="例如: Content-Type"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.headerPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
                 />
                 <button
                   @click="removeCorsAllowedHeader(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
               </div>
 
-              <div class="w-full h-px bg-slate-100"></div>
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">暴露响应头 Exposed Headers</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.exposedHeaders') }}</div>
                 <button
                   @click="addCorsExposedHeader"
-                  class="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 bg-cyan-50 rounded-md transition-colors"
+                  class="text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium px-2 py-1 bg-cyan-50 dark:bg-cyan-900/30 rounded-md transition-colors"
                 >
-                  + 添加响应头
+                  + {{ t('tavern.addExposedHeader') }}
                 </button>
               </div>
 
@@ -715,22 +718,22 @@ onMounted(() => {
                 <input
                   type="text"
                   v-model="tavernConfig.cors.exposedHeaders[index]"
-                  placeholder="例如: X-Trace-Id"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.exposedHeaderPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
                 />
                 <button
                   @click="removeCorsExposedHeader(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
               </div>
 
-              <div class="w-full h-px bg-slate-100"></div>
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
               <div class="flex items-center justify-between">
-                <div class="text-sm text-slate-600">允许携带凭证 Credentials</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.allowCredentials') }}</div>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" v-model="tavernConfig.cors.credentials" class="sr-only peer">
                   <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
@@ -738,12 +741,12 @@ onMounted(() => {
               </div>
 
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">缓存时间 Max Age (留空为 null)</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.maxAge') }}</div>
                 <input
                   type="number"
                   :value="tavernConfig.cors.maxAge ?? ''"
                   @input="onCorsMaxAgeInput"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2 outline-none transition-all"
                 />
               </div>
             </div>
@@ -751,16 +754,16 @@ onMounted(() => {
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhGlobe :size="20" class="text-rose-500" weight="duotone" />
-            请求代理
+            {{ t('tavern.requestProxy') }}
           </h2>
 
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-medium text-slate-700">启用 Request Proxy</div>
-                <div class="text-xs text-slate-500">为外部请求设置统一代理</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.enableProxy') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.enableProxyDesc') }}</div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.requestProxy.enabled" class="sr-only peer">
@@ -768,26 +771,26 @@ onMounted(() => {
               </label>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.requestProxy.enabled }">
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">代理地址 URL</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.proxyUrl') }}</div>
                 <input
                   type="text"
                   v-model="tavernConfig.requestProxy.url"
-                  placeholder="例如: socks5://127.0.0.1:1080"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.proxyUrlPlaceholder')"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-2 outline-none transition-all"
                 />
               </div>
 
               <div class="flex items-center justify-between">
-                <div class="font-medium text-slate-700 text-sm">绕过代理地址</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.bypassList') }}</div>
                 <button
                   @click="addRequestProxyBypass"
-                  class="text-xs text-rose-600 hover:text-rose-700 font-medium px-2 py-1 bg-rose-50 rounded-md transition-colors"
+                  class="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium px-2 py-1 bg-rose-50 dark:bg-rose-900/30 rounded-md transition-colors"
                 >
-                  + 添加地址
+                  + {{ t('tavern.addBypass') }}
                 </button>
               </div>
 
@@ -795,13 +798,13 @@ onMounted(() => {
                 <input
                   type="text"
                   v-model="tavernConfig.requestProxy.bypass[index]"
-                  placeholder="例如: localhost"
-                  class="flex-1 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-2 outline-none transition-all"
+                  :placeholder="t('tavern.bypassPlaceholder')"
+                  class="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-2 outline-none transition-all"
                 />
                 <button
                   @click="removeRequestProxyBypass(index)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="移除"
+                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  :title="t('common.remove')"
                 >
                   ✕
                 </button>
@@ -811,25 +814,25 @@ onMounted(() => {
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhBrowser :size="20" class="text-emerald-500" weight="duotone" />
-            备份配置
+            {{ t('tavern.backupSettings') }}
           </h2>
 
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <div class="space-y-2">
-              <div class="font-medium text-slate-700 text-sm">通用备份数量</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.commonBackups') }}</div>
               <input
                 type="number"
                 v-model.number="tavernConfig.backups.common.numberOfBackups"
-                class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
+                class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
               />
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="flex items-center justify-between">
-              <div class="text-sm text-slate-600">启用聊天备份</div>
+              <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.enableChatBackup') }}</div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.backups.chat.enabled" class="sr-only peer">
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
@@ -837,7 +840,7 @@ onMounted(() => {
             </div>
 
             <div class="flex items-center justify-between" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.backups.chat.enabled }">
-              <div class="text-sm text-slate-600">启用完整性校验</div>
+              <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.checkIntegrity') }}</div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.backups.chat.checkIntegrity" class="sr-only peer">
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
@@ -846,19 +849,19 @@ onMounted(() => {
 
             <div class="grid grid-cols-2 gap-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.backups.chat.enabled }">
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">聊天最大备份数</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.maxTotalBackups') }}</div>
                 <input
                   type="number"
                   v-model.number="tavernConfig.backups.chat.maxTotalBackups"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
                 />
               </div>
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">节流间隔 (ms)</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.throttleInterval') }}</div>
                 <input
                   type="number"
                   v-model.number="tavernConfig.backups.chat.throttleInterval"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none transition-all"
                 />
               </div>
             </div>
@@ -866,14 +869,14 @@ onMounted(() => {
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <PhBrowser :size="20" class="text-teal-500" weight="duotone" />
-            缩略图配置
+            {{ t('tavern.thumbnailSettings') }}
           </h2>
 
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <div class="flex items-center justify-between">
-              <div class="text-sm text-slate-600">启用缩略图</div>
+              <div class="text-sm text-slate-600 dark:text-slate-400">{{ t('tavern.enableThumbnails') }}</div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" v-model="tavernConfig.thumbnails.enabled" class="sr-only peer">
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
@@ -882,69 +885,100 @@ onMounted(() => {
 
             <div class="grid grid-cols-2 gap-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.thumbnails.enabled }">
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">格式</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.thumbnailFormat') }}</div>
                 <input
                   type="text"
                   v-model="tavernConfig.thumbnails.format"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2 outline-none transition-all"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2 outline-none transition-all"
                 />
               </div>
               <div class="space-y-2">
-                <div class="font-medium text-slate-700 text-sm">质量</div>
+                <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.thumbnailQuality') }}</div>
                 <input
                   type="number"
                   v-model.number="tavernConfig.thumbnails.quality"
-                  class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2 outline-none transition-all"
+                  class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2 outline-none transition-all"
                 />
               </div>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.thumbnails.enabled }">
-              <div class="font-medium text-slate-700 text-sm">尺寸 (宽 x 高)</div>
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.dimensions') }}</div>
               <div class="grid grid-cols-5 gap-2 items-center">
-                <div class="text-sm text-slate-500">背景</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.bg[0]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <div class="text-sm text-slate-500 dark:text-slate-400">{{ t('tavern.background') }}</div>
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.bg[0]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div class="text-center text-slate-400">x</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.bg[1]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.bg[1]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div></div>
               </div>
               <div class="grid grid-cols-5 gap-2 items-center">
-                <div class="text-sm text-slate-500">头像</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.avatar[0]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <div class="text-sm text-slate-500 dark:text-slate-400">{{ t('tavern.avatar') }}</div>
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.avatar[0]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div class="text-center text-slate-400">x</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.avatar[1]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.avatar[1]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div></div>
               </div>
               <div class="grid grid-cols-5 gap-2 items-center">
-                <div class="text-sm text-slate-500">人设</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.persona[0]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <div class="text-sm text-slate-500 dark:text-slate-400">{{ t('tavern.persona') }}</div>
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.persona[0]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div class="text-center text-slate-400">x</div>
-                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.persona[1]" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
+                <input type="number" v-model.number="tavernConfig.thumbnails.dimensions.persona[1]" class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2 outline-none transition-all focus:ring-teal-500 focus:border-teal-500" />
                 <div></div>
               </div>
             </div>
           </div>
         </section>
 
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <PhBrowser :size="20" class="text-sky-500" weight="duotone" />
+            {{ t('tavern.browserSettings') }}
+          </h2>
+
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.autoLaunchBrowser') }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.autoLaunchBrowserDesc') }}</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="tavernConfig.browserLaunchEnabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+              </label>
+            </div>
+
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+
+            <div class="space-y-2">
+              <div class="font-medium text-slate-700 dark:text-slate-300 text-sm">{{ t('tavern.browserType') }}</div>
+              <input
+                type="text"
+                v-model="tavernConfig.browserType"
+                class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block p-2 outline-none transition-all"
+              />
+            </div>
+          </div>
+        </section>
+
         <!-- Browser Settings -->
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <PhBrowser :size="20" class="text-orange-500" weight="duotone" />
-            浏览器启动
+            {{ t('tavern.browserSettings') }}
           </h2>
           
-          <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
             <!-- Auto run -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+                <div class="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500 dark:text-orange-400">
                   <PhBrowser :size="18" weight="duotone" />
                 </div>
                 <div>
-                  <div class="font-medium text-slate-700">启动时自动打开</div>
-                  <div class="text-xs text-slate-500">启动酒馆后自动在浏览器中打开页面</div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.autoOpenOnStart') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.autoOpenOnStartDesc') }}</div>
                 </div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
@@ -953,24 +987,24 @@ onMounted(() => {
               </label>
             </div>
 
-            <div class="w-full h-px bg-slate-100"></div>
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
             <!-- Browser Type -->
             <div class="flex items-center justify-between" :class="{ 'opacity-50 pointer-events-none': !tavernConfig.browserLaunchEnabled }">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500">
+                <div class="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
                   <PhBrowser :size="18" weight="duotone" />
                 </div>
                 <div>
-                  <div class="font-medium text-slate-700">浏览器选择</div>
-                  <div class="text-xs text-slate-500">选择要使用的浏览器</div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('tavern.browserSelection') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('tavern.browserSelectionDesc') }}</div>
                 </div>
               </div>
               <select 
                 v-model="tavernConfig.browserType" 
-                class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5 min-w-[120px] outline-none transition-all"
+                class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5 min-w-[120px] outline-none transition-all"
               >
-                <option value="default">系统默认</option>
+                <option value="default">{{ t('tavern.browserDefault') }}</option>
                 <option value="chrome">Chrome</option>
                 <option value="edge">Edge</option>
                 <option value="firefox">Firefox</option>

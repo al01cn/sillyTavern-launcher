@@ -37,8 +37,11 @@
 import { ref, onMounted } from 'vue';
 import { Wrench, ExternalLink } from 'lucide-vue-next';
 import { openUrl as open } from '@tauri-apps/plugin-opener';
+// import { useI18n } from 'vue-i18n'; // 暂未使用
 import config from '../lib/config';
 import { getCachedImageUrl } from '../lib/imageCache';
+
+// const { t } = useI18n(); // 暂未使用
 
 interface ToolItem {
   name: string;

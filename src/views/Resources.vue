@@ -3,12 +3,14 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { PhUserSquare, PhArrowsClockwise, PhTrash, PhPlus, PhGlobe } from '@phosphor-icons/vue'
 import { ChevronLeft, ChevronRight, CheckSquare, Square, BookOpen } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { openCharacterCardDialog } from '../lib/useCharacterCardDialog'
 import { openUploadCharacterCardDialog } from '../lib/useUploadCharacterCard'
 import { openWorldInfoDialog } from '../lib/useWorldInfoDialog'
 import { openUploadWorldInfoDialog } from '../lib/useUploadWorldInfo'
 import { Dialog } from '../lib/useDialog'
 
+const { t } = useI18n()
 const activeTab = ref<'characters' | 'worlds'>('characters')
 
 interface CharacterCardFile {
@@ -91,13 +93,13 @@ const handleItemClick = (fileName: string, event: Event) => {
 const deleteSelected = async () => {
   if (selectedFiles.value.size === 0) return
   const isChar = activeTab.value === 'characters'
-  const itemName = isChar ? '角色卡' : '世界书'
+  const itemName = isChar ? t('resources.characterCard') : t('resources.worldInfo')
   
   Dialog.warning({
-    title: '确认删除',
-    msg: `确定要删除选中的 ${selectedFiles.value.size} 个${itemName}吗？此操作不可恢复。`,
-    confirmText: '删除',
-    cancelText: '取消',
+    title: t('resources.confirmDelete'),
+    msg: t('resources.confirmDeleteMultiple', { count: selectedFiles.value.size, type: itemName }),
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
     onConfirm: async () => {
       loading.value = true
       try {
@@ -114,7 +116,7 @@ const deleteSelected = async () => {
           await loadWorldInfos()
         }
       } catch (e: any) {
-        errorMsg.value = `删除失败: ${e?.message || String(e)}`
+        errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
     }
@@ -124,13 +126,13 @@ const deleteSelected = async () => {
 const deleteSingle = async (fileName: string, event: Event) => {
   event.stopPropagation()
   const isChar = activeTab.value === 'characters'
-  const itemName = isChar ? '角色卡' : '世界书'
+  const itemName = isChar ? t('resources.characterCard') : t('resources.worldInfo')
   
   Dialog.warning({
-    title: '确认删除',
-    msg: `确定要删除${itemName} "${fileName}" 吗？此操作不可恢复。`,
-    confirmText: '删除',
-    cancelText: '取消',
+    title: t('resources.confirmDelete'),
+    msg: t('resources.confirmDeleteSingle', { type: itemName, name: fileName }),
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
     onConfirm: async () => {
       loading.value = true
       try {
@@ -142,7 +144,7 @@ const deleteSingle = async (fileName: string, event: Event) => {
           await loadWorldInfos()
         }
       } catch (e: any) {
-        errorMsg.value = `删除失败: ${e?.message || String(e)}`
+        errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
     }
@@ -151,14 +153,12 @@ const deleteSingle = async (fileName: string, event: Event) => {
 
 const importCard = () => {
   openUploadCharacterCardDialog(() => {
-    // 成功后重新加载角色卡
     loadCharacterCards()
   })
 }
 
 const importWorld = () => {
   openUploadWorldInfoDialog(() => {
-    // 成功后重新加载世界书
     loadWorldInfos()
   })
 }
@@ -293,112 +293,112 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-6 px-1">
-      <h1 class="text-2xl font-bold">资源管理</h1>
+      <h1 class="text-2xl font-bold dark:text-slate-100">{{ t('resources.title') }}</h1>
       <div class="flex items-center gap-2">
         <button
           v-if="activeTab === 'characters'"
           @click="importCard()"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 flex items-center gap-2 border border-blue-200/50"
+          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
           type="button"
         >
           <PhPlus :size="16" weight="bold" />
-          添加角色卡
+          {{ t('resources.addCharacterCard') }}
         </button>
         <button
           v-if="activeTab === 'worlds'"
           @click="importWorld()"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 flex items-center gap-2 border border-blue-200/50"
+          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
           type="button"
         >
           <PhPlus :size="16" weight="bold" />
-          添加世界书
+          {{ t('resources.addWorldInfo') }}
         </button>
         <button
           @click="activeTab === 'characters' ? loadCharacterCards() : loadWorldInfos()"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-2"
+          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
           type="button"
         >
           <PhArrowsClockwise :size="16" weight="duotone" :class="loading ? 'animate-spin' : ''" />
-          刷新
+          {{ t('common.refresh') }}
         </button>
       </div>
     </div>
 
-    <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 shrink-0">
+    <div class="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit mb-6 shrink-0">
       <button
         @click="activeTab = 'characters'"
         :class="[
           'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
           activeTab === 'characters'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
         ]"
         type="button"
       >
         <PhUserSquare :size="16" weight="duotone" />
-        角色卡
+        {{ t('resources.characterCards') }}
       </button>
       <button
         @click="activeTab = 'worlds'"
         :class="[
           'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
           activeTab === 'worlds'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
         ]"
         type="button"
       >
         <PhGlobe :size="16" weight="duotone" />
-        世界书
+        {{ t('resources.worldInfos') }}
       </button>
     </div>
 
     <div class="flex-1 overflow-y-auto px-1 pb-10 min-h-0 relative">
       <div v-if="activeTab === 'characters'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="text-sm font-medium text-slate-700">角色卡</div>
-              <div class="w-px h-4 bg-slate-200"></div>
+              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('resources.characterCards') }}</div>
+              <div class="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
               
               <button
                 @click="toggleSelectMode"
                 class="text-xs font-medium px-2 py-1 rounded transition-colors"
-                :class="isSelectMode ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'"
+                :class="isSelectMode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'"
               >
-                {{ isSelectMode ? '退出选择' : '批量操作' }}
+                {{ isSelectMode ? t('resources.exitSelection') : t('resources.batchOperations') }}
               </button>
               
               <template v-if="isSelectMode">
                 <button
                   @click="selectAllOnPage"
-                  class="text-xs font-medium px-2 py-1 rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  class="text-xs font-medium px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                 >
-                  本页全选/取消
+                  {{ t('resources.selectAllOnPage') }}
                 </button>
                 <div v-if="selectedFiles.size > 0" class="flex items-center gap-2">
-                  <span class="text-xs text-slate-500">已选 {{ selectedFiles.size }} 项</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.selectedItems', { count: selectedFiles.size }) }}</span>
                   <button
                     @click="deleteSelected"
-                    class="text-xs font-medium px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-1"
+                    class="text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
                   >
                     <PhTrash :size="14" />
-                    删除选中
+                    {{ t('resources.deleteSelected') }}
                   </button>
                 </div>
               </template>
             </div>
-            <div class="text-xs text-slate-500 font-medium shrink-0">共 {{ totalCount }} 张</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">{{ t('resources.totalCards', { count: totalCount }) }}</div>
           </div>
         </div>
 
-        <div v-if="errorMsg" class="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-600">
+        <div v-if="errorMsg" class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
           {{ errorMsg }}
         </div>
 
-        <div v-else-if="!loading && totalCount === 0" class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm text-center text-slate-400">
-          <div class="text-sm font-medium text-slate-500">未找到角色卡</div>
-          <div class="text-xs text-slate-400 mt-1">请确认目录下存在 .png 角色卡文件</div>
+        <div v-else-if="!loading && totalCount === 0" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400">
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('resources.noCharacterCards') }}</div>
+          <div class="text-xs text-slate-400 mt-1">{{ t('resources.noCharacterCardsHint') }}</div>
         </div>
 
         <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -426,13 +426,13 @@ onUnmounted(() => {
               v-if="!isSelectMode"
               @click="deleteSingle(card.fileName, $event)"
               class="absolute top-3 right-3 z-10 p-1.5 bg-white/90 backdrop-blur text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-              title="删除角色卡"
+              :title="t('common.delete')"
             >
               <PhTrash :size="16" weight="bold" />
             </button>
 
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-soft transition-shadow overflow-hidden flex-1 flex flex-col">
-              <div class="bg-slate-100 aspect-[2/3] shrink-0">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-soft transition-shadow overflow-hidden flex-1 flex flex-col">
+              <div class="bg-slate-100 dark:bg-slate-700 aspect-2/3 shrink-0">
                 <img
                   v-if="thumbUrlByFileName[card.fileName]"
                   :src="thumbUrlByFileName[card.fileName]"
@@ -440,38 +440,38 @@ onUnmounted(() => {
                   :alt="card.fileName"
                   loading="lazy"
                 />
-                <div v-else class="w-full h-full flex items-center justify-center text-slate-400 text-xs font-medium">
-                  正在加载...
+                <div v-else class="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-medium">
+                  {{ t('common.loading') }}
                 </div>
               </div>
               <div class="p-3 flex-1 flex flex-col justify-between">
-                <div class="text-sm font-semibold text-slate-800 line-clamp-2 leading-tight">{{ card.fileName }}</div>
-                <div class="text-xs text-slate-500 mt-2 shrink-0">{{ formatSize(card.size) }}</div>
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight">{{ card.fileName }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 mt-2 shrink-0">{{ formatSize(card.size) }}</div>
               </div>
             </div>
           </button>
         </div>
 
         <!-- Pagination Controls -->
-        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-xl mt-6">
-          <span class="text-sm text-slate-500">
-            共 {{ totalCount }} 个角色卡
+        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6">
+          <span class="text-sm text-slate-500 dark:text-slate-400">
+            {{ t('resources.totalCards', { count: totalCount }) }}
           </span>
           <div class="flex items-center gap-2">
             <button 
               @click="prevPage" 
               :disabled="currentPage === 1"
-              class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
             >
               <ChevronLeft class="w-4 h-4" />
             </button>
-            <span class="text-sm font-medium text-slate-700 min-w-[3rem] text-center">
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center">
               {{ currentPage }} / {{ totalPages }}
             </span>
             <button 
               @click="nextPage" 
               :disabled="currentPage === totalPages"
-              class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
             >
               <ChevronRight class="w-4 h-4" />
             </button>
@@ -480,50 +480,50 @@ onUnmounted(() => {
       </div>
 
       <div v-else-if="activeTab === 'worlds'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="text-sm font-medium text-slate-700">世界书</div>
-              <div class="w-px h-4 bg-slate-200"></div>
+              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('resources.worldInfos') }}</div>
+              <div class="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
               
               <button
                 @click="toggleSelectMode"
                 class="text-xs font-medium px-2 py-1 rounded transition-colors"
-                :class="isSelectMode ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'"
+                :class="isSelectMode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'"
               >
-                {{ isSelectMode ? '退出选择' : '批量操作' }}
+                {{ isSelectMode ? t('resources.exitSelection') : t('resources.batchOperations') }}
               </button>
               
               <template v-if="isSelectMode">
                 <button
                   @click="selectAllOnPage"
-                  class="text-xs font-medium px-2 py-1 rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  class="text-xs font-medium px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                 >
-                  本页全选/取消
+                  {{ t('resources.selectAllOnPage') }}
                 </button>
                 <div v-if="selectedFiles.size > 0" class="flex items-center gap-2">
-                  <span class="text-xs text-slate-500">已选 {{ selectedFiles.size }} 项</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.selectedItems', { count: selectedFiles.size }) }}</span>
                   <button
                     @click="deleteSelected"
-                    class="text-xs font-medium px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-1"
+                    class="text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
                   >
                     <PhTrash :size="14" />
-                    删除选中
+                    {{ t('resources.deleteSelected') }}
                   </button>
                 </div>
               </template>
             </div>
-            <div class="text-xs text-slate-500 font-medium shrink-0">共 {{ totalCount }} 个</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">{{ t('resources.totalInfos', { count: totalCount }) }}</div>
           </div>
         </div>
 
-        <div v-if="errorMsg" class="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-600">
+        <div v-if="errorMsg" class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
           {{ errorMsg }}
         </div>
 
-        <div v-else-if="!loading && totalCount === 0" class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm text-center text-slate-400">
-          <div class="text-sm font-medium text-slate-500">未找到世界书</div>
-          <div class="text-xs text-slate-400 mt-1">请确认目录下存在 .json 世界书文件</div>
+        <div v-else-if="!loading && totalCount === 0" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400">
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('resources.noWorldInfos') }}</div>
+          <div class="text-xs text-slate-400 mt-1">{{ t('resources.noWorldInfosHint') }}</div>
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -545,48 +545,48 @@ onUnmounted(() => {
             <button
               v-if="!isSelectMode"
               @click="deleteSingle(world.fileName, $event)"
-              class="absolute top-1/2 -translate-y-1/2 right-3 z-10 p-1.5 bg-white/90 backdrop-blur text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-              title="删除世界书"
+              class="absolute top-1/2 -translate-y-1/2 right-3 z-10 p-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+              :title="t('common.delete')"
             >
               <PhTrash :size="16" weight="bold" />
             </button>
 
-            <div class="bg-white rounded-xl border transition-all p-4 flex items-center gap-4"
+            <div class="bg-white dark:bg-slate-800 rounded-xl border transition-all p-4 flex items-center gap-4"
               :class="[
-                isSelectMode && selectedFiles.has(world.fileName) ? 'border-blue-500 bg-blue-50/30' : 'border-slate-200 hover:shadow-soft',
+                isSelectMode && selectedFiles.has(world.fileName) ? 'border-blue-500 dark:border-blue-400 bg-blue-50/30 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:shadow-soft',
                 isSelectMode ? 'pr-12' : ''
               ]"
             >
-              <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <BookOpen class="w-5 h-5 text-blue-500" />
+              <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <BookOpen class="w-5 h-5 text-blue-500 dark:text-blue-400" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-semibold text-slate-800 truncate">{{ world.fileName }}</div>
-                <div class="text-xs text-slate-500 mt-1">{{ formatSize(world.size) }}</div>
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{{ world.fileName }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ formatSize(world.size) }}</div>
               </div>
             </div>
           </button>
         </div>
 
-        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-xl mt-6">
-          <span class="text-sm text-slate-500">
-            共 {{ totalCount }} 个世界书
+        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6">
+          <span class="text-sm text-slate-500 dark:text-slate-400">
+            {{ t('resources.totalInfos', { count: totalCount }) }}
           </span>
           <div class="flex items-center gap-2">
             <button 
               @click="prevPage" 
               :disabled="currentPage === 1"
-              class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
             >
               <ChevronLeft class="w-4 h-4" />
             </button>
-            <span class="text-sm font-medium text-slate-700 min-w-[3rem] text-center">
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center">
               {{ currentPage }} / {{ totalPages }}
             </span>
             <button 
               @click="nextPage" 
               :disabled="currentPage === totalPages"
-              class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
             >
               <ChevronRight class="w-4 h-4" />
             </button>

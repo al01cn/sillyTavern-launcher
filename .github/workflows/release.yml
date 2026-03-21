@@ -8,6 +8,10 @@ on:
       - "package.json" # 限制：只有当由您主动推送了带有修改过 package.json（也就是修改了版本号等信息）才会触发构建
   workflow_dispatch: # 您也可以依然在网页上手动点击运行
 
+# 强制所有 JavaScript Actions 使用 Node.js 24 运行时，消除 Node.js 20 弃用警告
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     strategy:
@@ -24,6 +28,7 @@ jobs:
             args: ""
 
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
     permissions:
       contents: write # 必须开启 write 权限才能创建 Release
 
@@ -56,6 +61,32 @@ jobs:
       - name: Sync Version
         run: bun run sync-version
 
+      # 从「UPDATELOGS.md」中提取当前版本对应的更新内容
+      - name: Extract Changelog
+        id: changelog
+        shell: bash
+        run: |
+          # 读取 package.json 中的版本号
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $VERSION"
+
+          # 从更新日志中提取对应版本区块
+          # 匹配 ## [x.y.z] 开头的区块，提取直到下一个 ## [ 或文件末尾  
+          BODY=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" UPDATELOGS.md)
+
+          if [ -z "$BODY" ]; then
+            BODY="Please download the corresponding installation package according to your system. The client can also upgrade seamlessly!"
+            echo "⚠️ No version [$VERSION] record found in the update log, using default description."
+          else
+            echo "✅ Successfully extracted update log for version [$VERSION]."
+          fi
+
+          # 输出（多行内容需要使用 heredoc 格式）
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "body<<$EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+
       # 使用官方 Tauri Action，它会自动将跨平台的 updater 产物合并成 latest.json
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -67,7 +98,7 @@ jobs:
         with:
           tagName: "v__VERSION__" # tauri-action 的魔法占位符：自动从编译后的 tauri.conf 读取您的包版本
           releaseName: "SillyTavern Launcher GUI v__VERSION__"
-          releaseBody: "请根据您的系统下载对应的安装包。客户端也可直接无缝静默升级！"
+          releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false # 默认创建正式发布，您可以选择 true 预览
           prerelease: false
           args: ${{ matrix.args }}

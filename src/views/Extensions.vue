@@ -3,61 +3,61 @@
     <!-- Header Info -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800">扩展管理</h1>
-        <p class="text-slate-600 text-sm mt-1">管理酒馆已安装的第三方扩展扩展</p>
+        <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100">{{ t('extensions.title') }}</h1>
+        <p class="text-slate-600 dark:text-slate-400 text-sm mt-1">{{ t('extensions.subtitle') }}</p>
       </div>
       <div class="flex items-center gap-3">
         <button 
           @click="handleInstallPlugin"
-          class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200 active:scale-95"
+          class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-800 dark:hover:bg-slate-600 shadow-lg shadow-slate-200 dark:shadow-slate-900 active:scale-95"
         >
           <Download class="w-4 h-4" />
-          安装扩展
+          {{ t('extensions.installExtension') }}
         </button>
         <button 
           @click="openExtensionFolder"
-          class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+          class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 shadow-sm"
         >
           <FolderOpen class="w-4 h-4" />
-          打开扩展文件夹
+          {{ t('extensions.openExtensionFolder') }}
         </button>
       </div>
     </div>
 
     <!-- Version Selection -->
-    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 flex items-center justify-center">
           <Puzzle class="w-5 h-5" />
         </div>
         <div>
-          <h3 class="font-bold text-slate-800">当前选择的酒馆版本</h3>
-          <p class="text-xs text-slate-500 mt-0.5">将根据此版本检查扩展兼容性</p>
+          <h3 class="font-bold text-slate-800 dark:text-slate-100">{{ t('extensions.currentTavernVersion') }}</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ t('extensions.checkCompatibility') }}</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <div class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700">
-          {{ selectedVersion || '未选择版本' }}
+        <div class="px-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300">
+          {{ selectedVersion || t('versions.notSet') }}
         </div>
         <router-link 
           to="/versions"
-          class="text-xs text-blue-500 hover:text-blue-600 font-medium transition-colors ml-1"
+          class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors ml-1"
         >
-          去切换
+          {{ t('extensions.goSwitch') }}
         </router-link>
       </div>
     </div>
 
     <!-- Extensions List -->
-    <div v-if="selectedVersion" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+    <div v-if="selectedVersion" class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+      <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+        <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <Puzzle class="w-5 h-5 text-slate-400" />
-          已安装扩展
+          {{ t('extensions.installedExtensions') }}
         </h3>
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-slate-600">显示系统扩展</span>
+            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">{{ t('extensions.showSystemExtensions') }}</span>
             <button 
               @click="showOfficial = !showOfficial"
               class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
@@ -69,7 +69,7 @@
               />
             </button>
           </div>
-          <button @click="refresh(true)" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-lg hover:bg-slate-50">
+          <button @click="refresh(true)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">
             <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
           </button>
         </div>
@@ -77,52 +77,52 @@
       
       <div v-if="loading && extensions.length === 0" class="p-10 text-center text-slate-400">
         <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
-        <p>正在扫描扩展...</p>
+        <p>{{ t('extensions.scanningExtensions') }}</p>
       </div>
 
       <div v-else-if="filteredExtensions.length === 0" class="p-10 text-center text-slate-400 flex flex-col items-center">
         <Puzzle class="w-12 h-12 mb-3 text-slate-300" />
-        <p>没有找到任何扩展</p>
-        <p class="text-xs mt-1">您可以点击右上角按钮打开文件夹放入扩展</p>
+        <p>{{ t('extensions.noExtensionsFound') }}</p>
+        <p class="text-xs mt-1">{{ t('extensions.noExtensionsHint') }}</p>
       </div>
 
       <div v-else class="flex flex-col">
-        <div class="divide-y divide-slate-50">
-          <div v-for="ext in paginatedExtensions" :key="ext.id" class="p-5 hover:bg-slate-50/50 transition-colors group">
+        <div class="divide-y divide-slate-50 dark:divide-slate-700">
+          <div v-for="ext in paginatedExtensions" :key="ext.id" class="p-5 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors group">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-3 mb-2">
-                  <h4 class="font-bold text-slate-800 text-lg" :class="{'opacity-50 line-through': !ext.enabled}">{{ ext.manifest.display_name || ext.id }}</h4>
-                  <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold tracking-wide" :class="{'opacity-50': !ext.enabled}">
-                    v{{ ext.manifest.version || '未知' }}
+                  <h4 class="font-bold text-slate-800 dark:text-slate-100 text-lg" :class="{'opacity-50 line-through': !ext.enabled}">{{ ext.manifest.display_name || ext.id }}</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[10px] font-bold tracking-wide" :class="{'opacity-50': !ext.enabled}">
+                    v{{ ext.manifest.version || t('versions.notSet') }}
                   </span>
-                  <span v-if="ext.manifest.minimum_client_version !== undefined && ext.manifest.minimum_client_version !== null" class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 text-[10px] font-bold tracking-wide" :class="{'opacity-50': !ext.enabled}" title="最小支持客户端版本">
+                  <span v-if="ext.manifest.minimum_client_version !== undefined && ext.manifest.minimum_client_version !== null" class="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 text-[10px] font-bold tracking-wide" :class="{'opacity-50': !ext.enabled}" :title="t('extensions.minClientVersion')">
                     ST &ge; {{ ext.manifest.minimum_client_version }}
                   </span>
                   <!-- Compatibility Warning -->
-                  <span v-if="ext.manifest.minimum_client_version !== undefined && ext.manifest.minimum_client_version !== null && !isCompatible(ext.manifest.minimum_client_version)" class="px-2 py-0.5 rounded-full bg-red-50 text-red-500 text-[10px] font-bold tracking-wide flex items-center gap-1" :class="{'opacity-50': !ext.enabled}" title="当前版本可能不兼容">
+                  <span v-if="ext.manifest.minimum_client_version !== undefined && ext.manifest.minimum_client_version !== null && !isCompatible(ext.manifest.minimum_client_version)" class="px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 text-[10px] font-bold tracking-wide flex items-center gap-1" :class="{'opacity-50': !ext.enabled}" :title="t('extensions.maybeIncompatible')">
                     <AlertTriangle class="w-3 h-3" />
-                    可能不兼容
+                    {{ t('extensions.maybeIncompatible') }}
                   </span>
                   <!-- Disabled Badge -->
-                  <span v-if="!ext.enabled" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold tracking-wide">
-                    已禁用
+                  <span v-if="!ext.enabled" class="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-bold tracking-wide">
+                    {{ t('extensions.disabled') }}
                   </span>
                   <!-- Scope Badge -->
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide" :class="ext.scope === 'global' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'">
-                    {{ ext.scope === 'global' ? '全局' : '当前用户' }}
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide" :class="ext.scope === 'global' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'">
+                    {{ ext.scope === 'global' ? t('extensions.scope.global') : t('extensions.scope.user') }}
                   </span>
                   <!-- System Badge -->
-                  <span v-if="ext.is_system" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold tracking-wide flex items-center gap-1">
+                  <span v-if="ext.is_system" class="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold tracking-wide flex items-center gap-1">
                     <ShieldCheck class="w-3 h-3" />
-                    系统
+                    {{ t('extensions.system') }}
                   </span>
                 </div>
                 
-                <div class="flex items-center gap-4 text-sm text-slate-500 mb-1">
+                <div class="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mb-1">
                   <span class="flex items-center gap-1">
                      <User class="w-3.5 h-3.5" />
-                     {{ ext.manifest.author || '未知作者' }}
+                     {{ ext.manifest.author || t('extensions.unknownAuthor') }}
                   </span>
                   <span class="text-slate-300">|</span>
                   <span class="flex items-center gap-1 font-mono text-xs">
@@ -135,19 +135,19 @@
                       :href="ext.manifest.homePage" 
                       target="_blank" 
                       @click.prevent="openUrl(ext.manifest.homePage)"
-                      class="px-2 py-1 text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-md transition-colors flex items-center gap-1"
-                      title="访问扩展主页"
+                      class="px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors flex items-center gap-1"
+                      :title="t('extensions.visitHomepage')"
                     >
                       <Globe class="w-3 h-3" />
-                      访问主页
+                      {{ t('extensions.visitHomepage') }}
                     </a>
                     <button 
                       @click="openSpecificExtensionFolder(ext.dir_path)"
-                      class="px-2 py-1 text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-md transition-colors flex items-center gap-1"
-                      title="在资源管理器中打开此扩展文件夹"
+                      class="px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors flex items-center gap-1"
+                      :title="t('extensions.openDirectory')"
                     >
                       <FolderOpen class="w-3 h-3" />
-                      打开目录
+                      {{ t('extensions.openDirectory') }}
                     </button>
                   </div>
                 </div>
@@ -157,7 +157,7 @@
                  <div v-if="!ext.is_system" class="flex items-center gap-2">
                    <!-- Enable/Disable Switch -->
                    <div class="flex items-center gap-2">
-                     <span class="text-sm font-medium" :class="ext.enabled ? 'text-slate-600' : 'text-slate-400'">{{ ext.enabled ? '已启用' : '已禁用' }}</span>
+                     <span class="text-sm font-medium" :class="ext.enabled ? 'text-slate-600 dark:text-slate-400' : 'text-slate-400'">{{ ext.enabled ? t('extensions.enabled') : t('extensions.disabled') }}</span>
                      <button 
                        @click="toggleEnable(ext)"
                        class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
@@ -173,8 +173,8 @@
                    <!-- Delete Button -->
                    <button 
                      @click="deleteExtension(ext)"
-                     class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                     title="删除扩展"
+                     class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                     :title="t('extensions.deleteExtension')"
                    >
                      <Trash2 class="w-4 h-4" />
                    </button>
@@ -182,7 +182,7 @@
                  
                  <!-- Auto Update Switch -->
                  <div v-if="ext.manifest.auto_update !== undefined && ext.manifest.auto_update !== null" class="flex items-center gap-2" :class="{ 'pr-[34px]': !ext.is_system }">
-                   <span class="text-sm text-slate-500 font-medium">自动更新</span>
+                   <span class="text-sm text-slate-500 dark:text-slate-400 font-medium">{{ t('extensions.autoUpdate') }}</span>
                    <button 
                      @click="toggleAutoUpdate(ext)"
                      class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
@@ -227,9 +227,9 @@
       </div>
     </div>
     
-    <div v-else class="bg-white p-10 rounded-2xl shadow-sm border border-slate-100 text-center text-slate-400">
-      <Puzzle class="w-12 h-12 mx-auto mb-3 text-slate-300" />
-      <p>请先在上方选择一个酒馆版本来查看扩展</p>
+    <div v-else class="bg-white dark:bg-slate-800 p-10 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 text-center text-slate-400 dark:text-slate-500">
+      <Puzzle class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+      <p>{{ t('extensions.selectVersionFirst') }}</p>
     </div>
   </div>
 </template>
@@ -238,6 +238,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
+import { useI18n } from 'vue-i18n';
 import { 
     Download, FolderOpen, Puzzle, RefreshCw, Loader2, 
     User, Globe, Folder, AlertTriangle, Trash2,
@@ -246,6 +247,8 @@ import {
 import { toast } from 'vue-sonner';
 import { Dialog } from '../lib/useDialog';
 import { openInstallExtensionDialog } from '../lib/useExtensionInstall';
+
+const { t } = useI18n();
 
 interface ExtensionManifest {
     display_name?: string;
@@ -416,7 +419,7 @@ const refresh = async (forceUpdate = false) => {
         }
     } catch (e) {
         console.error(e);
-        toast.error('获取扩展列表失败: ' + String(e));
+        toast.error(t('extensions.fetchFailed') + ': ' + String(e));
     } finally {
         loading.value = false;
     }
@@ -424,29 +427,29 @@ const refresh = async (forceUpdate = false) => {
 
 const openExtensionFolder = async () => {
     Dialog.warning({
-        title: '选择目录',
-        msg: '请选择要打开的扩展目录：',
-        confirmText: '当前用户',
-        thirdBtnText: '全局',
+        title: t('extensions.selectDirectory'),
+        msg: t('extensions.selectDirectoryMsg'),
+        confirmText: t('home.currentUser'),
+        thirdBtnText: t('home.global'),
         showCancel: false,
         onConfirm: async () => {
             try {
                 await invoke('open_extension_folder', { scope: 'user', version: selectedVersion.value });
             } catch (e) {
-                toast.error('打开用户目录失败: ' + String(e));
+                toast.error(t('extensions.openUserDirFailed') + ': ' + String(e));
             } finally {
                 Dialog.close();
             }
         },
         onThirdBtn: async () => {
             if (!selectedVersion.value) {
-                toast.warning('请先在页面顶部选择一个酒馆版本');
+                toast.warning(t('extensions.selectVersionWarning'));
                 return;
             }
             try {
                 await invoke('open_extension_folder', { scope: 'global', version: selectedVersion.value });
             } catch (e) {
-                toast.error('打开全局目录失败: ' + String(e));
+                toast.error(t('extensions.openGlobalDirFailed') + ': ' + String(e));
             } finally {
                 Dialog.close();
             }
@@ -464,7 +467,7 @@ const openSpecificExtensionFolder = async (dirPath: string) => {
     try {
         await invoke('open_specific_extension_folder', { dirPath });
     } catch (e) {
-        toast.error('打开目录失败: ' + String(e));
+        toast.error(t('extensions.openDirFailed') + ': ' + String(e));
     }
 };
 
@@ -479,7 +482,7 @@ const openUrl = async (url?: string) => {
     try {
         await tauriOpenUrl(url);
     } catch (e) {
-        toast.error('无法打开链接: ' + String(e));
+        toast.error(t('tools.failedToOpen') + ': ' + String(e));
     }
 };
 
@@ -500,28 +503,28 @@ const toggleEnable = async (ext: ExtensionInfo) => {
             dirPath: ext.dir_path
         });
         updateCache();
-        toast.success(`已${newStatus ? '启用' : '禁用'}扩展：${ext.manifest.display_name || ext.id}`);
+        toast.success(t(newStatus ? 'extensions.extensionEnabled' : 'extensions.extensionDisabled', { name: ext.manifest.display_name || ext.id }));
     } catch (e) {
         // Revert on failure
         ext.enabled = !newStatus;
-        toast.error('切换状态失败: ' + String(e));
+        toast.error(t('extensions.toggleEnableFailed') + ': ' + String(e));
     }
 };
 
 const deleteExtension = (ext: ExtensionInfo) => {
     const extName = ext.manifest.display_name || ext.id;
     Dialog.warning({
-        title: '删除确认',
-        msg: `确定要删除扩展 "${extName}" 吗？此操作将彻底删除该扩展文件夹。`,
-        confirmText: '删除',
-        cancelText: '取消',
+        title: t('extensions.confirmDelete'),
+        msg: t('extensions.confirmDeleteExt', { name: extName }),
+        confirmText: t('common.delete'),
+        cancelText: t('common.cancel'),
         onConfirm: async () => {
             try {
                 await invoke('delete_extension', { 
                     id: ext.id,
                     dirPath: ext.dir_path
                 });
-                toast.success(`扩展 "${extName}" 已删除`);
+                toast.success(t('extensions.extensionDeleted', { name: extName }));
                 // Remove from list
                 extensions.value = extensions.value.filter(e => e.id !== ext.id);
                 updateCache();
@@ -530,7 +533,7 @@ const deleteExtension = (ext: ExtensionInfo) => {
                     currentPage.value--;
                 }
             } catch (e) {
-                toast.error('删除扩展失败: ' + String(e));
+                toast.error(t('extensions.deleteFailed') + ': ' + String(e));
             } finally {
                 Dialog.close();
             }
@@ -555,11 +558,11 @@ const toggleAutoUpdate = async (ext: ExtensionInfo) => {
             dirPath: ext.dir_path
         });
         updateCache();
-        toast.success(`已${newValue ? '开启' : '关闭'}自动更新`);
+        toast.success(t(newValue ? 'extensions.autoUpdateEnabled' : 'extensions.autoUpdateDisabled'));
     } catch (e) {
         // Revert on failure
         ext.manifest.auto_update = !newValue;
-        toast.error('切换自动更新失败: ' + String(e));
+        toast.error(t('extensions.toggleAutoUpdateFailed') + ': ' + String(e));
     }
 };
 

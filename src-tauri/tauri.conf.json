@@ -34,6 +34,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5MzhFMEFDNkU5QTNGMkIKUldRclA1cHVyT0E0S2RXT01sNURsUEFjV1JXYldLd0k2WFZ6VEdZRE5lNVpYWXZyR1hsVW42MEkK",
       "endpoints": [
+        "https://ghfast.top/https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json",
         "https://gh.llkk.cc/https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json",
         "https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json"
       ]

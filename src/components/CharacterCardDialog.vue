@@ -5,6 +5,9 @@ import { getCharacterInfo, getValueByPath } from 'gstinfo'
 import { X, Loader2, FileImage, Tags, User, BookOpen } from 'lucide-vue-next'
 import { characterCardDialogState, closeCharacterCardDialog } from '../lib/useCharacterCardDialog'
 import { Dialog } from '../lib/useDialog'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type CharacterInfo = Awaited<ReturnType<typeof getCharacterInfo>>
 
@@ -35,18 +38,18 @@ const formatDateTime = (input: unknown) => {
 }
 
 const positionMap: Record<string, string> = {
-  'before_char': '角色定义前 (Before Char)',
-  'after_char': '角色定义后 (After Char)',
-  '0': '角色定义前 (Before Char)',
-  '1': '角色定义后 (After Char)',
-  '2': '作者留言后 (After AN)',
-  'before_example': '示例对话前 (Before Example)',
-  'after_example': '示例对话后 (After Example)',
-  'before_prompt': '系统提示词前 (Before Prompt)',
-  'after_prompt': '系统提示词后 (After Prompt)',
-  'before_author': '作者留言前 (Before AN)',
-  'after_author': '作者留言后 (After AN)',
-  'at_depth': '指定深度 (@ Depth)',
+  'before_char': t('resources.positionBeforeChar'),
+  'after_char': t('resources.positionAfterChar'),
+  '0': t('resources.positionBeforeChar'),
+  '1': t('resources.positionAfterChar'),
+  '2': t('resources.positionAfterAN'),
+  'before_example': t('resources.positionBeforeExample'),
+  'after_example': t('resources.positionAfterExample'),
+  'before_prompt': t('resources.positionBeforePrompt'),
+  'after_prompt': t('resources.positionAfterPrompt'),
+  'before_author': t('resources.positionBeforeAuthor'),
+  'after_author': t('resources.positionAfterAN'),
+  'at_depth': t('resources.positionAtDepth'),
 }
 
 const translatePosition = (pos: string) => {
@@ -243,13 +246,13 @@ const handleImport = async () => {
     await invoke('import_character_card', { sourcePath: characterCardDialogState.importSourcePath })
     window.dispatchEvent(new Event('character-card-imported'))
     Dialog.success({
-      title: '导入成功',
-      context: `角色卡 ${characterCardDialogState.fileName} 已成功添加到酒馆`
+      title: t('resources.importCardSuccess'),
+      context: t('resources.importCardSuccessMsg', { name: characterCardDialogState.fileName })
     })
     closeCharacterCardDialog()
   } catch (e: any) {
     Dialog.error({
-      title: '导入失败',
+      title: t('resources.importCardFailed'),
       context: e?.message || String(e)
     })
   } finally {
@@ -326,7 +329,7 @@ onUnmounted(() => {
               <div v-if="!imageUrl" class="h-52 flex items-center justify-center text-slate-400">
                 <FileImage class="w-7 h-7" />
               </div>
-              <img v-else :src="imageUrl" class="w-full h-auto block" alt="角色卡" />
+              <img v-else :src="imageUrl" class="w-full h-auto block" :alt="t('resources.characterCard')" />
             </div>
           </div>
 
@@ -341,17 +344,17 @@ onUnmounted(() => {
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
                   <User class="w-4 h-4 text-blue-500" />
-                  作者
+                  {{ t('resources.author') }}
                 </div>
                 <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? (getValueByPath<string>(info as any, 'data.creator', '') || getValueByPath<string>(info as any, 'creator', '') || '未知') : '—' }}
+                  {{ info ? (getValueByPath<string>(info as any, 'data.creator', '') || getValueByPath<string>(info as any, 'creator', '') || t('resources.unknown')) : '—' }}
                 </div>
               </div>
 
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
                   <BookOpen class="w-4 h-4 text-indigo-500" />
-                  世界书条目
+                  {{ t('resources.worldBookEntries') }}
                 </div>
                 <div class="text-xs text-slate-500 mt-1">
                   {{ info ? `${preferredBookLabel} / ${preferredBookEntriesCount}` : '—' }}
@@ -361,24 +364,24 @@ onUnmounted(() => {
 
             <div class="mt-3 grid grid-cols-2 gap-3">
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="text-slate-700 text-sm font-semibold">创建日期</div>
+                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.createDate') }}</div>
                 <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? (createDate || '未知') : '—' }}
+                  {{ info ? (createDate || t('resources.unknown')) : '—' }}
                 </div>
               </div>
 
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="text-slate-700 text-sm font-semibold">规范版本</div>
+                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.specVersion') }}</div>
                 <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? ((spec ? `${spec}` : '未知') + (specVersion ? ` / ${specVersion}` : '')) : '—' }}
+                  {{ info ? ((spec ? `${spec}` : t('resources.unknown')) + (specVersion ? ` / ${specVersion}` : '')) : '—' }}
                 </div>
               </div>
             </div>
 
             <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div class="text-slate-700 text-sm font-semibold">简介</div>
+              <div class="text-slate-700 text-sm font-semibold">{{ t('resources.description') }}</div>
               <div v-if="info" class="text-xs text-slate-500 mt-1 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap">
-                {{ description || '无' }}
+                {{ description || t('resources.none') }}
               </div>
               <div v-else class="text-xs text-slate-400 mt-1">—</div>
             </div>
@@ -386,7 +389,7 @@ onUnmounted(() => {
             <div class="mt-4">
               <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
                 <Tags class="w-4 h-4 text-emerald-500" />
-                标签
+                {{ t('resources.tags') }}
               </div>
               <div class="mt-2 flex flex-wrap gap-2">
                 <span
@@ -396,35 +399,35 @@ onUnmounted(() => {
                 >
                   {{ tag }}
                 </span>
-                <span v-if="info && tags.length === 0" class="text-xs text-slate-500">无</span>
+                <span v-if="info && tags.length === 0" class="text-xs text-slate-500">{{ t('resources.none') }}</span>
                 <span v-if="!info" class="text-xs text-slate-400">—</span>
               </div>
             </div>
 
             <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div class="text-slate-700 text-sm font-semibold">世界书</div>
+              <div class="text-slate-700 text-sm font-semibold">{{ t('resources.worldBook') }}</div>
               <div class="text-xs text-slate-500 mt-1 space-y-1">
                 <div v-if="info">
-                  <span class="font-medium text-slate-600">来源：</span>
+                  <span class="font-medium text-slate-600">{{ t('resources.source') }}：</span>
                   <span>{{ preferredBookLabel }}</span>
                 </div>
                 <div v-if="info">
-                  <span class="font-medium text-slate-600">名称：</span>
-                  <span>{{ preferredBookSource === 'none' ? '无' : (preferredBookName || '未知') }}</span>
+                  <span class="font-medium text-slate-600">{{ t('resources.name') }}：</span>
+                  <span>{{ preferredBookSource === 'none' ? t('resources.none') : (preferredBookName || t('resources.unknown')) }}</span>
                 </div>
                 <div v-if="info">
-                  <span class="font-medium text-slate-600">条目：</span>
+                  <span class="font-medium text-slate-600">{{ t('resources.entries') }}：</span>
                   <span>{{ preferredBookEntriesCount }}</span>
                 </div>
                 <div v-if="!info" class="text-slate-400">—</div>
               </div>
 
               <div v-if="info && preferredBookSource === 'none'" class="mt-3 text-xs text-slate-400">
-                未检测到 worldInfo / character_book 数据
+                {{ t('resources.noWorldInfoDetected') }}
               </div>
 
               <div v-else-if="info && preferredBookEntries.length === 0" class="mt-3 text-xs text-slate-400">
-                未检测到世界书 entries
+                {{ t('resources.noEntriesDetected2') }}
               </div>
 
               <div v-else-if="info" class="mt-3 space-y-2">
@@ -438,11 +441,11 @@ onUnmounted(() => {
                       <div class="text-xs font-semibold text-slate-800 truncate">
                         #{{ idx + 1 }}
                         <span class="text-slate-500 font-medium">
-                          {{ entry.keys.length ? entry.keys.join(', ') : '（无 keys）' }}
+                          {{ entry.keys.length ? entry.keys.join(', ') : t('resources.noKeys') }}
                         </span>
                       </div>
                       <div class="text-[11px] text-slate-500 truncate">
-                        {{ entry.comment || '无 comment' }}
+                        {{ entry.comment || t('resources.noComment') }}
                       </div>
                     </div>
                     <span
@@ -455,33 +458,33 @@ onUnmounted(() => {
                             : 'bg-slate-50 text-slate-500 border-slate-200'
                       ]"
                     >
-                      {{ entry.enabled === null ? '未知' : (entry.enabled ? '已启用' : '已禁用') }}
+                      {{ entry.enabled === null ? t('resources.unknownStatus') : (entry.enabled ? t('resources.enabled') : t('resources.disabled')) }}
                     </span>
                   </summary>
 
                   <div class="p-3 border-t border-slate-200">
                     <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
                       <div class="truncate">
-                        <span class="font-semibold">位置：</span>
+                        <span class="font-semibold">{{ t('resources.position') }}：</span>
                         <span>{{ translatePosition(entry.position) }}</span>
                       </div>
                       <div class="truncate">
-                        <span class="font-semibold">插入顺序：</span>
+                        <span class="font-semibold">{{ t('resources.insertionOrder') }}：</span>
                         <span>{{ entry.insertionOrder ?? '—' }}</span>
                       </div>
                     </div>
 
                     <div class="mt-2 text-[11px] text-slate-600">
-                      <span class="font-semibold">关键词：</span>
+                      <span class="font-semibold">{{ t('resources.keywords') }}：</span>
                       <span>{{ entry.keys.length ? entry.keys.join(', ') : '—' }}</span>
                     </div>
 
                     <div class="mt-2 text-[11px] text-slate-600">
-                      <span class="font-semibold">备注：</span>
+                      <span class="font-semibold">{{ t('resources.comment') }}：</span>
                       <span>{{ entry.comment || '—' }}</span>
                     </div>
 
-                    <div class="mt-2 text-[11px] text-slate-600 font-semibold">内容：</div>
+                    <div class="mt-2 text-[11px] text-slate-600 font-semibold">{{ t('resources.content') }}：</div>
                     <div class="mt-1 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                       {{ entry.content || '—' }}
                     </div>
@@ -495,7 +498,7 @@ onUnmounted(() => {
 
         <div v-if="loading" class="mt-6 flex items-center gap-3 text-slate-500 text-sm font-medium">
           <Loader2 class="w-4 h-4 animate-spin" />
-          正在解析角色卡信息...
+          {{ t('resources.parsingCard') }}
         </div>
 
         <div v-else-if="errorMsg" class="mt-6 bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-600">
@@ -510,7 +513,7 @@ onUnmounted(() => {
             class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
             :disabled="isImporting"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <button
             type="button"
@@ -519,7 +522,7 @@ onUnmounted(() => {
             :disabled="isImporting"
           >
             <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
-            {{ isImporting ? '导入中...' : '确认添加' }}
+            {{ isImporting ? t('resources.addingCard') : t('resources.confirmAdd') }}
           </button>
         </div>
       </div>

@@ -4,6 +4,9 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { installState, resetInstallState } from '../lib/useInstall';
 import { CheckCircle2, Loader2, XCircle, Terminal } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const logContainer = ref<HTMLElement | null>(null);
 let unlisten: UnlistenFn | null = null;
@@ -89,16 +92,16 @@ const cancel = async () => {
                         <Loader2 v-if="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)" class="w-5 h-5 animate-spin text-blue-500" />
                         <CheckCircle2 v-else-if="installState.status === 'done'" class="w-6 h-6 text-emerald-500" />
                         <XCircle v-else-if="installState.status === 'error'" class="w-6 h-6 text-red-500" />
-                        <span>{{ installState.operation === 'delete' ? '删除' : '安装' }}酒馆版本 {{ installState.version }}</span>
+                        <span>{{ installState.operation === 'delete' ? t('versions.deleteTitle', { version: installState.version }) : t('versions.installTitle', { version: installState.version }) }}</span>
                     </h3>
                     <p class="text-slate-500 text-sm mt-1">
                         {{ 
-                            installState.status === 'downloading' ? '正在下载文件...' : 
-                            installState.status === 'extracting' ? '正在解压文件...' : 
-                            installState.status === 'installing' ? '正在安装依赖...' : 
-                            installState.status === 'deleting' ? '正在删除文件...' :
-                            installState.status === 'done' ? (installState.operation === 'delete' ? '删除已完成' : '安装已完成') : 
-                            '发生错误'
+                            installState.status === 'downloading' ? t('versions.downloading') : 
+                            installState.status === 'extracting' ? t('versions.extracting') : 
+                            installState.status === 'installing' ? t('versions.installingDeps') : 
+                            installState.status === 'deleting' ? t('versions.deletingFiles') :
+                            installState.status === 'done' ? (installState.operation === 'delete' ? t('versions.deleteComplete') : t('versions.installComplete')) : 
+                            t('versions.errorOccurred')
                         }}
                     </p>
                 </div>
@@ -109,7 +112,7 @@ const cancel = async () => {
                 <div class="px-4 h-10 bg-slate-800 border-b border-slate-700 flex items-center justify-between gap-2 text-xs text-slate-400 font-mono">
                     <div class="flex items-center gap-2">
                         <Terminal class="w-3 h-3" />
-                        <span>{{ installState.operation === 'delete' ? 'DELETION' : 'INSTALLATION' }} LOGS</span>
+                        <span>{{ installState.operation === 'delete' ? t('versions.deletionLogs') : t('versions.installationLogs') }}</span>
                     </div>
                 </div>
                 
@@ -135,7 +138,7 @@ const cancel = async () => {
                             : 'bg-red-50 text-red-500 hover:bg-red-100 active:scale-95'
                     ]"
                 >
-                    {{ installState.isCanceling ? '正在取消...' : '取消' }}
+                    {{ installState.isCanceling ? t('versions.canceling') : t('common.cancel') }}
                 </button>
                 <button 
                     @click="close"
@@ -147,7 +150,7 @@ const cancel = async () => {
                             : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-lg shadow-slate-200'
                     ]"
                 >
-                    {{ installState.status === 'done' ? '完成' : '关闭' }}
+                    {{ installState.status === 'done' ? t('versions.done') : t('common.close') }}
                 </button>
             </div>
         </div>

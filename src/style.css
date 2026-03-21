@@ -28,6 +28,72 @@ body {
   font-weight: 400;
   font-size: 16px;
   line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 暗色主题 */
+.dark body {
+  background-color: #0F172A;
+  color: #E2E8F0;
+}
+
+/* 暗色主题下的通用样式增强 */
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark .bg-white {
+  background-color: #1E293B;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: #334155;
+}
+
+.dark .text-slate-700,
+.dark .text-slate-800 {
+  color: #E2E8F0;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-600 {
+  color: #94A3B8;
+}
+
+.dark .text-slate-400 {
+  color: #64748B;
+}
+
+.dark .bg-slate-50 {
+  background-color: #0F172A;
+}
+
+.dark .bg-slate-100 {
+  background-color: #1E293B;
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1E293B;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #3B82F6;
+  background-color: #1E293B;
+}
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 button:hover {

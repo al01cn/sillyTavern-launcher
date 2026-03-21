@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use sys_locale::get_locale;
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -82,6 +83,7 @@ struct GithubProxyConfig {
 #[serde(default, rename_all = "camelCase")]
 struct SillyTavernConfig {
     version: String,
+    use_global_config: bool,
 }
 
 impl Default for WindowPosition {
@@ -94,7 +96,7 @@ impl Default for GithubProxyConfig {
     fn default() -> Self {
         Self {
             enable: false,
-            url: "https://gh.llkk.cc".to_string(),
+            url: "https://ghfast.top/".to_string(),
         }
     }
 }
@@ -103,6 +105,7 @@ impl Default for SillyTavernConfig {
     fn default() -> Self {
         Self {
             version: "".to_string(),
+            use_global_config: true, // 默认使用全局配置
         }
     }
 }
@@ -122,14 +125,98 @@ struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            lang: "zh-CN".to_string(),
-            theme: "dark".to_string(),
+            lang: "auto".to_string(),
+            theme: "auto".to_string(),
             remember_window_position: false,
             window_position: None,
             github_proxy: GithubProxyConfig::default(),
             sillytavern: SillyTavernConfig::default(),
             npm_registry: "https://registry.npmjs.org/".to_string(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lang {
+    ZhCn,
+    EnUs,
+}
+
+impl Lang {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "en-US" | "en" => Lang::EnUs,
+            "zh-CN" | "zh" => Lang::ZhCn,
+            "auto" => {
+                // 获取系统语言
+                let locale = get_locale().unwrap_or_else(|| "zh-CN".to_string());
+                if locale.to_lowercase().starts_with("en") {
+                    Lang::EnUs
+                } else {
+                    Lang::ZhCn
+                }
+            }
+            _ => Lang::ZhCn,
+        }
+    }
+}
+
+fn get_current_lang(app: &AppHandle) -> Lang {
+    let config = read_app_config_from_disk(app);
+    Lang::from_str(&config.lang)
+}
+
+#[allow(dead_code)]
+fn tr(lang: Lang, key: &str) -> &str {
+    match lang {
+        Lang::ZhCn => match key {
+            "get_versions" => "获取已安装的酒馆版本列表",
+            "dir_not_exists" => "酒馆目录不存在，返回空列表",
+            "versions_found" => "找到已安装的版本: {:?}",
+            "switching_version" => "切换酒馆版本为: {}",
+            "version_not_exists" => "版本 {} 不存在",
+            "installing_version" => "开始安装酒馆版本: {}，URL: {}",
+            "version_exists_skip" => "版本 {} 已存在，跳过安装",
+            "deleting_version" => "准备删除酒馆版本: {}",
+            "delete_success" => "版本 {} 删除成功",
+            "delete_fail" => "删除版本 {} 失败: {}",
+            "delete_task_fail" => "执行删除任务失败: {}",
+            "reading_config" => "读取酒馆配置: 版本 {}",
+            "writing_config" => "写入酒馆配置: 版本 {}",
+            "getting_config_options" => "获取酒馆高级配置: 版本 {}",
+            "updating_config_options" => "更新酒馆高级配置: 版本 {}",
+            "starting_st" => "启动 SillyTavern...",
+            "stopping_st" => "停止 SillyTavern...",
+            "st_started" => "SillyTavern 已启动 (PID: {})",
+            "st_stopped" => "SillyTavern 已停止",
+            "st_exit_success" => "SillyTavern 进程正常退出",
+            "st_exit_error" => "SillyTavern 进程异常退出: {}",
+            _ => key,
+        },
+        Lang::EnUs => match key {
+            "get_versions" => "Getting installed SillyTavern version list",
+            "dir_not_exists" => "SillyTavern directory does not exist, returning empty list",
+            "versions_found" => "Found installed versions: {:?}",
+            "switching_version" => "Switching SillyTavern version to: {}",
+            "version_not_exists" => "Version {} does not exist",
+            "installing_version" => "Starting installation of SillyTavern version: {}, URL: {}",
+            "version_exists_skip" => "Version {} already exists, skipping installation",
+            "deleting_version" => "Preparing to delete SillyTavern version: {}",
+            "delete_success" => "Version {} deleted successfully",
+            "delete_fail" => "Failed to delete version {}: {}",
+            "delete_task_fail" => "Failed to execute delete task: {}",
+            "reading_config" => "Reading SillyTavern config: version {}",
+            "writing_config" => "Writing SillyTavern config: version {}",
+            "getting_config_options" => "Getting SillyTavern options: version {}",
+            "updating_config_options" => "Updating SillyTavern options: version {}",
+            "starting_st" => "Starting SillyTavern...",
+            "stopping_st" => "Stopping SillyTavern...",
+            "st_started" => "SillyTavern started (PID: {})",
+            "st_stopped" => "SillyTavern stopped",
+            "st_exit_success" => "SillyTavern process exited normally",
+            "st_exit_error" => "SillyTavern process exited with error: {}",
+            _ => key,
+        },
     }
 }
 
@@ -304,7 +391,11 @@ async fn fetch_sillytavern_releases() -> Result<Vec<Release>, String> {
 
 #[tauri::command]
 async fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String>, String> {
-    tracing::info!("获取已安装的酒馆版本列表");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("获取已安装的酒馆版本列表"),
+        Lang::EnUs => tracing::info!("Getting installed SillyTavern version list"),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let start_time = std::time::Instant::now();
@@ -315,10 +406,10 @@ async fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String
         let sillytavern_dir = data_dir.join("sillytavern");
 
         if !sillytavern_dir.exists() {
-            tracing::info!(
-                "酒馆目录不存在，返回空列表, 耗时: {:?}",
-                start_time.elapsed()
-            );
+            match lang {
+                Lang::ZhCn => tracing::info!("酒馆目录不存在，返回空列表, 耗时: {:?}", start_time.elapsed()),
+                Lang::EnUs => tracing::info!("SillyTavern directory does not exist, returning empty list, elapsed: {:?}", start_time.elapsed()),
+            }
             return Ok(vec![]);
         }
 
@@ -336,11 +427,10 @@ async fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<String
                 }
             }
         }
-        tracing::info!(
-            "找到已安装的版本: {:?}, 耗时: {:?}",
-            versions,
-            start_time.elapsed()
-        );
+        match lang {
+            Lang::ZhCn => tracing::info!("找到已安装的版本: {:?}, 耗时: {:?}", versions, start_time.elapsed()),
+            Lang::EnUs => tracing::info!("Found installed versions: {:?}, elapsed: {:?}", versions, start_time.elapsed()),
+        }
         Ok(versions)
     })
     .await
@@ -436,7 +526,11 @@ fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, 
 
 #[tauri::command]
 async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
-    tracing::info!("切换酒馆版本到: {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("切换酒馆版本到: {}", version),
+        Lang::EnUs => tracing::info!("Switching SillyTavern version to: {}", version),
+    }
     let mut config = read_app_config_from_disk(&app);
     let data_dir = get_config_path(&app)
         .parent()
@@ -445,8 +539,16 @@ async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(
     let version_dir = data_dir.join("sillytavern").join(&version);
 
     if !version_dir.exists() {
-        tracing::error!("要切换的版本 {} 不存在", version);
-        return Err(format!("Version {} not found", version));
+        match lang {
+            Lang::ZhCn => {
+                tracing::error!("要切换的版本 {} 不存在", version);
+                return Err(format!("版本 {} 不存在", version));
+            }
+            Lang::EnUs => {
+                tracing::error!("Target version {} does not exist", version);
+                return Err(format!("Version {} not found", version));
+            }
+        }
     }
 
     config.sillytavern.version = version;
@@ -467,7 +569,11 @@ async fn install_sillytavern_version(
     version: String,
     url: String,
 ) -> Result<(), String> {
-    tracing::info!("开始安装酒馆版本: {}，URL: {}", version, url);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("开始安装酒馆版本: {}，URL: {}", version, url),
+        Lang::EnUs => tracing::info!("Starting installation of SillyTavern version: {}, URL: {}", version, url),
+    }
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -475,12 +581,18 @@ async fn install_sillytavern_version(
     let sillytavern_dir = data_dir.join("sillytavern").join(&version);
 
     if sillytavern_dir.exists() {
-        tracing::info!("版本 {} 已存在，跳过安装", version);
+        match lang {
+            Lang::ZhCn => tracing::info!("版本 {} 已存在，跳过安装", version),
+            Lang::EnUs => tracing::info!("Version {} already exists, skipping installation", version),
+        }
         return Ok(()); // Already installed
     }
 
     fs::create_dir_all(&sillytavern_dir).map_err(|e| {
-        tracing::error!("创建目录失败: {}", e);
+        match lang {
+            Lang::ZhCn => tracing::error!("创建目录失败: {}", e),
+            Lang::EnUs => tracing::error!("Failed to create directory: {}", e),
+        }
         e.to_string()
     })?;
 
@@ -499,7 +611,14 @@ async fn install_sillytavern_version(
         );
     };
 
-    emit_progress("downloading", 0.0, &format!("准备下载版本 {}...", version));
+    emit_progress(
+        "downloading",
+        0.0,
+        &match lang {
+            Lang::ZhCn => format!("准备下载版本 {}...", version),
+            Lang::EnUs => format!("Preparing to download version {}...", version),
+        },
+    );
 
     // Download zip to temp dir
     let temp_dir = std::env::temp_dir();
@@ -509,16 +628,25 @@ async fn install_sillytavern_version(
         .user_agent("sillyTavern-launcher")
         .build()
         .map_err(|e| {
-            tracing::error!("创建 HTTP 客户端失败: {}", e);
+            match lang {
+                Lang::ZhCn => tracing::error!("创建 HTTP 客户端失败: {}", e),
+                Lang::EnUs => tracing::error!("Failed to create HTTP client: {}", e),
+            }
             e.to_string()
         })?;
 
     let response = client.get(&url).send().await.map_err(|e| {
-        tracing::error!("请求下载失败: {}", e);
+        match lang {
+            Lang::ZhCn => tracing::error!("请求下载失败: {}", e),
+            Lang::EnUs => tracing::error!("Download request failed: {}", e),
+        }
         e.to_string()
     })?;
     let total_size = response.content_length().unwrap_or(0);
-    tracing::info!("开始下载，总大小: {} bytes", total_size);
+    match lang {
+        Lang::ZhCn => tracing::info!("开始下载，总大小: {} 字节", total_size),
+        Lang::EnUs => tracing::info!("Starting download, total size: {} bytes", total_size),
+    }
 
     let mut file = tokio::fs::File::create(&temp_zip_path)
         .await
@@ -532,8 +660,18 @@ async fn install_sillytavern_version(
         if state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
             let _ = tokio::fs::remove_file(&temp_zip_path).await;
             let _ = tokio::fs::remove_dir_all(&sillytavern_dir).await;
-            emit_progress("error", 0.0, "下载已取消");
-            return Err("下载已取消".to_string());
+            emit_progress(
+                "error",
+                0.0,
+                match lang {
+                    Lang::ZhCn => "下载已取消",
+                    Lang::EnUs => "Download cancelled",
+                },
+            );
+            return Err(match lang {
+                Lang::ZhCn => "下载已取消".to_string(),
+                Lang::EnUs => "Download cancelled".to_string(),
+            });
         }
 
         let chunk = item.map_err(|e| e.to_string())?;
@@ -553,14 +691,27 @@ async fn install_sillytavern_version(
             emit_progress(
                 "downloading",
                 progress,
-                &format!("已下载: {:.2} MB", mb_downloaded),
+                &match lang {
+                    Lang::ZhCn => format!("已下载: {:.2} MB", mb_downloaded),
+                    Lang::EnUs => format!("Downloaded: {:.2} MB", mb_downloaded),
+                },
             );
             last_emit = std::time::Instant::now();
         }
     }
 
-    emit_progress("extracting", 0.0, "下载完成，准备解压...");
-    tracing::info!("下载完成，准备解压到: {:?}", sillytavern_dir);
+    emit_progress(
+        "extracting",
+        0.0,
+        match lang {
+            Lang::ZhCn => "下载完成，准备解压...",
+            Lang::EnUs => "Download complete, preparing to extract...",
+        },
+    );
+    match lang {
+        Lang::ZhCn => tracing::info!("下载完成，准备解压到: {:?}", sillytavern_dir),
+        Lang::EnUs => tracing::info!("Download complete, preparing to extract to: {:?}", sillytavern_dir),
+    }
 
     // Extract zip in a blocking task to avoid blocking the tokio runtime
     let cancel_flag = state.cancel_flag.clone();
@@ -588,8 +739,18 @@ async fn install_sillytavern_version(
             if i % 10 == 0 && cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
                 let _ = fs::remove_file(&temp_zip_path_clone);
                 let _ = fs::remove_dir_all(&sillytavern_dir_clone);
-                emit_progress("error", 0.0, "解压已取消");
-                return Err("解压已取消".to_string());
+                emit_progress(
+                    "error",
+                    0.0,
+                    match lang {
+                        Lang::ZhCn => "解压已取消",
+                        Lang::EnUs => "Extraction cancelled",
+                    },
+                );
+                return Err(match lang {
+                    Lang::ZhCn => "解压已取消".to_string(),
+                    Lang::EnUs => "Extraction cancelled".to_string(),
+                });
             }
 
             let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
@@ -636,7 +797,10 @@ async fn install_sillytavern_version(
                     emit_progress(
                         "extracting",
                         progress,
-                        &format!("解压中: {}/{} 文件...", i + 1, total_files),
+                        &match lang {
+                            Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
+                            Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
+                        },
                     );
                 }
             }
@@ -653,7 +817,10 @@ async fn install_sillytavern_version(
     emit_progress(
         "installing",
         0.0,
-        "正在安装依赖 (npm install)... 这可能需要几分钟",
+        match lang {
+            Lang::ZhCn => "正在安装依赖 (npm install)... 这可能需要几分钟",
+            Lang::EnUs => "Installing dependencies (npm install)... this may take a few minutes",
+        },
     );
 
     // Do not await run_npm_install here directly to avoid blocking
@@ -667,19 +834,25 @@ async fn install_sillytavern_version(
                 DownloadProgress {
                     status: "error".to_string(),
                     progress: 0.0,
-                    log: format!("安装依赖失败: {}", e),
+                log: match lang {
+                    Lang::ZhCn => format!("安装依赖失败: {}", e),
+                    Lang::EnUs => format!("Failed to install dependencies: {}", e),
                 },
-            );
-        } else {
-            let _ = app_clone.emit(
-                "install-progress",
-                DownloadProgress {
-                    status: "done".to_string(),
-                    progress: 1.0,
-                    log: "安装完成！".to_string(),
+            },
+        );
+    } else {
+        let _ = app_clone.emit(
+            "install-progress",
+            DownloadProgress {
+                status: "done".to_string(),
+                progress: 1.0,
+                log: match lang {
+                    Lang::ZhCn => "安装完成！".to_string(),
+                    Lang::EnUs => "Installation complete!".to_string(),
                 },
-            );
-        }
+            },
+        );
+    }
     });
 
     Ok(())
@@ -691,6 +864,7 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
     let config = read_app_config_from_disk(app);
+    let lang = get_current_lang(app);
     let registry = config.npm_registry;
 
     tracing::info!(
@@ -702,7 +876,10 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
     // 检查 package.json 是否存在
     let package_json = target_dir.join("package.json");
     if !package_json.exists() {
-        tracing::error!("package.json 不存在: {:?}", package_json);
+        match lang {
+            Lang::ZhCn => tracing::error!("package.json 不存在: {:?}", package_json),
+            Lang::EnUs => tracing::error!("package.json does not exist: {:?}", package_json),
+        }
         return Err("package.json 文件不存在".to_string());
     }
     
@@ -728,7 +905,10 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
         args.push("--verbose".to_string());
         
         // Log the command we are running
-        tracing::info!("执行命令: {:?} {:?}", cmd, args);
+        match lang {
+            Lang::ZhCn => tracing::info!("执行命令: {:?} {:?}", cmd, args),
+            Lang::EnUs => tracing::info!("Executing command: {:?} {:?}", cmd, args),
+        }
         emit_progress(
             "installing",
             0.1,
@@ -821,16 +1001,25 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
 
         // Wait for completion
         let status = child.wait().await.map_err(|e| {
-            tracing::error!("等待 npm 执行完成时发生错误: {}", e);
+            match lang {
+                Lang::ZhCn => tracing::error!("等待 npm 执行完成时发生错误: {}", e),
+                Lang::EnUs => tracing::error!("Error occurred while waiting for npm execution to complete: {}", e),
+            }
             e.to_string()
         })?;
         
         if !status.success() {
-            tracing::error!("npm install 执行失败，退出码: {:?}", status.code());
+            match lang {
+                Lang::ZhCn => tracing::error!("npm install 执行失败，退出码: {:?}", status.code()),
+                Lang::EnUs => tracing::error!("npm install execution failed, exit code: {:?}", status.code()),
+            }
             
             // 输出收集到的错误日志
             if !error_logs.is_empty() {
-                tracing::error!("npm 错误日志:");
+                match lang {
+                    Lang::ZhCn => tracing::error!("npm 错误日志:"),
+                    Lang::EnUs => tracing::error!("npm error logs:"),
+                }
                 for log in &error_logs {
                     tracing::error!("  {}", log);
                 }
@@ -839,27 +1028,47 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
             // 清理失败的 node_modules
             let node_modules_path = target_dir.join("node_modules");
             if node_modules_path.exists() {
-                tracing::info!("清理失败的 node_modules 目录: {:?}", node_modules_path);
+                match lang {
+                    Lang::ZhCn => tracing::info!("清理失败的 node_modules 目录: {:?}", node_modules_path),
+                    Lang::EnUs => tracing::info!("Cleaning up failed node_modules directory: {:?}", node_modules_path),
+                }
                 if let Err(e) = tokio::fs::remove_dir_all(&node_modules_path).await {
-                    tracing::warn!("清理 node_modules 失败: {}", e);
+                    match lang {
+                        Lang::ZhCn => tracing::warn!("清理 node_modules 失败: {}", e),
+                        Lang::EnUs => tracing::warn!("Failed to clean up node_modules: {}", e),
+                    }
                 }
             }
             
             let error_msg = if !error_logs.is_empty() {
-                format!("npm install 失败: {}", error_logs.join("\n"))
+                match lang {
+                    Lang::ZhCn => format!("npm install 失败: {}", error_logs.join("\n")),
+                    Lang::EnUs => format!("npm install failed: {}", error_logs.join("\n")),
+                }
             } else {
-                format!("npm install 失败，退出码: {:?}", status.code())
+                match lang {
+                    Lang::ZhCn => format!("npm install 失败，退出码: {:?}", status.code()),
+                    Lang::EnUs => format!("npm install failed with exit code: {:?}", status.code()),
+                }
             };
             
             return Err(error_msg);
         }
-        tracing::info!("npm install 执行成功");
+        match lang {
+            Lang::ZhCn => tracing::info!("npm install 执行成功"),
+            Lang::EnUs => tracing::info!("npm install executed successfully"),
+        }
     } else {
-        tracing::warn!("未找到 npm，跳过依赖安装");
-        return Err(
-            "未找到 npm，跳过依赖安装。请确保已安装 Node.js 或在设置中配置了正确的环境。"
-                .to_string(),
-        );
+        match lang {
+            Lang::ZhCn => {
+                tracing::warn!("未找到 npm，跳过依赖安装");
+                return Err("未找到 npm，跳过依赖安装。请确保已安装 Node.js 或在设置中配置了正确的环境。".to_string());
+            }
+            Lang::EnUs => {
+                tracing::warn!("npm not found, skipping dependency installation");
+                return Err("npm not found, skipping dependency installation. Please ensure Node.js is installed or environment is correctly configured in settings.".to_string());
+            }
+        }
     }
 
     Ok(())
@@ -879,6 +1088,7 @@ async fn install_sillytavern_dependencies(app: AppHandle, version: String) -> Re
 
     let app_clone = app.clone();
     let sillytavern_dir_clone = sillytavern_dir.clone();
+    let lang = get_current_lang(&app);
 
     tokio::spawn(async move {
         if let Err(e) = run_npm_install(&app_clone, &sillytavern_dir_clone).await {
@@ -887,7 +1097,10 @@ async fn install_sillytavern_dependencies(app: AppHandle, version: String) -> Re
                 DownloadProgress {
                     status: "error".to_string(),
                     progress: 0.0,
-                    log: format!("安装依赖失败: {}", e),
+                    log: match lang {
+                        Lang::ZhCn => format!("安装依赖失败: {}", e),
+                        Lang::EnUs => format!("Failed to install dependencies: {}", e),
+                    },
                 },
             );
         } else {
@@ -896,7 +1109,10 @@ async fn install_sillytavern_dependencies(app: AppHandle, version: String) -> Re
                 DownloadProgress {
                     status: "done".to_string(),
                     progress: 1.0,
-                    log: "依赖安装完成！".to_string(),
+                    log: match lang {
+                        Lang::ZhCn => "依赖安装完成！".to_string(),
+                        Lang::EnUs => "Dependency installation complete!".to_string(),
+                    },
                 },
             );
         }
@@ -914,7 +1130,11 @@ struct InstalledVersionInfo {
 
 #[tauri::command]
 async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<InstalledVersionInfo>, String> {
-    tracing::info!("获取已安装版本的详细信息");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("获取已安装版本的详细信息"),
+        Lang::EnUs => tracing::info!("Getting detailed info of installed versions"),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let start_time = std::time::Instant::now();
@@ -925,10 +1145,10 @@ async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<InstalledVers
         let sillytavern_dir = data_dir.join("sillytavern");
 
         if !sillytavern_dir.exists() {
-            tracing::info!(
-                "酒馆目录不存在，返回空详细信息列表, 耗时: {:?}",
-                start_time.elapsed()
-            );
+            match lang {
+                Lang::ZhCn => tracing::info!("酒馆目录不存在，返回空详细信息列表, 耗时: {:?}", start_time.elapsed()),
+                Lang::EnUs => tracing::info!("SillyTavern directory does not exist, returning empty info list, elapsed: {:?}", start_time.elapsed()),
+            }
             return Ok(vec![]);
         }
 
@@ -961,11 +1181,10 @@ async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<InstalledVers
                 }
             }
         }
-        tracing::info!(
-            "获取到版本详细信息: {:?}, 耗时: {:?}",
-            versions,
-            start_time.elapsed()
-        );
+        match lang {
+            Lang::ZhCn => tracing::info!("获取到版本详细信息: {:?}, 耗时: {:?}", versions, start_time.elapsed()),
+            Lang::EnUs => tracing::info!("Got detailed version info: {:?}, elapsed: {:?}", versions, start_time.elapsed()),
+        }
         Ok(versions)
     })
     .await
@@ -1075,6 +1294,7 @@ async fn save_app_config(app: AppHandle, config: AppConfig) -> Result<(), String
 async fn fetch_github_proxies() -> Result<Vec<ProxyItem>, String> {
     let client = reqwest::Client::builder()
         .user_agent("sillyTavern-launcher")
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -1088,7 +1308,35 @@ async fn fetch_github_proxies() -> Result<Vec<ProxyItem>, String> {
         .map_err(|e| e.to_string())?;
 
     if response.code == 200 {
-        Ok(response.data)
+        let mut proxies = response.data;
+        
+        // 添加 ghfast.top 到列表并测试延迟
+        let ghfast_url = "https://ghfast.top/";
+        if !proxies.iter().any(|p| p.url == ghfast_url) {
+            // 测试 ghfast.top 的延迟
+            let test_url = format!("{}https://github.com", ghfast_url);
+            let start = std::time::Instant::now();
+            let latency = match client
+                .head(&test_url)
+                .send()
+                .await
+            {
+                Ok(_) => start.elapsed().as_millis() as u32,
+                Err(_) => 9999, // 如果测试失败，设置一个较大的延迟值
+            };
+            
+            proxies.insert(0, ProxyItem {
+                url: ghfast_url.to_string(),
+                server: "ghfast.top".to_string(),
+                ip: "".to_string(),
+                location: "Default".to_string(),
+                latency,
+                speed: 0.0,
+                tag: "推荐".to_string(),
+            });
+        }
+        
+        Ok(proxies)
     } else {
         Err(format!("API Error: {}", response.msg))
     }
@@ -1096,7 +1344,11 @@ async fn fetch_github_proxies() -> Result<Vec<ProxyItem>, String> {
 
 #[tauri::command]
 async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
-    tracing::info!("检查 Node.js 环境");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("检查 Node.js 环境"),
+        Lang::EnUs => tracing::info!("Checking Node.js environment"),
+    }
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -1122,7 +1374,10 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                tracing::info!("找到本地 Node.js: {}", version);
+                match lang {
+                    Lang::ZhCn => tracing::info!("找到本地 Node.js: {}", version),
+                    Lang::EnUs => tracing::info!("Found local Node.js: {}", version),
+                }
                 return Ok(NodeInfo {
                     version: Some(version),
                     path: Some(local_node_path.to_string_lossy().to_string()),
@@ -1178,7 +1433,10 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
                 }
             }
 
-            tracing::info!("找到系统 Node.js: {}", version);
+            match lang {
+                Lang::ZhCn => tracing::info!("找到系统 Node.js: {}", version),
+                Lang::EnUs => tracing::info!("Found system Node.js: {}", version),
+            }
             return Ok(NodeInfo {
                 version: Some(version),
                 path: Some(node_path),
@@ -1187,7 +1445,10 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         }
     }
 
-    tracing::warn!("未找到 Node.js 环境");
+    match lang {
+        Lang::ZhCn => tracing::warn!("未找到 Node.js 环境"),
+        Lang::EnUs => tracing::warn!("Node.js environment not found"),
+    }
     Ok(NodeInfo {
         version: None,
         path: None,
@@ -1197,7 +1458,11 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
 
 #[tauri::command]
 async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
-    tracing::info!("检查 NPM 环境");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("检查 NPM 环境"),
+        Lang::EnUs => tracing::info!("Checking NPM environment"),
+    }
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -1230,7 +1495,10 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
             if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    tracing::info!("找到本地 NPM (cmd/bin): {}", version);
+                    match lang {
+                        Lang::ZhCn => tracing::info!("找到本地 NPM (cmd/bin): {}", version),
+                        Lang::EnUs => tracing::info!("Found local NPM (cmd/bin): {}", version),
+                    }
                     return Ok(NpmInfo {
                         version: Some(version),
                         path: Some(npm_cmd.to_string_lossy().to_string()),
@@ -1331,7 +1599,10 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                 }
             }
 
-            tracing::info!("找到系统 NPM: {}", version);
+            match lang {
+                Lang::ZhCn => tracing::info!("找到系统 NPM: {}", version),
+                Lang::EnUs => tracing::info!("Found system NPM: {}", version),
+            }
             return Ok(NpmInfo {
                 version: Some(version),
                 path: Some(npm_path),
@@ -1340,7 +1611,10 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         }
     }
 
-    tracing::warn!("未找到 NPM 环境");
+    match lang {
+        Lang::ZhCn => tracing::warn!("未找到 NPM 环境"),
+        Lang::EnUs => tracing::warn!("NPM environment not found"),
+    }
     Ok(NpmInfo {
         version: None,
         path: None,
@@ -1350,6 +1624,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
 
 #[tauri::command]
 async fn install_nodejs(app: AppHandle) -> Result<(), String> {
+    let lang = get_current_lang(&app);
     let os = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
 
@@ -1375,12 +1650,20 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         .to_path_buf();
     let node_dir = data_dir.join("node");
 
-    tracing::info!(
-        "开始安装 Node.js, OS: {}, Arch: {}, URL: {}",
-        node_os,
-        node_arch,
-        url
-    );
+    match lang {
+        Lang::ZhCn => tracing::info!(
+            "开始安装 Node.js, OS: {}, Arch: {}, URL: {}",
+            node_os,
+            node_arch,
+            url
+        ),
+        Lang::EnUs => tracing::info!(
+            "Starting Node.js installation, OS: {}, Arch: {}, URL: {}",
+            node_os,
+            node_arch,
+            url
+        ),
+    }
 
     let emit_progress = |status: &str, progress: f64, log: &str| {
         let _ = app.emit(
@@ -1396,7 +1679,10 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     emit_progress(
         "downloading",
         0.0,
-        &format!("开始下载 Node.js: {}", filename),
+        &match lang {
+            Lang::ZhCn => format!("开始下载 Node.js: {}", filename),
+            Lang::EnUs => format!("Starting Node.js download: {}", filename),
+        },
     );
 
     let temp_dir = std::env::temp_dir();
@@ -1406,16 +1692,25 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         .user_agent("sillyTavern-launcher")
         .build()
         .map_err(|e| {
-            tracing::error!("创建 HTTP 客户端失败: {}", e);
+            match lang {
+                Lang::ZhCn => tracing::error!("创建 HTTP 客户端失败: {}", e),
+                Lang::EnUs => tracing::error!("Failed to create HTTP client: {}", e),
+            }
             e.to_string()
         })?;
 
     let response = client.get(&url).send().await.map_err(|e| {
-        tracing::error!("请求 Node.js 下载失败: {}", e);
+        match lang {
+            Lang::ZhCn => tracing::error!("请求 Node.js 下载失败: {}", e),
+            Lang::EnUs => tracing::error!("Node.js download request failed: {}", e),
+        }
         e.to_string()
     })?;
     let total_size = response.content_length().unwrap_or(0);
-    tracing::info!("Node.js 下载开始，总大小: {} bytes", total_size);
+    match lang {
+        Lang::ZhCn => tracing::info!("Node.js 下载开始，总大小: {} 字节", total_size),
+        Lang::EnUs => tracing::info!("Node.js download started, total size: {} bytes", total_size),
+    }
 
     let mut file = tokio::fs::File::create(&temp_zip_path)
         .await
@@ -1441,15 +1736,26 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         emit_progress(
             "downloading",
             progress,
-            &format!("已下载: {:.2} MB", mb_downloaded),
+            &match lang {
+                Lang::ZhCn => format!("已下载: {:.2} MB", mb_downloaded),
+                Lang::EnUs => format!("Downloaded: {:.2} MB", mb_downloaded),
+            },
         );
     }
 
-    emit_progress("extracting", 0.0, "下载完成，正在解压...");
+    emit_progress(
+        "extracting",
+        0.0,
+        &match lang {
+            Lang::ZhCn => "下载完成，正在解压...".to_string(),
+            Lang::EnUs => "Download complete, extracting...".to_string(),
+        },
+    );
 
     let app_clone = app.clone();
     let temp_zip_path_clone = temp_zip_path.clone();
     let node_dir_clone = node_dir.clone();
+    let lang_clone = lang.clone(); // Clone lang for the spawned task
 
     let _extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
         let emit_progress = |status: &str, progress: f64, log: &str| {
@@ -1506,7 +1812,10 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
                 emit_progress(
                     "extracting",
                     progress,
-                    &format!("解压中: {}/{} 文件...", i + 1, total_files),
+                    &match lang_clone {
+                        Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
+                        Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
+                    },
                 );
             }
         }
@@ -1516,14 +1825,25 @@ async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())??;
 
     let _ = tokio::fs::remove_file(temp_zip_path).await;
-    emit_progress("done", 1.0, "Node.js 安装完成");
+    emit_progress(
+        "done",
+        1.0,
+        &match lang {
+            Lang::ZhCn => "Node.js 安装完成".to_string(),
+            Lang::EnUs => "Node.js installation complete".to_string(),
+        },
+    );
 
     Ok(())
 }
 
 #[tauri::command]
 async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
-    tracing::info!("检查酒馆目录是否为空");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("检查酒馆目录是否为空"),
+        Lang::EnUs => tracing::info!("Checking if SillyTavern directory is empty"),
+    }
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -1531,14 +1851,20 @@ async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
     let sillytavern_dir = data_dir.join("sillytavern");
 
     if !sillytavern_dir.exists() {
-        tracing::info!("酒馆目录不存在，视为空");
+        match lang {
+            Lang::ZhCn => tracing::info!("酒馆目录不存在，视为空"),
+            Lang::EnUs => tracing::info!("SillyTavern directory does not exist, considered empty"),
+        }
         return Ok(true);
     }
 
     let entries = match fs::read_dir(&sillytavern_dir) {
         Ok(e) => e,
         Err(e) => {
-            tracing::warn!("无法读取酒馆目录，视为空: {}", e);
+            match lang {
+                Lang::ZhCn => tracing::warn!("无法读取酒馆目录，视为空: {}", e),
+                Lang::EnUs => tracing::warn!("Could not read SillyTavern directory, considered empty: {}", e),
+            }
             return Ok(true); // If we can't read it, assume it's empty/invalid
         }
     };
@@ -1555,7 +1881,10 @@ async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
         }
     }
 
-    tracing::info!("酒馆目录检查结果: isEmpty={}", !has_valid_files);
+    match lang {
+        Lang::ZhCn => tracing::info!("酒馆目录检查结果: isEmpty={}", !has_valid_files),
+        Lang::EnUs => tracing::info!("SillyTavern directory check result: isEmpty={}", !has_valid_files),
+    }
     Ok(!has_valid_files)
 }
 
@@ -1638,7 +1967,11 @@ fn get_app_version(app: AppHandle) -> String {
 
 #[tauri::command]
 async fn get_tavern_version(app: AppHandle) -> Result<String, String> {
-    tracing::info!("获取当前使用的酒馆版本");
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("获取当前使用的酒馆版本"),
+        Lang::EnUs => tracing::info!("Getting currently used SillyTavern version"),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let start_time = std::time::Instant::now();
@@ -2131,21 +2464,57 @@ async fn import_world_info(app: AppHandle, source_path: String) -> Result<(), St
     .map_err(|e| e.to_string())?
 }
 
-fn get_sillytavern_config_file_path(app: &AppHandle, version: &str) -> Result<PathBuf, String> {
+fn get_sillytavern_config_file_path(app: &AppHandle, version: &str, use_global: bool) -> Result<PathBuf, String> {
     if version.trim().is_empty() {
         return Err("版本号不能为空".to_string());
     }
-    if version.contains("..") || version.contains('/') || version.contains('\\') {
-        return Err("版本号不合法".to_string());
-    }
+    
     let data_dir = get_config_path(app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
-    let config_path = data_dir
-        .join("sillytavern")
-        .join(version)
-        .join("config.yaml");
+    
+    let config_path = if use_global {
+        // 使用全局配置文件
+        let st_data_dir = data_dir.join("st_data");
+        if !st_data_dir.exists() {
+            if let Err(e) = std::fs::create_dir_all(&st_data_dir) {
+                return Err(format!("无法创建全局数据目录: {}", e));
+            }
+        }
+        let global_config = st_data_dir.join("config.yaml");
+        
+        // 如果全局配置不存在，从版本目录复制一份
+        if !global_config.exists() {
+            if version.contains("..") || version.contains('/') || version.contains('\\') {
+                return Err("版本号不合法".to_string());
+            }
+            let version_config = data_dir
+                .join("sillytavern")
+                .join(version)
+                .join("config.yaml");
+            if version_config.exists() {
+                if let Err(e) = std::fs::copy(&version_config, &global_config) {
+                    let lang = get_current_lang(app);
+                    match lang {
+                        Lang::ZhCn => tracing::warn!("复制配置文件失败: {}", e),
+                        Lang::EnUs => tracing::warn!("Failed to copy config file: {}", e),
+                    }
+                }
+            }
+        }
+        global_config
+    } else {
+        // 使用局部配置文件（版本目录下的配置）
+        if version.contains("..") || version.contains('/') || version.contains('\\') {
+            return Err("版本号不合法".to_string());
+        }
+        data_dir
+            .join("sillytavern")
+            .join(version)
+            .join("config.yaml")
+    };
+    
     if !config_path.exists() {
         return Err(format!("配置文件不存在: {:?}", config_path));
     }
@@ -2515,7 +2884,11 @@ fn get_or_init_child_mapping<'a>(
 
 #[tauri::command]
 async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
-    tracing::info!("准备删除酒馆版本: {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("准备删除酒馆版本: {}", version),
+        Lang::EnUs => tracing::info!("Preparing to delete SillyTavern version: {}", version),
+    }
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -2523,8 +2896,16 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
     let version_dir = data_dir.join("sillytavern").join(&version);
 
     if !version_dir.exists() {
-        tracing::warn!("要删除的版本 {} 不存在", version);
-        return Err(format!("版本 {} 不存在", version));
+        match lang {
+            Lang::ZhCn => {
+                tracing::warn!("要删除的版本 {} 不存在", version);
+                return Err(format!("版本 {} 不存在", version));
+            }
+            Lang::EnUs => {
+                tracing::warn!("Target version {} does not exist", version);
+                return Err(format!("Version {} not found", version));
+            }
+        }
     }
 
     // Double check we are not deleting the whole sillytavern dir or something wrong
@@ -2533,8 +2914,16 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
         || version.contains("/")
         || version.contains("\\")
     {
-        tracing::error!("无效的版本号: {}", version);
-        return Err("无效的版本号".to_string());
+        match lang {
+            Lang::ZhCn => {
+                tracing::error!("无效的版本号: {}", version);
+                return Err("无效的版本号".to_string());
+            }
+            Lang::EnUs => {
+                tracing::error!("Invalid version number: {}", version);
+                return Err("Invalid version number".to_string());
+            }
+        }
     }
 
     let app_clone = app.clone();
@@ -2547,7 +2936,10 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
             DownloadProgress {
                 status: "deleting".to_string(),
                 progress: 0.1,
-                log: format!("开始删除版本 {}...", version_clone),
+                log: match lang {
+                    Lang::ZhCn => format!("开始删除版本 {}...", version_clone),
+                    Lang::EnUs => format!("Starting deletion of version {}...", version_clone),
+                },
             },
         );
 
@@ -2558,7 +2950,10 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
             DownloadProgress {
                 status: "deleting".to_string(),
                 progress: 0.3,
-                log: format!("正在快速清理版本 {} 的全部文件...", version_clone),
+                log: match lang {
+                    Lang::ZhCn => format!("正在快速清理版本 {} 的全部文件...", version_clone),
+                    Lang::EnUs => format!("Quickly clearing all files of version {}...", version_clone),
+                },
             },
         );
 
@@ -2581,7 +2976,10 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
                 DownloadProgress {
                     status: "deleting".to_string(),
                     progress: 0.3 + (0.5 * (i as f64 / total_samples as f64)),
-                    log: format!("已删除：{}/{}", version_clone, name),
+                    log: match lang {
+                        Lang::ZhCn => format!("已删除：{}/{}", version_clone, name),
+                        Lang::EnUs => format!("Deleted: {}/{}", version_clone, name),
+                    },
                 },
             );
         }
@@ -2633,7 +3031,10 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
             DownloadProgress {
                 status: "deleting".to_string(),
                 progress: 1.0,
-                log: format!("版本 {} 的文件已全部删除完成", version_clone),
+                log: match lang {
+                    Lang::ZhCn => format!("版本 {} 的文件已全部删除完成", version_clone),
+                    Lang::EnUs => format!("All files of version {} have been successfully deleted", version_clone),
+                },
             },
         );
 
@@ -2643,32 +3044,68 @@ async fn delete_sillytavern_version(app: AppHandle, version: String) -> Result<(
 
     match result {
         Ok(Ok(_)) => {
-            tracing::info!("版本 {} 删除成功", version);
+            match lang {
+                Lang::ZhCn => tracing::info!("版本 {} 删除成功", version),
+                Lang::EnUs => tracing::info!("Version {} deleted successfully", version),
+            }
             Ok(())
         }
         Ok(Err(e)) => {
-            tracing::error!("删除版本 {} 失败: {}", version, e);
-            Err(format!("删除失败: {}", e))
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("删除版本 {} 失败: {}", version, e);
+                    Err(format!("删除失败: {}", e))
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to delete version {}: {}", version, e);
+                    Err(format!("Deletion failed: {}", e))
+                }
+            }
         }
         Err(e) => {
-            tracing::error!("执行删除任务失败: {}", e);
-            Err(format!("任务执行失败: {}", e))
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("执行删除任务失败: {}", e);
+                    Err(format!("任务执行失败: {}", e))
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to execute delete task: {}", e);
+                    Err(format!("Task execution failed: {}", e))
+                }
+            }
         }
     }
 }
 
 #[tauri::command]
 async fn read_sillytavern_config(app: AppHandle, version: String) -> Result<String, String> {
-    tracing::info!("读取酒馆配置: 版本 {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("读取酒馆配置: 版本 {}", version),
+        Lang::EnUs => tracing::info!("Reading SillyTavern config: version {}", version),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let start_time = std::time::Instant::now();
-        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let app_config = read_app_config_from_disk(&app_clone);
+        let use_global = app_config.sillytavern.use_global_config;
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version, use_global)?;
         let result = fs::read_to_string(&config_path).map_err(|e| {
-            tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
-            format!("读取失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
+                    format!("读取失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to read config: {}, elapsed: {:?}", e, start_time.elapsed());
+                    format!("Read failed: {}", e)
+                }
+            }
         });
-        tracing::info!("读取配置成功, 耗时: {:?}", start_time.elapsed());
+        match lang {
+            Lang::ZhCn => tracing::info!("读取配置成功, 耗时: {:?}", start_time.elapsed()),
+            Lang::EnUs => tracing::info!("Read config successfully, elapsed: {:?}", start_time.elapsed()),
+        }
         result
     })
     .await
@@ -2681,13 +3118,27 @@ async fn write_sillytavern_config(
     version: String,
     content: String,
 ) -> Result<(), String> {
-    tracing::info!("写入酒馆配置: 版本 {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("写入酒馆配置: 版本 {}", version),
+        Lang::EnUs => tracing::info!("Writing SillyTavern config: version {}", version),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
-        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let app_config = read_app_config_from_disk(&app_clone);
+        let use_global = app_config.sillytavern.use_global_config;
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version, use_global)?;
         fs::write(&config_path, content).map_err(|e| {
-            tracing::error!("写入配置失败: {}", e);
-            format!("写入失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("写入配置失败: {}", e);
+                    format!("写入失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to write config: {}", e);
+                    format!("Write failed: {}", e)
+                }
+            }
         })
     })
     .await
@@ -2696,7 +3147,9 @@ async fn write_sillytavern_config(
 
 #[tauri::command]
 fn get_sillytavern_config_path(app: AppHandle, version: String) -> Result<String, String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
+    let config = read_app_config_from_disk(&app);
+    let use_global = config.sillytavern.use_global_config;
+    let config_path = get_sillytavern_config_file_path(&app, &version, use_global)?;
     Ok(config_path.to_string_lossy().to_string())
 }
 
@@ -2705,17 +3158,34 @@ async fn get_sillytavern_config_options(
     app: AppHandle,
     version: String,
 ) -> Result<TavernConfigPayload, String> {
-    tracing::info!("获取酒馆高级配置: 版本 {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("获取酒馆高级配置: 版本 {}", version),
+        Lang::EnUs => tracing::info!("Getting SillyTavern options: version {}", version),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let start_time = std::time::Instant::now();
-        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let app_config = read_app_config_from_disk(&app_clone);
+        let use_global = app_config.sillytavern.use_global_config;
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version, use_global)?;
         let content = fs::read_to_string(&config_path).map_err(|e| {
-            tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
-            format!("读取失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("读取配置失败: {}, 耗时: {:?}", e, start_time.elapsed());
+                    format!("读取失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to read config: {}, elapsed: {:?}", e, start_time.elapsed());
+                    format!("Read failed: {}", e)
+                }
+            }
         })?;
         let payload = parse_tavern_config_payload(&content);
-        tracing::info!("解析配置成功, 耗时: {:?}", start_time.elapsed());
+        match lang {
+            Lang::ZhCn => tracing::info!("解析配置成功, 耗时: {:?}", start_time.elapsed()),
+            Lang::EnUs => tracing::info!("Parsed config successfully, elapsed: {:?}", start_time.elapsed()),
+        }
         payload
     })
     .await
@@ -2728,17 +3198,39 @@ async fn update_sillytavern_config_options(
     version: String,
     config: TavernConfigPayload,
 ) -> Result<TavernConfigPayload, String> {
-    tracing::info!("更新酒馆高级配置: 版本 {}", version);
+    let lang = get_current_lang(&app);
+    match lang {
+        Lang::ZhCn => tracing::info!("更新酒馆高级配置: 版本 {}", version),
+        Lang::EnUs => tracing::info!("Updating SillyTavern options: version {}", version),
+    }
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
-        let config_path = get_sillytavern_config_file_path(&app_clone, &version)?;
+        let app_config = read_app_config_from_disk(&app_clone);
+        let use_global = app_config.sillytavern.use_global_config;
+        let config_path = get_sillytavern_config_file_path(&app_clone, &version, use_global)?;
         let content = fs::read_to_string(&config_path).map_err(|e| {
-            tracing::error!("读取配置失败: {}", e);
-            format!("读取失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("读取配置失败: {}", e);
+                    format!("读取失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to read config: {}", e);
+                    format!("Read failed: {}", e)
+                }
+            }
         })?;
         let mut root: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|e| {
-            tracing::error!("解析配置失败: {}", e);
-            format!("解析配置失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("解析配置失败: {}", e);
+                    format!("解析配置失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to parse config: {}", e);
+                    format!("Parse failed: {}", e)
+                }
+            }
         })?;
         let mapping = root
             .as_mapping_mut()
@@ -3031,12 +3523,28 @@ async fn update_sillytavern_config_options(
         );
 
         let new_content = serde_yaml::to_string(&root).map_err(|e| {
-            tracing::error!("序列化配置失败: {}", e);
-            format!("序列化配置失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("序列化配置失败: {}", e);
+                    format!("序列化配置失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to serialize config: {}", e);
+                    format!("Serialize failed: {}", e)
+                }
+            }
         })?;
         fs::write(&config_path, new_content).map_err(|e| {
-            tracing::error!("写入失败: {}", e);
-            format!("写入失败: {}", e)
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("写入失败: {}", e);
+                    format!("写入失败: {}", e)
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to write: {}", e);
+                    format!("Write failed: {}", e)
+                }
+            }
         })?;
         Ok(config)
     })
@@ -3049,19 +3557,39 @@ async fn start_sillytavern(
     app: AppHandle,
     state: tauri::State<'_, ProcessState>,
 ) -> Result<(), String> {
+    let lang = get_current_lang(&app);
     let mut kill_tx_guard = state.kill_tx.lock().await;
     if kill_tx_guard.is_some() {
-        tracing::warn!("尝试启动酒馆，但进程已经在运行中了");
-        return Err("进程已经在运行中了".to_string());
+        match lang {
+            Lang::ZhCn => {
+                tracing::warn!("尝试启动酒馆，但进程已经在运行中了");
+                return Err("进程已经在运行中了".to_string());
+            }
+            Lang::EnUs => {
+                tracing::warn!("Attempting to start SillyTavern, but it's already running");
+                return Err("Process is already running".to_string());
+            }
+        }
     }
 
-    tracing::info!("准备启动酒馆...");
+    match lang {
+        Lang::ZhCn => tracing::info!("准备启动酒馆..."),
+        Lang::EnUs => tracing::info!("Preparing to start SillyTavern..."),
+    }
 
     let config = read_app_config_from_disk(&app);
     let version = config.sillytavern.version;
     if version.is_empty() {
-        tracing::warn!("启动失败：未选择酒馆版本");
-        return Err("未选择酒馆版本，请先在版本页面选择或安装".to_string());
+        match lang {
+            Lang::ZhCn => {
+                tracing::warn!("启动失败：未选择酒馆版本");
+                return Err("未选择酒馆版本，请先在版本页面选择或安装".to_string());
+            }
+            Lang::EnUs => {
+                tracing::warn!("Start failed: No version selected");
+                return Err("No version selected, please select or install one in Version page".to_string());
+            }
+        }
     }
 
     let data_dir = get_config_path(&app)
@@ -3074,17 +3602,30 @@ async fn start_sillytavern(
     let st_data_dir = data_dir.join("st_data");
     if !st_data_dir.exists() {
         if let Err(e) = std::fs::create_dir_all(&st_data_dir) {
-            tracing::error!("无法创建全局数据目录: {}", e);
-            return Err(format!("无法创建全局数据目录: {}", e));
+            match lang {
+                Lang::ZhCn => {
+                    tracing::error!("无法创建全局数据目录: {}", e);
+                    return Err(format!("无法创建全局数据目录: {}", e));
+                }
+                Lang::EnUs => {
+                    tracing::error!("Failed to create global data directory: {}", e);
+                    return Err(format!("Failed to create global data directory: {}", e));
+                }
+            }
         }
     }
 
     if !sillytavern_dir.exists() {
-        tracing::error!("版本 {} 的目录不存在", version);
-        return Err(format!(
-            "版本 {} 的目录不存在，请检查是否已正确安装",
-            version
-        ));
+        match lang {
+            Lang::ZhCn => {
+                tracing::error!("版本 {} 的目录不存在", version);
+                return Err(format!("版本 {} 的目录不存在，请检查是否已正确安装", version));
+            }
+            Lang::EnUs => {
+                tracing::error!("Directory for version {} does not exist", version);
+                return Err(format!("Directory for version {} not found, please check installation", version));
+            }
+        }
     }
 
     let node_dir = data_dir.join("node");
@@ -3095,18 +3636,32 @@ async fn start_sillytavern(
     };
 
     if !node_path.exists() {
-        tracing::info!("本地 node 不存在，回退到系统 node");
+        match lang {
+            Lang::ZhCn => tracing::info!("本地 node 不存在，回退到系统 node"),
+            Lang::EnUs => tracing::info!("Local node not found, falling back to system node"),
+        }
         node_path = PathBuf::from("node"); // Fallback to system node
     }
 
     let server_js = sillytavern_dir.join("server.js");
 
     if !server_js.exists() {
-        tracing::error!("找不到 server.js，酒馆文件可能损坏");
-        return Err("找不到 server.js，酒馆文件可能损坏".to_string());
+        match lang {
+            Lang::ZhCn => {
+                tracing::error!("找不到 server.js，酒馆文件可能损坏");
+                return Err("找不到 server.js，酒馆文件可能损坏".to_string());
+            }
+            Lang::EnUs => {
+                tracing::error!("server.js not found, files may be corrupted");
+                return Err("server.js not found, files may be corrupted".to_string());
+            }
+        }
     }
 
-    tracing::info!("正在启动酒馆，节点路径: {:?}，版本: {}", node_path, version);
+    match lang {
+        Lang::ZhCn => tracing::info!("正在启动酒馆，节点路径: {:?}，版本: {}", node_path, version),
+        Lang::EnUs => tracing::info!("Starting SillyTavern, node: {:?}, version: {}", node_path, version),
+    }
 
     let mut std_cmd = std::process::Command::new(&node_path);
     std_cmd.arg(&server_js);
@@ -3115,6 +3670,26 @@ async fn start_sillytavern(
     let st_data_dir_str = st_data_dir.to_string_lossy().to_string();
     std_cmd.arg("--dataRoot");
     std_cmd.arg(&st_data_dir_str);
+
+    // 如果使用全局配置，添加 --config 参数
+    let use_global_config = config.sillytavern.use_global_config;
+    if use_global_config {
+        let global_config_path = st_data_dir.join("config.yaml");
+        if global_config_path.exists() {
+            let config_path_str = global_config_path.to_string_lossy().to_string();
+            std_cmd.arg("--config");
+            std_cmd.arg(&config_path_str);
+            match lang {
+                Lang::ZhCn => tracing::info!("使用全局配置文件: {}", config_path_str),
+                Lang::EnUs => tracing::info!("Using global config: {}", config_path_str),
+            }
+        } else {
+            match lang {
+                Lang::ZhCn => tracing::warn!("全局配置文件不存在，将使用默认配置"),
+                Lang::EnUs => tracing::warn!("Global config not found, using default"),
+            }
+        }
+    }
 
     std_cmd.current_dir(&sillytavern_dir);
     // 同时设置环境变量，确保兼容性
@@ -3132,8 +3707,16 @@ async fn start_sillytavern(
 
     let mut cmd = tokio::process::Command::from(std_cmd);
     let mut child = cmd.spawn().map_err(|e| {
-        tracing::error!("启动进程失败: {}", e);
-        format!("启动进程失败: {}", e)
+        match lang {
+            Lang::ZhCn => {
+                tracing::error!("启动进程失败: {}", e);
+                format!("启动进程失败: {}", e)
+            }
+            Lang::EnUs => {
+                tracing::error!("Failed to start process: {}", e);
+                format!("Failed to start process: {}", e)
+            }
+        }
     })?;
 
     let stdout = child.stdout.take().ok_or_else(|| {
@@ -3210,7 +3793,9 @@ async fn check_sillytavern_status(state: tauri::State<'_, ProcessState>) -> Resu
 
 #[tauri::command]
 fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), String> {
-    let config_path = get_sillytavern_config_file_path(&app, &version)?;
+    let config = read_app_config_from_disk(&app);
+    let use_global = config.sillytavern.use_global_config;
+    let config_path = get_sillytavern_config_file_path(&app, &version, use_global)?;
 
     #[cfg(target_os = "windows")]
     {

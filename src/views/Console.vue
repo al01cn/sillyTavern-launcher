@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { 
   TerminalSquare, 
   Play, 
@@ -12,6 +13,7 @@ import {
 import { consoleStatus as status, consoleLogs as logs, serverUrl, startProcess, stopProcess, clearLogs } from '../lib/consoleState'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
+const { t } = useI18n()
 const logsContainer = ref<HTMLElement | null>(null)
 
 // 自动滚动到底部
@@ -89,7 +91,7 @@ const handleOpenUrl = async (url: string) => {
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
           <TerminalSquare class="w-5 h-5 text-slate-400" />
-          <h1 class="text-sm font-medium text-slate-200 tracking-wide">服务控制台</h1>
+          <h1 class="text-sm font-medium text-slate-200 tracking-wide">{{ t('console.serviceConsole') }}</h1>
         </div>
         
         <div class="h-4 w-px bg-[#2a2d3d] mx-1"></div>
@@ -110,11 +112,11 @@ const handleOpenUrl = async (url: string) => {
           <XCircle v-else-if="status === 4" class="w-3.5 h-3.5" />
           
           <span>
-            <template v-if="status === 0">未启动</template>
-            <template v-else-if="status === 1">启动中...</template>
-            <template v-else-if="status === 2">启动成功</template>
-            <template v-else-if="status === 3">已停止</template>
-            <template v-else-if="status === 4">启动失败</template>
+            <template v-if="status === 0">{{ t('console.notStarted') }}</template>
+            <template v-else-if="status === 1">{{ t('console.starting') }}</template>
+            <template v-else-if="status === 2">{{ t('console.started') }}</template>
+            <template v-else-if="status === 3">{{ t('console.stopped') }}</template>
+            <template v-else-if="status === 4">{{ t('console.failed') }}</template>
           </span>
         </div>
         
@@ -124,9 +126,9 @@ const handleOpenUrl = async (url: string) => {
           <button 
             @click="handleOpenUrl(serverUrl)"
             class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors group"
-            title="在浏览器中打开 SillyTavern"
+            :title="t('console.openInBrowser')"
           >
-            <span>访问酒馆: {{ serverUrl }}</span>
+            <span>{{ t('console.visitTavern') }}: {{ serverUrl }}</span>
             <svg class="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
           </button>
         </div>
@@ -136,7 +138,7 @@ const handleOpenUrl = async (url: string) => {
       <div class="flex items-center gap-2">
         <button 
           @click="clearLogs"
-          title="清空日志"
+          :title="t('console.clearLogs')"
           class="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-[#2a2d3d] transition-colors"
         >
           <Trash2 class="w-4 h-4" />
@@ -152,7 +154,7 @@ const handleOpenUrl = async (url: string) => {
           :class="status === 0 || status === 3 || status === 4 ? 'text-slate-500 bg-[#2a2d3d]' : 'text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20'"
         >
           <Square class="w-3.5 h-3.5 fill-current" />
-          停止
+          {{ t('console.stop') }}
         </button>
         
         <!-- 启动按钮 -->
@@ -163,7 +165,7 @@ const handleOpenUrl = async (url: string) => {
           :class="status === 1 || status === 2 ? 'text-slate-500 bg-[#2a2d3d]' : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20'"
         >
           <Play class="w-3.5 h-3.5 fill-current" />
-          启动
+          {{ t('console.start') }}
         </button>
       </div>
     </div>
@@ -175,7 +177,7 @@ const handleOpenUrl = async (url: string) => {
         <div v-if="logs.length === 0" class="flex items-center justify-center h-full min-h-[200px] opacity-40 select-none">
           <div class="flex flex-col items-center gap-3">
             <TerminalSquare class="w-12 h-12 text-slate-500" />
-            <span class="text-slate-400">控制台已就绪，等待进程启动...</span>
+            <span class="text-slate-400">{{ t('console.consoleReady') }}</span>
           </div>
         </div>
         
@@ -201,7 +203,7 @@ const handleOpenUrl = async (url: string) => {
               <a v-else 
                  @click.prevent="handleOpenUrl(part.content)" 
                  class="text-blue-400 hover:text-blue-300 underline cursor-pointer transition-colors"
-                 title="点击在浏览器中打开"
+                 :title="t('console.clickToOpen')"
               >{{ part.content }}</a>
             </template>
           </span>

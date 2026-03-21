@@ -7,6 +7,9 @@ import { X, UploadCloud, FileJson, CheckCircle2, AlertTriangle, Loader2 } from '
 import { toast } from 'vue-sonner';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const isDragging = ref(false);
 const isImporting = ref(false);
@@ -53,7 +56,7 @@ const setupDragDrop = async () => {
                 if (jsonPaths.length > 0) {
                     handleFilesSelected(jsonPaths);
                 } else {
-                    toast.error('请上传 .json 格式的世界书文件');
+                    toast.error(t('resources.uploadJsonError'));
                 }
             }
         } else if (event.payload.type === 'enter') {
@@ -103,7 +106,7 @@ const handleFilesSelected = async (filePaths: string[]) => {
             const entries = data.entries;
             
             if (!entries || (Array.isArray(entries) && entries.length === 0) || (typeof entries === 'object' && Object.keys(entries).length === 0)) {
-                throw new Error('未检测到世界书词条数据');
+                throw new Error(t('resources.noEntriesDetected'));
             }
             
             file.worldName = data.name || file.name;
@@ -172,7 +175,7 @@ const importWorlds = async () => {
     isImporting.value = false;
 
     if (successCount > 0) {
-        toast.success(`成功导入 ${successCount} 个世界书`);
+        toast.success(t('resources.importSuccessMsg', { count: successCount, type: t('resources.worldInfo') }));
         if (uploadWorldInfoState.onSuccess) {
             uploadWorldInfoState.onSuccess();
         }
@@ -183,7 +186,7 @@ const importWorlds = async () => {
             }, 1000);
         }
     } else {
-        toast.error('导入世界书失败，请查看详细信息');
+        toast.error(t('resources.importFailedMsg', { type: t('resources.worldInfo') }));
     }
 };
 
@@ -204,7 +207,7 @@ const importWorlds = async () => {
         ]">
             <!-- Header -->
             <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-800">添加世界书</h3>
+                <h3 class="text-lg font-bold text-slate-800">{{ t('resources.uploadWorldTitle') }}</h3>
                 <button 
                     @click="!isImporting && closeUploadWorldInfoDialog()"
                     :disabled="isImporting"
@@ -218,7 +221,7 @@ const importWorlds = async () => {
             <div class="p-6 space-y-6">
                 <!-- Empty / Dragging State -->
                 <div v-if="selectedFiles.length === 0 || isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">世界书文件 (.json)</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.worldJsonFile') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
@@ -231,15 +234,15 @@ const importWorlds = async () => {
                             <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 mb-3">
                                 <UploadCloud class="w-6 h-6" />
                             </div>
-                            <p class="text-slate-700 font-medium">点击选择或拖拽文件到此处</p>
-                            <p class="text-slate-400 text-xs mt-1">支持选择多个 .json 格式的世界书文件</p>
+                            <p class="text-slate-700 font-medium">{{ t('resources.clickOrDrag') }}</p>
+                            <p class="text-slate-400 text-xs mt-1">{{ t('resources.supportMultipleWorlds') }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Single File UI -->
                 <div v-else-if="selectedFiles.length === 1 && !isDragging">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">世界书文件 (.json)</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.worldJsonFile') }}</label>
                     <div 
                         @click="selectFile"
                         :class="[
@@ -252,7 +255,7 @@ const importWorlds = async () => {
                                 <FileJson class="w-6 h-6" />
                             </div>
                             <p class="text-slate-700 font-medium truncate max-w-[250px]">{{ selectedFiles[0].name }}</p>
-                            <p class="text-blue-500 text-xs mt-1">点击重新选择</p>
+                            <p class="text-blue-500 text-xs mt-1">{{ t('resources.clickToReselect') }}</p>
                         </div>
                     </div>
 
@@ -263,13 +266,13 @@ const importWorlds = async () => {
                     ]">
                         <div v-if="selectedFiles[0].status === 'verifying'" class="flex items-center gap-3 text-slate-500">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在验证世界书...</span>
+                            <span class="text-sm font-medium">{{ t('resources.verifyingWorld') }}</span>
                         </div>
                         
                         <div v-else-if="selectedFiles[0].status === 'invalid'" class="flex items-start gap-3 text-red-600">
                             <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">无效的世界书</p>
+                                <p class="text-sm font-bold">{{ t('resources.invalidWorld') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
@@ -277,27 +280,27 @@ const importWorlds = async () => {
                         <div v-else-if="selectedFiles[0].status === 'error'" class="flex items-start gap-3 text-red-600">
                             <X class="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
-                                <p class="text-sm font-bold">导入失败</p>
+                                <p class="text-sm font-bold">{{ t('resources.importFailed') }}</p>
                                 <p class="text-xs mt-1 opacity-80">{{ selectedFiles[0].errorMsg }}</p>
                             </div>
                         </div>
 
                         <div v-else-if="selectedFiles[0].status === 'importing'" class="flex items-center gap-3 text-blue-600">
                             <Loader2 class="w-5 h-5 animate-spin" />
-                            <span class="text-sm font-medium">正在导入...</span>
+                            <span class="text-sm font-medium">{{ t('resources.importing') }}...</span>
                         </div>
 
                         <div v-else-if="selectedFiles[0].status === 'success'" class="flex items-center gap-3 text-emerald-600">
                             <CheckCircle2 class="w-5 h-5" />
-                            <span class="text-sm font-medium">导入成功</span>
+                            <span class="text-sm font-medium">{{ t('resources.importSuccess') }}</span>
                         </div>
                         
                         <div v-else-if="selectedFiles[0].status === 'valid'" class="flex items-start gap-3 text-emerald-700">
                             <CheckCircle2 class="w-5 h-5 shrink-0 mt-0.5" />
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-bold">有效的世界书</p>
+                                <p class="text-sm font-bold">{{ t('resources.validWorld') }}</p>
                                 <div class="mt-2 space-y-1 text-xs opacity-90">
-                                    <p v-if="selectedFiles[0].worldName"><span class="font-semibold">名称：</span>{{ selectedFiles[0].worldName }}</p>
+                                    <p v-if="selectedFiles[0].worldName"><span class="font-semibold">{{ t('resources.worldName') }}：</span>{{ selectedFiles[0].worldName }}</p>
                                 </div>
                             </div>
                         </div>
@@ -307,9 +310,9 @@ const importWorlds = async () => {
                 <!-- Multiple Files UI -->
                 <div v-else-if="selectedFiles.length > 1 && !isDragging" class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <label class="block text-sm font-bold text-slate-700">已选择 {{ selectedFiles.length }} 个文件</label>
+                        <label class="block text-sm font-bold text-slate-700">{{ t('resources.selectedFiles', { count: selectedFiles.length }) }}</label>
                         <button @click="selectFile" :disabled="isImporting" class="text-xs text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50">
-                            重新选择
+                            {{ t('resources.reselect') }}
                         </button>
                     </div>
                     
@@ -338,27 +341,27 @@ const importWorlds = async () => {
                             <div class="shrink-0 ml-3 flex items-center justify-end min-w-[70px]">
                                 <div v-if="file.status === 'verifying'" class="flex items-center gap-1.5 text-slate-400 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>验证中</span>
+                                    <span>{{ t('resources.verifying') }}</span>
                                 </div>
-                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 text-xs" title="无效的文件">
+                                <div v-else-if="file.status === 'invalid'" class="flex items-center gap-1.5 text-red-500 text-xs" :title="t('resources.invalid')">
                                     <AlertTriangle class="w-3.5 h-3.5" />
-                                    <span>无效</span>
+                                    <span>{{ t('resources.invalid') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'valid'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>待导入</span>
+                                    <span>{{ t('resources.pending') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'importing'" class="flex items-center gap-1.5 text-blue-500 text-xs">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                                    <span>导入中</span>
+                                    <span>{{ t('resources.importing') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'success'" class="flex items-center gap-1.5 text-emerald-500 text-xs">
                                     <CheckCircle2 class="w-3.5 h-3.5" />
-                                    <span>成功</span>
+                                    <span>{{ t('resources.importSuccess') }}</span>
                                 </div>
                                 <div v-else-if="file.status === 'error'" class="flex items-center gap-1.5 text-red-500 text-xs" :title="file.errorMsg">
                                     <X class="w-3.5 h-3.5" />
-                                    <span>失败</span>
+                                    <span>{{ t('resources.importFailed') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -373,7 +376,7 @@ const importWorlds = async () => {
                     :disabled="isImporting"
                     class="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50 text-sm"
                 >
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button 
                     @click="importWorlds"
@@ -386,7 +389,7 @@ const importWorlds = async () => {
                     ]"
                 >
                     <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
-                    <span>{{ isImporting ? '导入中...' : '开始导入' }}</span>
+                    <span>{{ isImporting ? t('resources.importing') + '...' : t('resources.startImport') }}</span>
                 </button>
             </div>
         </div>
