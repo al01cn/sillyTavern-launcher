@@ -1,8 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "sillyTavern-launcher-gui",
+  "mainBinaryName": "sillytavern-launcher-gui",
+  "productName": "sillytavern-launcher-gui",
   "version": "0.1.0",
-  "identifier": "com.sillyTavern-launcher-gui.app",
+  "identifier": "com.sillytavern-launcher-gui",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -39,6 +40,9 @@
     }
   },
   "bundle": {
+    "copyright": "Make by 灵狼AL01",
+    "publisher": "AL01",
+    "license": "MIT",
     "active": true,
     "targets": "all",
     "icon": [
@@ -53,7 +57,11 @@
         "type": "embedBootstrapper"
       },
       "nsis": {
+        "installMode": "both",
+        "startMenuFolder": "SillyTavern Launcher",
+        "installerIcon": "icons/icon.ico",
         "displayLanguageSelector": true,
+        "installerHooks": "installer/hooks.nsh",
         "languages": [
           "SimpChinese",
           "English"

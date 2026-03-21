@@ -654,23 +654,20 @@ onMounted(async () => {
           <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
             <img :src="globalConfig.appIcon" alt="Logo" class="w-12 h-12 opacity-80" />
           </div>
-            <div>
-              <h2 class="text-xl font-bold text-slate-800">{{ globalConfig.appName }}</h2>
-              <p class="text-slate-500 text-sm mt-1">版本 {{ globalConfig.appVersion }}</p>
-            </div>
-            <button 
-              @click="handleCheckUpdate" 
-              :disabled="checkingUpdate"
-              class="mt-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <PhArrowsClockwise :class="{'animate-spin': checkingUpdate}" :size="16" weight="bold" />
-              {{ checkingUpdate ? '正在检查...' : '检查更新' }}
-            </button>
-            <p class="text-slate-600 max-w-md text-sm leading-relaxed mt-4">
-              {{ globalConfig.appName }} 是一个辅助管理 SillyTavern 的工具，提供了一键启动、版本管理、插件管理等功能。
-            </p>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">{{ globalConfig.appName }}({{ globalConfig.appNameEn }})</h2>
+            <p class="text-slate-500 text-sm mt-1">版本 {{ globalConfig.appVersion }}</p>
           </div>
+          <button @click="handleCheckUpdate" :disabled="checkingUpdate"
+            class="mt-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <PhArrowsClockwise :class="{ 'animate-spin': checkingUpdate }" :size="16" weight="bold" />
+            {{ checkingUpdate ? '正在检查...' : '检查更新' }}
+          </button>
+          <p class="text-slate-600 max-w-md text-sm leading-relaxed mt-4">
+            {{ globalConfig.appDescription }}
+          </p>
         </div>
+      </div>
 
     </div>
   </div>

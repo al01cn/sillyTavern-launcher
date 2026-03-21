@@ -4,7 +4,10 @@ import logo from '../assets/logo.svg'
 
 export default {
     appName: '酒馆启动器',
+    appNameEn: "SillyTavern Launcher GUI",
     appVersion: pkg.version,
+    appDescription: pkg.description,
+    appHomepage:pkg.homepage,
     appIcon: logo,
     git: {
         github: "",
@@ -24,7 +27,7 @@ export default {
             },
             {
                 icon: "https://sillytavern.wiki/favicon.ico",
-                name: 'SillyTavern',
+                name: 'SillyTavern Wiki',
                 url: 'https://sillytavern.wiki/',
             }
         ],

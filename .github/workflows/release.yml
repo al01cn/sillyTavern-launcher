@@ -2,8 +2,11 @@ name: Build and Release Tauri App
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - "GUI"
+    paths:
+      - "package.json" # 限制：只有当由您主动推送了带有修改过 package.json（也就是修改了版本号等信息）才会触发构建
+  workflow_dispatch: # 您也可以依然在网页上手动点击运行
 
 jobs:
   build:
@@ -11,14 +14,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'windows-latest'
-            args: ''
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-13'
-            args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
+          - platform: "windows-latest"
+            args: ""
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-13"
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
 
     runs-on: ${{ matrix.platform }}
     permissions:
@@ -62,10 +65,9 @@ jobs:
           TAURI_SIGNER_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNER_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }} # 使用推上来的 tag 名称
-          releaseName: "SillyTavern Launcher GUI ${{ github.ref_name }}"
+          tagName: "v__VERSION__" # tauri-action 的魔法占位符：自动从编译后的 tauri.conf 读取您的包版本
+          releaseName: "SillyTavern Launcher GUI v__VERSION__"
           releaseBody: "请根据您的系统下载对应的安装包。客户端也可直接无缝静默升级！"
           releaseDraft: false # 默认创建正式发布，您可以选择 true 预览
           prerelease: false
           args: ${{ matrix.args }}
-

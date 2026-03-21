@@ -1,87 +1,74 @@
-import fs from 'fs';
-import path from 'path';
+#!/usr/bin/env node
+/**
+ * 版本信息同步脚本
+ * 在构建前自动同步 package.json 中的版本信息到各个配置文件
+ */
+
+import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, '..');
 
-const rootDir = path.resolve(__dirname, '..');
-const packageJsonPath = path.join(rootDir, 'package.json');
-const tauriConfPath = path.join(rootDir, 'src-tauri', 'tauri.conf.json');
-const cargoTomlPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
+// 读取 package.json
+const packageJson = JSON.parse(
+  readFileSync(join(rootDir, 'package.json'), 'utf-8')
+);
 
+const { name, version, description } = packageJson;
+const homepage = packageJson.homepage || 'https://github.com/al01cn/sillytavern-launcher';
+
+console.log('🔄 开始同步版本信息...');
+console.log(`📦 项目名称: ${name}`);
+console.log(`🏷️ 版本号: ${version}`);
+console.log(`📝 描述: ${description}`);
+console.log(`🌐 主页: ${homepage}`);
+
+// 1. 同步到 tauri.conf.json
 try {
-  // 1. 读取 package.json 的信息
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  const version = packageJson.version;
-  const name = packageJson.name;
-  const description = packageJson.description || '';
-
-  if (!version || !name) {
-    throw new Error('No version or name found in package.json');
-  }
-
-  console.log(`Syncing name: ${name}, description: ${description}, version: ${version} from package.json...`);
-
-  // 2. 更新 tauri.conf.json
-  const tauriConfStr = fs.readFileSync(tauriConfPath, 'utf8');
-  const tauriConf = JSON.parse(tauriConfStr);
+  const tauriConfigPath = join(rootDir, 'src-tauri/tauri.conf.json');
+  const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, 'utf-8'));
   
-  let tauriConfUpdated = false;
-
-  if (tauriConf.version !== version) {
-    tauriConf.version = version;
-    tauriConfUpdated = true;
-    console.log(`✅ Updated tauri.conf.json version to ${version}`);
-  }
+  tauriConfig.version = version;
+  tauriConfig.productName = name;
   
-  if (tauriConf.productName !== name) {
-    tauriConf.productName = name;
-    tauriConfUpdated = true;
-    console.log(`✅ Updated tauri.conf.json productName to ${name}`);
-  }
-
-  if (tauriConfUpdated) {
-    fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n', 'utf8');
-  } else {
-    console.log(`⚡ tauri.conf.json is already up to date`);
-  }
-
-  // 3. 更新 Cargo.toml
-  let cargoTomlStr = fs.readFileSync(cargoTomlPath, 'utf8');
-  
-  // 匹配并替换 [package] 下的 version, name, description
-  const versionRegex = /^(\s*version\s*=\s*")([^"]+)(")/m;
-  const nameRegex = /^(\s*name\s*=\s*")([^"]+)(")/m;
-  const descriptionRegex = /^(\s*description\s*=\s*")([^"]*)(")/m;
-  
-  let newCargoTomlStr = cargoTomlStr.replace(versionRegex, (match, p1, p2, p3) => {
-      return `${p1}${version}${p3}`;
-  });
-
-  newCargoTomlStr = newCargoTomlStr.replace(nameRegex, (match, p1, p2, p3) => {
-      // Cargo 包名通常全小写
-      return `${p1}${name.toLowerCase()}${p3}`;
-  });
-
-  if (descriptionRegex.test(newCargoTomlStr)) {
-    newCargoTomlStr = newCargoTomlStr.replace(descriptionRegex, (match, p1, p2, p3) => {
-        return `${p1}${description}${p3}`;
-    });
-  } else {
-    newCargoTomlStr = newCargoTomlStr.replace(versionRegex, (match) => {
-        return `${match}\ndescription = "${description}"`;
-    });
-  }
-
-  if (cargoTomlStr !== newCargoTomlStr) {
-    fs.writeFileSync(cargoTomlPath, newCargoTomlStr, 'utf8');
-    console.log(`✅ Updated Cargo.toml with new name/description/version`);
-  } else {
-    console.log(`⚡ Cargo.toml is already up to date`);
-  }
-
+  writeFileSync(
+    tauriConfigPath,
+    JSON.stringify(tauriConfig, null, 2) + '\n',
+    'utf-8'
+  );
+  console.log('✅ 已同步到 tauri.conf.json');
 } catch (error) {
-  console.error('Error syncing version:', error);
+  console.error('❌ 同步 tauri.conf.json 失败:', error.message);
   process.exit(1);
 }
+
+// 2. 同步到 Cargo.toml
+try {
+  const cargoTomlPath = join(rootDir, 'src-tauri/Cargo.toml');
+  let cargoToml = readFileSync(cargoTomlPath, 'utf-8');
+  
+  // 替换版本号
+  cargoToml = cargoToml.replace(
+    /^version = ".*"$/m,
+    `version = "${version}"`
+  );
+  
+  // 替换描述
+  cargoToml = cargoToml.replace(
+    /^description = ".*"$/m,
+    `description = "${description}"`
+  );
+  
+  writeFileSync(cargoTomlPath, cargoToml, 'utf-8');
+  console.log('✅ 已同步到 Cargo.toml');
+} catch (error) {
+  console.error('❌ 同步 Cargo.toml 失败:', error.message);
+  process.exit(1);
+}
+
+console.log('');
+console.log('🎉 版本信息同步完成！');
+console.log('');

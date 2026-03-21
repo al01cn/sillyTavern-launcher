@@ -362,8 +362,8 @@ fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, 
         // Windows layout: node_modules/npm/bin/npm-cli.js
         // Linux layout: lib/node_modules/npm/bin/npm-cli.js
         let npm_cli_paths = vec![
-            node_dir.join("node_modules/npm/bin/npm-cli.js"),
-            node_dir.join("lib/node_modules/npm/bin/npm-cli.js"),
+            node_dir.join("node_modules").join("npm").join("bin").join("npm-cli.js"),
+            node_dir.join("lib").join("node_modules").join("npm").join("bin").join("npm-cli.js"),
         ];
 
         for cli in npm_cli_paths {
@@ -418,7 +418,7 @@ fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathBuf, 
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    if command.output().is_ok() {
+    if command.stdin(std::process::Stdio::null()).output().is_ok() {
         return Some((
             PathBuf::from(system_npm),
             vec![
@@ -698,6 +698,14 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
         target_dir,
         registry
     );
+    
+    // 检查 package.json 是否存在
+    let package_json = target_dir.join("package.json");
+    if !package_json.exists() {
+        tracing::error!("package.json 不存在: {:?}", package_json);
+        return Err("package.json 文件不存在".to_string());
+    }
+    
     let npm_cmd = get_npm_install_command(&data_dir, &registry);
 
     let emit_progress = |status: &str, progress: f64, log: &str| {
@@ -711,46 +719,103 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
         );
     };
 
-    if let Some((cmd, args)) = npm_cmd {
+    if let Some((cmd, mut args)) = npm_cmd {
         use std::process::Stdio;
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::process::Command;
 
+        // 添加 --verbose 参数以显示安装进度
+        args.push("--verbose".to_string());
+        
         // Log the command we are running
         tracing::info!("执行命令: {:?} {:?}", cmd, args);
         emit_progress(
             "installing",
             0.1,
-            &format!("执行命令: {:?} {:?}", cmd, args),
+            "正在安装依赖，请稍候...",
         );
 
-        let mut child = Command::new(&cmd)
-            .args(&args)
+        // Prepend node directory to PATH to ensure sub-processes/shims can find it
+        let node_bin_dir = data_dir.join("node");
+        let path_env = std::env::var_os("PATH").unwrap_or_default();
+        let mut paths = std::env::split_paths(&path_env).collect::<Vec<_>>();
+        // Also add potential Linux bin folder if cross-compiling or similar logic
+        paths.insert(0, node_bin_dir.join("bin"));
+        paths.insert(0, node_bin_dir); // For Windows node.exe location
+
+        let new_path_env = std::env::join_paths(paths).unwrap_or(path_env);
+
+        let mut command = Command::new(&cmd);
+        command.args(&args)
             .current_dir(target_dir)
+            .env("PATH", new_path_env)
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        #[cfg(target_os = "windows")]
+        {
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        let mut child = command
             .spawn()
             .map_err(|e| {
                 tracing::error!("启动 npm 失败: {}", e);
-                format!("Failed to start npm: {}", e)
+                format!("启动 npm 失败: {}", e)
             })?;
 
-        // Stream stdout
-        if let Some(stdout) = child.stdout.take() {
-            let mut reader = BufReader::new(stdout);
-            let mut line = String::new();
-            let mut last_emit = std::time::Instant::now();
-            while let Ok(bytes) = reader.read_line(&mut line).await {
-                if bytes == 0 {
-                    break;
+        let mut stdout_reader = child.stdout.take().map(BufReader::new);
+        let mut stderr_reader = child.stderr.take().map(BufReader::new);
+        
+        let mut stdout_line = String::new();
+        let mut stderr_line = String::new();
+        let mut last_emit = std::time::Instant::now();
+        let mut error_logs = Vec::new();
+
+        loop {
+            tokio::select! {
+                result = async {
+                    stdout_reader.as_mut().unwrap().read_line(&mut stdout_line).await
+                }, if stdout_reader.is_some() => {
+                    match result {
+                        Ok(0) | Err(_) => stdout_reader = None,
+                        Ok(_) => {
+                            let text = stdout_line.trim_end();
+                            if !text.is_empty() {
+                                tracing::debug!("NPM_STDOUT: {}", text);
+                                if last_emit.elapsed() > std::time::Duration::from_millis(200) {
+                                    emit_progress("installing", 0.5, text);
+                                    last_emit = std::time::Instant::now();
+                                }
+                            }
+                            stdout_line.clear();
+                        }
+                    }
                 }
-                tracing::debug!("NPM_STDOUT: {}", line.trim_end());
-                // Throttle the IPC emit to avoid freezing the frontend
-                if last_emit.elapsed() > std::time::Duration::from_millis(100) {
-                    emit_progress("installing", 0.5, line.trim_end());
-                    last_emit = std::time::Instant::now();
+                result = async {
+                    stderr_reader.as_mut().unwrap().read_line(&mut stderr_line).await
+                }, if stderr_reader.is_some() => {
+                    match result {
+                        Ok(0) | Err(_) => stderr_reader = None,
+                        Ok(_) => {
+                            let text = stderr_line.trim_end();
+                            if !text.is_empty() {
+                                tracing::debug!("NPM_STDERR: {}", text);
+                                // 收集错误日志
+                                if text.contains("ERR!") || text.contains("error") || text.contains("failed") {
+                                    error_logs.push(text.to_string());
+                                }
+                                if last_emit.elapsed() > std::time::Duration::from_millis(200) {
+                                    emit_progress("installing", 0.5, text);
+                                    last_emit = std::time::Instant::now();
+                                }
+                            }
+                            stderr_line.clear();
+                        }
+                    }
                 }
-                line.clear();
+                else => break,
             }
         }
 
@@ -759,9 +824,34 @@ async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), Strin
             tracing::error!("等待 npm 执行完成时发生错误: {}", e);
             e.to_string()
         })?;
+        
         if !status.success() {
             tracing::error!("npm install 执行失败，退出码: {:?}", status.code());
-            return Err("npm install failed".to_string());
+            
+            // 输出收集到的错误日志
+            if !error_logs.is_empty() {
+                tracing::error!("npm 错误日志:");
+                for log in &error_logs {
+                    tracing::error!("  {}", log);
+                }
+            }
+            
+            // 清理失败的 node_modules
+            let node_modules_path = target_dir.join("node_modules");
+            if node_modules_path.exists() {
+                tracing::info!("清理失败的 node_modules 目录: {:?}", node_modules_path);
+                if let Err(e) = tokio::fs::remove_dir_all(&node_modules_path).await {
+                    tracing::warn!("清理 node_modules 失败: {}", e);
+                }
+            }
+            
+            let error_msg = if !error_logs.is_empty() {
+                format!("npm install 失败: {}", error_logs.join("\n"))
+            } else {
+                format!("npm install 失败，退出码: {:?}", status.code())
+            };
+            
+            return Err(error_msg);
         }
         tracing::info!("npm install 执行成功");
     } else {
@@ -1029,7 +1119,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
             command.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
 
-        if let Ok(output) = command.output() {
+        if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 tracing::info!("找到本地 Node.js: {}", version);
@@ -1057,7 +1147,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    if let Ok(output) = command.output() {
+    if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -1076,7 +1166,7 @@ async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
                 path_command.creation_flags(0x08000000); // CREATE_NO_WINDOW
             }
 
-            if let Ok(path_output) = path_command.output() {
+            if let Ok(path_output) = path_command.stdin(std::process::Stdio::null()).output() {
                 if path_output.status.success() {
                     let path_str = String::from_utf8_lossy(&path_output.stdout);
                     if let Some(first_line) = path_str.lines().next() {
@@ -1137,7 +1227,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                 command.creation_flags(0x08000000); // CREATE_NO_WINDOW
             }
 
-            if let Ok(output) = command.output() {
+            if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     tracing::info!("找到本地 NPM (cmd/bin): {}", version);
@@ -1171,10 +1261,16 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         };
 
         if let Some(cli) = target_cli {
-            if let Ok(output) = std::process::Command::new(&local_node_path)
-                .arg(&cli)
-                .arg("-v")
-                .output()
+            let mut command = std::process::Command::new(&local_node_path);
+            command.arg(&cli).arg("-v");
+            
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            
+            if let Ok(output) = command.stdin(std::process::Stdio::null()).output()
             {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -1204,7 +1300,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    if let Ok(output) = command.output() {
+    if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -1223,7 +1319,7 @@ async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                 path_command.creation_flags(0x08000000); // CREATE_NO_WINDOW
             }
 
-            if let Ok(path_output) = path_command.output() {
+            if let Ok(path_output) = path_command.stdin(std::process::Stdio::null()).output() {
                 if path_output.status.success() {
                     let path_str = String::from_utf8_lossy(&path_output.stdout);
                     if let Some(first_line) = path_str.lines().next() {
@@ -1512,12 +1608,14 @@ fn open_directory(
         cmd.arg(target_dir);
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.stdin(std::process::Stdio::null());
         cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .arg(target_dir)
+            .stdin(std::process::Stdio::null())
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -1525,6 +1623,7 @@ fn open_directory(
     {
         std::process::Command::new("xdg-open")
             .arg(target_dir)
+            .stdin(std::process::Stdio::null())
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -3021,6 +3120,7 @@ async fn start_sillytavern(
     // 同时设置环境变量，确保兼容性
     std_cmd.env("SILLYTAVERN_DATA_DIR", &st_data_dir_str);
     std_cmd.env("SillyTavern_DATA_DIR", &st_data_dir_str);
+    std_cmd.stdin(std::process::Stdio::null());
     std_cmd.stdout(std::process::Stdio::piped());
     std_cmd.stderr(std::process::Stdio::piped());
 
