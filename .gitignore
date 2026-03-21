@@ -55,6 +55,7 @@ lerna-debug.log*
 # =========================
 # Environment Variables
 # =========================
+.env
 .env.local
 .env.*.local
 *.local
@@ -73,4 +74,4 @@ updater.key.pub
 data/logs/*
 data/sillytavern/*
 data/node/*
-data/st_data/*
+data/st_data/*
