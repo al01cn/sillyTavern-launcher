@@ -30,10 +30,10 @@ console.log(`🌐 主页: ${homepage}`);
 try {
   const tauriConfigPath = join(rootDir, 'src-tauri/tauri.conf.json');
   const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, 'utf-8'));
-  
+
   tauriConfig.version = version;
-  tauriConfig.productName = name;
-  
+  tauriConfig.mainBinaryName = name;
+
   writeFileSync(
     tauriConfigPath,
     JSON.stringify(tauriConfig, null, 2) + '\n',
@@ -49,19 +49,19 @@ try {
 try {
   const cargoTomlPath = join(rootDir, 'src-tauri/Cargo.toml');
   let cargoToml = readFileSync(cargoTomlPath, 'utf-8');
-  
+
   // 替换版本号
   cargoToml = cargoToml.replace(
     /^version = ".*"$/m,
     `version = "${version}"`
   );
-  
+
   // 替换描述
   cargoToml = cargoToml.replace(
     /^description = ".*"$/m,
     `description = "${description}"`
   );
-  
+
   writeFileSync(cargoTomlPath, cargoToml, 'utf-8');
   console.log('✅ 已同步到 Cargo.toml');
 } catch (error) {

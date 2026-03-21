@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "mainBinaryName": "sillytavern-launcher-gui",
-  "productName": "sillytavern-launcher-gui",
+  "productName": "SillyTavern Launcher GUI",
   "version": "0.1.0",
   "identifier": "com.sillytavern-launcher-gui",
   "build": {
@@ -32,7 +32,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5MzhFMEFDNkU5QTNGMkIKUldRclA1cHVyT0E0S2RXT01sNURsUEFjV1JXYldLd0k2WFZ6VEdZRE5lNVpYWXZyR1hsVW42MEkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwMDk4NzVDRENFQTk2NzQKUldSMGx1cmNYSWNKc0hZbDF2UWNuOHFYNkRkQkVGNmtDNytUREVoc3FOcHJEL3E5bXhiZHZZWSsK",
       "endpoints": [
         "https://ghfast.top/https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json",
         "https://gh.llkk.cc/https://github.com/al01cn/sillytavern-launcher/releases/latest/download/latest.json",
@@ -64,10 +64,15 @@
         "installerIcon": "icons/icon.ico",
         "displayLanguageSelector": true,
         "installerHooks": "installer/hooks.nsh",
+        "template": "nsis/template.nsi",
         "languages": [
           "SimpChinese",
           "English"
-        ]
+        ],
+        "customLanguageFiles": {
+          "SimpChinese": "nsis/languages/SimpChinese.nsh",
+          "English": "nsis/languages/English.nsh"
+        }
       },
       "wix": {
         "language": [
