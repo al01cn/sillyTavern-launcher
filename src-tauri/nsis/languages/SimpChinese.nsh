@@ -1,3 +1,4 @@
+LangString shortcutName ${LANG_SIMPCHINESE} "酒馆启动器GUI"
 LangString addOrReinstall ${LANG_SIMPCHINESE} "添加/重新安装组件"
 LangString alreadyInstalled ${LANG_SIMPCHINESE} "已安装"
 LangString alreadyInstalledLong ${LANG_SIMPCHINESE} "${PRODUCTNAME} ${VERSION} 已经安装了。选择你想要执行的操作后点击下一步以继续。"
@@ -25,4 +26,3 @@ LangString webview2Downloading ${LANG_SIMPCHINESE} "正在下载 WebView2 引导
 LangString webview2InstallError ${LANG_SIMPCHINESE} "错误：安装 WebView2 时失败，错误代码：$1"
 LangString webview2InstallSuccess ${LANG_SIMPCHINESE} "成功安装 WebView2"
 LangString deleteAppData ${LANG_SIMPCHINESE} "删除应用程序数据"
-LangString shortcutName ${LANG_SIMPCHINESE} "酒馆启动器GUI"

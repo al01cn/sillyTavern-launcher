@@ -66,8 +66,7 @@
         "installerHooks": "installer/hooks.nsh",
         "template": "nsis/template.nsi",
         "languages": [
-          "SimpChinese",
-          "English"
+          "SimpChinese"
         ],
         "customLanguageFiles": {
           "SimpChinese": "nsis/languages/SimpChinese.nsh",
@@ -76,8 +75,7 @@
       },
       "wix": {
         "language": [
-          "zh-CN",
-          "en-US"
+          "zh-CN"
         ]
       }
     }

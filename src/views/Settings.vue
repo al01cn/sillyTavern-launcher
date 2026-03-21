@@ -10,7 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl as open } from '@tauri-apps/plugin-opener';
 import { toast } from 'vue-sonner';
-import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple } from '@phosphor-icons/vue';
+import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple, PhShield, PhShieldCheck } from '@phosphor-icons/vue';
 import globalConfig from '../lib/config'
 import { checkUpdate } from '../lib/updater'
 import { setTheme } from '../lib/theme'
@@ -108,6 +108,8 @@ const nodeInfo = ref<NodeInfo>({ version: null, path: null, source: 'none' });
 const npmInfo = ref<NpmInfo>({ version: null, path: null, source: 'none' });
 const installingNode = ref(false);
 const nodeProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
+const isElevated = ref(false);
+const elevating = ref(false);
 
 const isNodeVersionValid = computed(() => {
   if (!nodeInfo.value.version) return false;
@@ -322,6 +324,27 @@ const checkNpm = async () => {
   }
 };
 
+const checkElevation = async () => {
+  try {
+    isElevated.value = await invoke<boolean>('is_elevated');
+  } catch (error) {
+    console.error('Failed to check elevation:', error);
+  }
+};
+
+const requestElevation = async () => {
+  if (elevating.value) return;
+  elevating.value = true;
+  try {
+    await invoke('elevate_process');
+    // The app will restart, so we don't need to reset elevating.value
+  } catch (error) {
+    console.error('Failed to elevate:', error);
+    toast.error(t('common.failed') + ': ' + error);
+    elevating.value = false;
+  }
+};
+
 const installNode = async () => {
   if (installingNode.value) return;
   installingNode.value = true;
@@ -367,6 +390,7 @@ onMounted(async () => {
   checkNode();
   checkNpm();
 
+  await checkElevation();
   await listen<DownloadProgress>('download-progress', (event) => {
     if (installingNode.value) {
       nodeProgress.value = event.payload;
@@ -442,6 +466,7 @@ const openLink = (url: string) => {
               </div>
               <select v-model="config.lang"
                 class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[140px] outline-none transition-all">
+                <option value="auto">{{ t('settings.languageAuto') }}</option>
                 <option value="zh-CN">{{ t('settings.languageZhCN') }}</option>
                 <option value="en-US">{{ t('settings.languageEnUS') }}</option>
               </select>
@@ -586,6 +611,41 @@ const openLink = (url: string) => {
             </div>
             <div class="text-[10px] text-slate-400 pl-11">
               {{ t('settings.currentAddress') }}: {{ config.npmRegistry }}
+            </div>
+          </div>
+        </section>
+
+        <!-- Privilege Settings -->
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <PhShield :size="20" class="text-indigo-600" weight="duotone" />
+            {{ t('settings.privilege') }}
+          </h2>
+
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div :class="[
+                  'w-8 h-8 rounded-lg flex items-center justify-center',
+                  isElevated ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : 'bg-slate-50 dark:bg-slate-900/30 text-slate-400'
+                ]">
+                  <PhShieldCheck v-if="isElevated" :size="18" weight="duotone" />
+                  <PhShield v-else :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ isElevated ? t('settings.isElevated') : t('settings.nonElevated') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.elevateDesc') }}</div>
+                </div>
+              </div>
+
+              <div v-if="!isElevated">
+                <button @click="requestElevation" :disabled="elevating"
+                  class="px-3 py-1.5 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors flex items-center gap-1 disabled:opacity-50">
+                  <PhArrowsClockwise v-if="elevating" :size="14" class="animate-spin" />
+                  <PhShield v-else :size="14" />
+                  {{ elevating ? t('settings.elevating') : t('settings.elevateBtn') }}
+                </button>
+              </div>
             </div>
           </div>
         </section>

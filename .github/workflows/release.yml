@@ -18,8 +18,8 @@ jobs:
       matrix:
         include:
           - platform: "windows-latest"
-            rust_target: ""
-            args: ""
+            rust_target: "x86_64-pc-windows-msvc"
+            args: "--target x86_64-pc-windows-msvc"
           - platform: "macos-latest"
             rust_target: "aarch64-apple-darwin"
             args: "--target aarch64-apple-darwin"
@@ -84,7 +84,7 @@ jobs:
           echo "$EOF" >> "$GITHUB_OUTPUT"
 
       - name: Build and Release Tauri App
-        uses: tauri-apps/tauri-action@v0.6.2
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

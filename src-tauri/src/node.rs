@@ -273,8 +273,12 @@ pub async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), S
             let node_modules_path = target_dir.join("node_modules");
             if node_modules_path.exists() {
                 match lang {
-                    Lang::ZhCn => tracing::info!("清理失败的 node_modules: {:?}", node_modules_path),
-                    Lang::EnUs => tracing::info!("Cleaning failed node_modules: {:?}", node_modules_path),
+                    Lang::ZhCn => {
+                        tracing::info!("清理失败的 node_modules: {:?}", node_modules_path)
+                    }
+                    Lang::EnUs => {
+                        tracing::info!("Cleaning failed node_modules: {:?}", node_modules_path)
+                    }
                 }
                 if let Err(e) = tokio::fs::remove_dir_all(&node_modules_path).await {
                     match lang {
@@ -383,7 +387,11 @@ pub async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-            let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+            let path_cmd = if cfg!(target_os = "windows") {
+                "where"
+            } else {
+                "which"
+            };
             let mut node_path = "system".to_string();
 
             let mut path_command = std::process::Command::new(path_cmd);
@@ -543,7 +551,11 @@ pub async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-            let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+            let path_cmd = if cfg!(target_os = "windows") {
+                "where"
+            } else {
+                "which"
+            };
             let mut npm_path = "system".to_string();
 
             let mut path_command = std::process::Command::new(path_cmd);
@@ -611,8 +623,8 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         _ => return Err(format!("Unsupported Arch: {}", arch)),
     };
 
-    let filename = format!("node-v18.20.4-{}-{}.zip", node_os, node_arch);
-    let url = format!("https://npmmirror.com/mirrors/node/v18.20.4/{}", filename);
+    let filename = format!("node-v22.12.0-{}-{}.zip", node_os, node_arch);
+    let url = format!("https://npmmirror.com/mirrors/node/v22.12.0/{}", filename);
 
     let data_dir = get_config_path(&app)
         .parent()
@@ -621,8 +633,18 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
     let node_dir = data_dir.join("node");
 
     match lang {
-        Lang::ZhCn => tracing::info!("开始安装 Node.js, OS: {}, Arch: {}, URL: {}", node_os, node_arch, url),
-        Lang::EnUs => tracing::info!("Starting Node.js install, OS: {}, Arch: {}, URL: {}", node_os, node_arch, url),
+        Lang::ZhCn => tracing::info!(
+            "开始安装 Node.js, OS: {}, Arch: {}, URL: {}",
+            node_os,
+            node_arch,
+            url
+        ),
+        Lang::EnUs => tracing::info!(
+            "Starting Node.js install, OS: {}, Arch: {}, URL: {}",
+            node_os,
+            node_arch,
+            url
+        ),
     }
 
     let emit_progress = |status: &str, progress: f64, log: &str| {
@@ -761,8 +783,7 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
                         std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
                     }
                 }
-                let mut outfile =
-                    std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
+                let mut outfile = std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
                 std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
             }
 

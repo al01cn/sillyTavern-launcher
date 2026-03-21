@@ -9,6 +9,7 @@ pub mod sillytavern;
 pub mod types;
 pub mod utils;
 pub mod worldinfo;
+pub mod elevation;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 顶层 use
@@ -42,7 +43,17 @@ pub fn run() {
             if path.ends_with("src-tauri") {
                 path.pop();
             }
-            ensure_standard_layout(&path)?;
+
+            if let Err(e) = ensure_standard_layout(&path) {
+                #[cfg(target_os = "windows")]
+                {
+                    if e.kind() == std::io::ErrorKind::PermissionDenied && !elevation::is_elevated() {
+                        tracing::warn!("检测到无法写入应用目录且未提权，尝试自动请求管理员权限...");
+                        let _ = elevation::elevate_process(app.handle().clone());
+                    }
+                }
+                return Err(Box::new(e));
+            }
 
             // 初始化日志
             init_logger(&path.join("data"));
@@ -111,6 +122,9 @@ pub fn run() {
             worldinfo::read_world_info,
             worldinfo::delete_world_infos,
             worldinfo::import_world_info,
+            // 提权支持
+            elevation::is_elevated,
+            elevation::elevate_process,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

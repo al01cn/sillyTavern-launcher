@@ -29,28 +29,28 @@ ${StrLoc}
 
 !define WEBVIEW2APPGUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 
-!define MANUFACTURER "AL01"
-!define PRODUCTNAME "sillytavern-launcher-gui"
-!define VERSION "0.1.0"
-!define VERSIONWITHBUILD "0.1.0.0"
+!define MANUFACTURER "{{{manufacturer}}}"
+!define PRODUCTNAME "{{{product_name}}}"
+!define VERSION "{{{version}}}"
+!define VERSIONWITHBUILD "{{{version_with_build}}}"
 !define HOMEPAGE ""
 !define INSTALLMODE "both"
 !define LICENSE ""
-!define INSTALLERICON "..\..\..\..\icons\icon.ico"
+!define INSTALLERICON "{{{installer_icon}}}"
 !define SIDEBARIMAGE ""
 !define HEADERIMAGE ""
-!define MAINBINARYNAME "sillytavern-launcher-gui"
-!define MAINBINARYSRCPATH "..\..\sillytavern-launcher-gui.exe"
-!define BUNDLEID "com.sillytavern-launcher-gui"
+!define MAINBINARYNAME "{{{main_binary_name}}}"
+!define MAINBINARYSRCPATH "{{{main_binary_src_path}}}"
+!define BUNDLEID "{{{bundle_id}}}"
 !define COPYRIGHT "Make by 灵狼AL01"
 !define OUTFILE "nsis-output.exe"
 !define ARCH "x64"
-!define ADDITIONALPLUGINSPATH "C:\Users\Y_ALA\AppData\Local\tauri\NSIS\Plugins\x86-unicode\additional"
+!define ADDITIONALPLUGINSPATH "{{{additional_plugins_path}}}"
 !define ALLOWDOWNGRADES "true"
 !define DISPLAYLANGUAGESELECTOR "true"
 !define INSTALLWEBVIEW2MODE "embedBootstrapper"
 !define WEBVIEW2INSTALLERARGS "/silent"
-!define WEBVIEW2BOOTSTRAPPERPATH "C:\Users\Y_ALA\AppData\Local\tauri\MicrosoftEdgeWebview2Setup.exe"
+!define WEBVIEW2BOOTSTRAPPERPATH "{{{webview2_bootstrapper_path}}}"
 !define WEBVIEW2INSTALLERPATH ""
 !define MINIMUMWEBVIEW2VERSION ""
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCTNAME}"
@@ -66,7 +66,6 @@ Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 
-Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
 
@@ -446,6 +445,8 @@ FunctionEnd
   !include "..\..\..\..\nsis\languages\SimpChinese.nsh"
   !include "..\..\..\..\nsis\languages\English.nsh"
 
+Name "$(shortcutName)"
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -650,7 +651,7 @@ Section Install
   WriteRegStr SHCTX "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"
 
   ; Registry information for add/remove programs
-  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"
+  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "$(shortcutName)"
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayIcon" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\""
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "${MANUFACTURER}"
