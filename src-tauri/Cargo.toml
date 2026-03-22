@@ -1,6 +1,6 @@
 [package]
 name = "sillytavern-launcher-gui"
-version = "0.1.0"
+version = "0.1.1"
 description = "SillyTavern Launcher GUI 是一个专为 SillyTavern 设计的跨平台桌面客户端，基于 Tauri v2 + Vue 3 + Rust 构建。它提供了直观、现代的图形界面，让用户无需命令行即可完整管理 SillyTavern 的安装、启动、配置和扩展。"
 authors = ["you"]
 edition = "2021"
