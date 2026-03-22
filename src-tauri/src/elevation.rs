@@ -33,6 +33,7 @@ pub fn is_elevated() -> bool {
     #[cfg(not(target_os = "windows"))]
     {
         // 在类 Unix 系统上，检查 UID 是否为 0 (root)
+        // 注意：这里需要确保你已经运行过 `cargo add libc`
         unsafe { libc::getuid() == 0 }
     }
 }
@@ -40,22 +41,21 @@ pub fn is_elevated() -> bool {
 /// 以管理员权限重新启动应用程序
 #[tauri::command]
 pub fn elevate_process(_app: AppHandle) -> Result<(), String> {
-    let current_exe = std::env::current_exe().map_err(|e| {
-        tracing::error!("获取当前执行文件路径失败: {}", e);
-        e.to_string()
-    })?;
-
+    // 只有在 Windows 下才获取当前路径，避免 Unix 系统下的 unused_variable 警告
     #[cfg(target_os = "windows")]
     {
+        let current_exe = std::env::current_exe().map_err(|e| {
+            tracing::error!("获取当前执行文件路径失败: {}", e);
+            e.to_string()
+        })?;
+
         tracing::info!("确认提权请求，准备重新启动应用...");
         
         // 获取当前进程的所有参数
-        // 跳过第一个参数（程序路径本身）
         let args: Vec<String> = std::env::args().skip(1).collect();
         let args_str = if args.is_empty() {
             "".to_string()
         } else {
-            // 需要正确处理带空格的参数
             args.iter()
                 .map(|a| {
                     if a.contains(' ') {
@@ -68,7 +68,6 @@ pub fn elevate_process(_app: AppHandle) -> Result<(), String> {
                 .join(" ")
         };
 
-        // 使用 PowerShell 的 Start-Process -Verb RunAs 来触发 UAC
         let mut cmd = Command::new("powershell");
         cmd.arg("-Command");
         
@@ -99,6 +98,8 @@ pub fn elevate_process(_app: AppHandle) -> Result<(), String> {
 
     #[cfg(not(target_os = "windows"))]
     {
+        // 在 Unix 系统上，Command 确实没被用到，所以我们显式地让它知道
+        let _ = Command::new("true"); 
         Err("目前提权功能仅支持 Windows 平台。".to_string())
     }
 }
