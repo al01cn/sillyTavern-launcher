@@ -230,3 +230,46 @@ pub async fn read_local_file(path: String) -> Result<Vec<u8>, String> {
     .await
     .map_err(|e| e.to_string())?
 }
+#[tauri::command]
+pub async fn import_character_card_from_bytes(
+    app: AppHandle,
+    bytes: Vec<u8>,
+    filename: String,
+) -> Result<(), String> {
+    // 1. 基本安全和格式校验
+    if filename.trim().is_empty() {
+        return Err("文件名不能为空".to_string());
+    }
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err("文件名不合法".to_string());
+    }
+    if !filename.to_lowercase().ends_with(".png") {
+        return Err("只支持导入 png 格式的角色卡".to_string());
+    }
+
+    let app_clone = app.clone();
+    
+    // 2. 放入 blocking 线程池执行文件 I/O 操作
+    tokio::task::spawn_blocking(move || {
+        // 获取目标目录
+        let dir = get_character_cards_dir(&app_clone);
+        if !dir.exists() {
+            fs::create_dir_all(&dir).map_err(|e| format!("创建目录失败: {}", e))?;
+        }
+
+        // 拼接目标文件路径
+        let target_path = dir.join(&filename);
+        
+        // 查重：防止覆盖现有角色卡
+        if target_path.exists() {
+            return Err("同名角色卡已存在，请重命名后再导入".to_string());
+        }
+
+        // 3. 将传入的字节流写入文件
+        fs::write(&target_path, bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

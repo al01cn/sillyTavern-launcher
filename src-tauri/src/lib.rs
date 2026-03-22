@@ -111,17 +111,21 @@ pub fn run() {
             extensions::open_specific_extension_folder,
             extensions::verify_extension_zip,
             extensions::install_extension_zip,
+            extensions::verify_extension_zip_from_bytes,
+            extensions::install_extension_zip_from_bytes,
             // 角色卡
             character::list_character_card_pngs,
             character::read_character_card_png,
             character::delete_character_cards,
             character::import_character_card,
             character::read_local_file,
+            character::import_character_card_from_bytes,
             // 世界书
             worldinfo::list_world_infos,
             worldinfo::read_world_info,
             worldinfo::delete_world_infos,
             worldinfo::import_world_info,
+            worldinfo::import_world_info_from_bytes,
             // 提权支持
             elevation::is_elevated,
             elevation::elevate_process,

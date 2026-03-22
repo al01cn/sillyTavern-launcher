@@ -496,3 +496,147 @@ pub fn open_specific_extension_folder(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn verify_extension_zip_from_bytes(
+    bytes: Vec<u8>,
+) -> Result<ExtensionManifest, String> {
+    tokio::task::spawn_blocking(move || {
+        let reader = std::io::Cursor::new(bytes);
+        let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+
+            if name == "manifest.json" || name.ends_with("/manifest.json") {
+                let mut contents = String::new();
+                std::io::Read::read_to_string(&mut file, &mut contents)
+                    .map_err(|e| e.to_string())?;
+
+                let manifest: ExtensionManifest = serde_json::from_str(&contents)
+                    .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
+
+                return Ok(manifest);
+            }
+        }
+
+        Err("未在压缩包中找到 manifest.json 文件，这不是一个有效的扩展".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn install_extension_zip_from_bytes(
+    app: tauri::AppHandle,
+    bytes: Vec<u8>,
+    filename: String,
+    scope: String,
+    version: String,
+) -> Result<(), String> {
+    if filename.trim().is_empty() {
+        return Err("文件名不能为空".to_string());
+    }
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err("文件名不合法".to_string());
+    }
+    if !filename.to_lowercase().ends_with(".zip") {
+        return Err("只支持 zip 扩展包".to_string());
+    }
+
+    let app_clone = app.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let data_dir = get_config_path(&app_clone)
+            .parent()
+            .unwrap_or(&std::path::PathBuf::from("."))
+            .to_path_buf();
+
+        let target_dir = if scope == "user" {
+            data_dir
+                .join("st_data")
+                .join("default-user")
+                .join("extensions")
+        } else {
+            if version.is_empty() {
+                return Err("未指定酒馆版本，无法安装全局扩展".to_string());
+            }
+            data_dir
+                .join("sillytavern")
+                .join(&version)
+                .join("public")
+                .join("scripts")
+                .join("extensions")
+                .join("third-party")
+        };
+
+        if !target_dir.exists() {
+            std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+        }
+
+        let reader = std::io::Cursor::new(bytes);
+        let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
+
+        // 检测 root 目录
+        let mut root_dir: Option<String> = None;
+        let mut single_root = true;
+
+        for i in 0..archive.len() {
+            let file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            let first = name.split('/').next().unwrap_or("").to_string();
+
+            if root_dir.is_none() {
+                root_dir = Some(first.clone());
+            } else if root_dir.as_ref().unwrap() != &first {
+                single_root = false;
+                break;
+            }
+        }
+
+        let file_stem = std::path::Path::new(&filename)
+            .file_stem()
+            .unwrap_or(std::ffi::OsStr::new("extension"))
+            .to_string_lossy()
+            .to_string();
+
+        let extract_target = if single_root {
+            target_dir.clone()
+        } else {
+            target_dir.join(&file_stem)
+        };
+
+        if !extract_target.exists() {
+            std::fs::create_dir_all(&extract_target).map_err(|e| e.to_string())?;
+        }
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let outpath = match file.enclosed_name() {
+                Some(p) => p.to_owned(),
+                None => continue,
+            };
+
+            let target_path = extract_target.join(&outpath);
+
+            if file.name().ends_with('/') {
+                std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+            } else {
+                if let Some(p) = target_path.parent() {
+                    if !p.exists() {
+                        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                    }
+                }
+                let mut outfile = std::fs::File::create(&target_path)
+                    .map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut outfile)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

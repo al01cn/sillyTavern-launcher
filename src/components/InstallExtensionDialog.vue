@@ -1,12 +1,10 @@
 <script lang="ts" setup>
-import { ref, watch, onUnmounted, computed } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { installExtensionState, closeInstallExtensionDialog } from '../lib/useExtensionInstall';
 import { X, UploadCloud, FileArchive, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
-import { UnlistenFn } from '@tauri-apps/api/event';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -24,24 +22,18 @@ interface ExtensionManifest {
 
 interface ExtensionFile {
     id: string;
-    path: string;
+    path?: string;
     name: string;
     status: 'pending' | 'verifying' | 'valid' | 'invalid' | 'installing' | 'success' | 'error';
     manifestInfo?: ExtensionManifest;
     errorMsg?: string;
+    rawFile?: File;
 }
 
 const selectedFiles = ref<ExtensionFile[]>([]);
 
-let unlistenDrop: UnlistenFn | null = null;
-
-watch(() => installExtensionState.show, async (newVal) => {
-    if (newVal) {
-        resetState();
-        setupDragDrop();
-    } else {
-        cleanupDragDrop();
-    }
+watch(() => installExtensionState.show, (newVal) => {
+    if (newVal) resetState();
 });
 
 const resetState = () => {
@@ -51,58 +43,72 @@ const resetState = () => {
     isDragging.value = false;
 };
 
-const setupDragDrop = async () => {
-    const appWindow = getCurrentWebviewWindow();
-    
-    unlistenDrop = await appWindow.onDragDropEvent((event) => {
-        if (!installExtensionState.show || isInstalling.value) return;
-        
-        if (event.payload.type === 'drop') {
-            isDragging.value = false;
-            const paths = event.payload.paths;
-            if (paths && paths.length > 0) {
-                const zipPaths = paths.filter(p => p.toLowerCase().endsWith('.zip'));
-                if (zipPaths.length > 0) {
-                    handleFilesSelected(zipPaths);
-                } else {
-                    toast.error(t('resources.uploadPngError').replace('.png', '.zip'));
-                }
-            }
-        } else if (event.payload.type === 'enter') {
-            isDragging.value = true;
-        } else if (event.payload.type === 'leave') {
-            isDragging.value = false;
-        }
-    });
+// ✅ 和角色卡一致的拖拽
+const onDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    isDragging.value = true;
 };
 
-const cleanupDragDrop = () => {
-    if (unlistenDrop) {
-        unlistenDrop();
-        unlistenDrop = null;
+const onDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    isDragging.value = false;
+};
+
+const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    isDragging.value = false;
+
+    const files = Array.from(e.dataTransfer?.files || [])
+        .filter(f => f.name.toLowerCase().endsWith('.zip'));
+
+    if (files.length === 0) {
+        toast.error(t('resources.uploadPngError').replace('.png', '.zip'));
+        return;
     }
+
+    const newFiles: ExtensionFile[] = files.map(file => ({
+        id: crypto.randomUUID(),
+        name: file.name,
+        status: 'verifying',
+        rawFile: file
+    }));
+
+    processFiles(newFiles);
 };
 
-onUnmounted(() => {
-    cleanupDragDrop();
-});
-
-const handleFilesSelected = async (filePaths: string[]) => {
+const handleFilesSelected = (filePaths: string[]) => {
     const newFiles: ExtensionFile[] = filePaths.map(filePath => ({
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         path: filePath,
         name: filePath.split(/[/\\]/).pop() || 'unknown.zip',
         status: 'verifying'
     }));
 
-    // Replace the current selection
+    processFiles(newFiles);
+};
+
+const processFiles = async (newFiles: ExtensionFile[]) => {
     selectedFiles.value = newFiles;
 
     for (const file of selectedFiles.value) {
         try {
-            const result = await invoke<ExtensionManifest>('verify_extension_zip', { zipPath: file.path });
-            file.manifestInfo = result;
-            file.status = 'valid';
+            if (file.rawFile) {
+                const buffer = await file.rawFile.arrayBuffer();
+                const bytes = Array.from(new Uint8Array(buffer));
+
+                const result = await invoke<ExtensionManifest>('verify_extension_zip_from_bytes', {
+                    bytes
+                });
+
+                file.manifestInfo = result;
+                file.status = 'valid';
+            } else if (file.path) {
+                const result = await invoke<ExtensionManifest>('verify_extension_zip', {
+                    zipPath: file.path
+                });
+                file.manifestInfo = result;
+                file.status = 'valid';
+            }
         } catch (e) {
             file.errorMsg = String(e);
             file.status = 'invalid';
@@ -112,16 +118,13 @@ const handleFilesSelected = async (filePaths: string[]) => {
 
 const selectFile = async () => {
     if (isInstalling.value) return;
-    
+
     try {
         const selected = await open({
             multiple: true,
-            filters: [{
-                name: 'Zip',
-                extensions: ['zip']
-            }]
+            filters: [{ name: 'Zip', extensions: ['zip'] }]
         });
-        
+
         if (selected) {
             if (Array.isArray(selected)) {
                 const paths = selected.map(s => typeof s === 'string' ? s : (s as any).path);
@@ -137,34 +140,42 @@ const selectFile = async () => {
     }
 };
 
-const hasValidFiles = computed(() => {
-    return selectedFiles.value.some(f => f.status === 'valid');
-});
-
-const isAnyVerifying = computed(() => {
-    return selectedFiles.value.some(f => f.status === 'verifying');
-});
+const hasValidFiles = computed(() => selectedFiles.value.some(f => f.status === 'valid'));
+const isAnyVerifying = computed(() => selectedFiles.value.some(f => f.status === 'verifying'));
 
 const install = async () => {
     const validFiles = selectedFiles.value.filter(f => f.status === 'valid');
-    if (validFiles.length === 0 || isInstalling.value || isAnyVerifying.value) return;
-    
+    if (!validFiles.length || isInstalling.value || isAnyVerifying.value) return;
+
     if (scope.value === 'global' && !installExtensionState.version) {
         toast.error(t('extensions.selectVersionWarning'));
         return;
     }
-    
+
     isInstalling.value = true;
     let successCount = 0;
 
     for (const file of validFiles) {
         file.status = 'installing';
         try {
-            await invoke('install_extension_zip', {
-                zipPath: file.path,
-                scope: scope.value,
-                version: installExtensionState.version
-            });
+            if (file.rawFile) {
+                const buffer = await file.rawFile.arrayBuffer();
+                const bytes = Array.from(new Uint8Array(buffer));
+
+                await invoke('install_extension_zip_from_bytes', {
+                    bytes,
+                    filename: file.name,
+                    scope: scope.value,
+                    version: installExtensionState.version
+                });
+            } else if (file.path) {
+                await invoke('install_extension_zip', {
+                    zipPath: file.path,
+                    scope: scope.value,
+                    version: installExtensionState.version
+                });
+            }
+
             file.status = 'success';
             successCount++;
         } catch (e) {
@@ -172,26 +183,20 @@ const install = async () => {
             file.errorMsg = String(e);
         }
     }
-    
+
     isInstalling.value = false;
 
     if (successCount > 0) {
         toast.success(t('resources.installSuccessCount', { count: successCount }));
-        if (installExtensionState.onSuccess) {
-            installExtensionState.onSuccess();
-        }
-        
-        // Auto close if all selected valid files were successfully installed
+        installExtensionState.onSuccess?.();
+
         if (successCount === validFiles.length) {
-            setTimeout(() => {
-                closeInstallExtensionDialog();
-            }, 1000);
+            setTimeout(() => closeInstallExtensionDialog(), 1000);
         }
     } else {
         toast.error(t('resources.importFailedMsg', { type: t('extensions.title') }));
     }
 };
-
 </script>
 
 <template>
@@ -250,7 +255,7 @@ const install = async () => {
                 </div>
 
                 <!-- Empty / Dragging State -->
-                <div v-if="selectedFiles.length === 0 || isDragging">
+                <div v-if="selectedFiles.length === 0" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
                     <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.extensionPackage') }}</label>
                     <div 
                         @click="selectFile"

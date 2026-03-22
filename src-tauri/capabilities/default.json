@@ -22,6 +22,8 @@
     "opener:default",
     "opener:allow-open-url",
     "process:default",
-    "updater:default"
+    "updater:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

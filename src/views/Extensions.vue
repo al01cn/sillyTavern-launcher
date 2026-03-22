@@ -514,7 +514,7 @@ const toggleEnable = async (ext: ExtensionInfo) => {
 const deleteExtension = (ext: ExtensionInfo) => {
     const extName = ext.manifest.display_name || ext.id;
     Dialog.warning({
-        title: t('extensions.confirmDelete'),
+        title: t('extensions.deleteExtension'),
         msg: t('extensions.confirmDeleteExt', { name: extName }),
         confirmText: t('common.delete'),
         cancelText: t('common.cancel'),
