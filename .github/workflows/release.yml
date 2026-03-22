@@ -3,81 +3,92 @@ name: Build and Release Tauri App
 on:
   push:
     branches:
-      - GUI
+      - "GUI"
     paths:
-      - package.json
+      - "package.json"
   workflow_dispatch:
 
-jobs:
-  publish-tauri:
-    permissions:
-      contents: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+jobs:
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-          - platform: ubuntu-22.04
-            args: ""
-          - platform: windows-latest
-            args: ""
+          - platform: 'macos-latest' # for Arm based macs (M1 and above).
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest' # for Intel based macs.
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
 
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ✅ Node（官方推荐）
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: lts/*
+          bun-version: latest
 
-      # ✅ Rust
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
-      # ✅ Linux 依赖
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      # ✅ Windows 补 NSIS（关键修复点）
-      - name: Install NSIS (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: choco install nsis -y
+      - name: Install dependencies
+        run: bun install
 
-      # ✅ 依赖安装（你用 bun 就换）
-      - name: Install frontend dependencies
-        run: |
-          npm install
-          # 如果你坚持用 bun：
-          # npm install -g bun
-          # bun install
-
-      # ✅ 同步版本（保留你的逻辑）
       - name: Sync Version
-        run: npm run sync-version
+        run: bun run sync-version
 
-      # ✅ Tauri 构建 + 发布（核心）
-      - name: Build and Release
+      - name: Extract Changelog
+        id: changelog
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $VERSION"
+
+          BODY=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" UPDATELOGS.md)
+
+          if [ -z "$BODY" ]; then
+            BODY="Please download the corresponding installation package according to your system. The client can also upgrade seamlessly!"
+            echo "⚠️ No version [$VERSION] record found in the update log."
+          else
+            echo "✅ Changelog extracted."
+          fi
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "body<<$EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-
         with:
-          tagName: v__VERSION__
+          tagName: "v__VERSION__"
           releaseName: "SillyTavern Launcher GUI v__VERSION__"
-          releaseBody: "Download the installer for your platform."
+          releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
