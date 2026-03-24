@@ -1,7 +1,9 @@
 {
-  "name": "ai-studio-applet",
+  "name": "sillytavern-launcher-web",
+  "description": "Modernized launcher for SillyTavern. Seamlessly install, update and manage your SillyTavern instances across all platforms.",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

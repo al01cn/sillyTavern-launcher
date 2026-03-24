@@ -30,8 +30,9 @@ export const translations = {
     size: "SIZE",
     download: "DOWNLOAD",
     noAssets: "No assets available for this release.",
-    noData: "Release data unavailable." ,
-    footerRights: "MTI LICENSE，AL01, copyright 2026"
+    noData: "Release data unavailable.",
+    footerRights: "MTI LICENSE，AL01, copyright 2026",
+    macosWarning: "macOS Compatibility Notice: This application has not been tested on actual macOS devices due to developer's hardware limitations. It may or may not work properly on macOS."
   },
   zh: {
     navTitle: "酒馆启动器GUI",
@@ -64,7 +65,8 @@ export const translations = {
     download: "下载",
     noAssets: "此版本没有可用的安装包。",
     noData: "无法获取发行版数据。",
-    footerRights: "MTI 开源协议，灵狼AL01, copyright 2026"
+    footerRights: "MTI 开源协议，灵狼 AL01, copyright 2026",
+    macosWarning: "macOS 兼容性提示：由于开发者缺乏 macOS 设备，此应用未在真实的 macOS 设备上进行测试。在 macOS 上可能无法正常运行。"
   }
 };
 
