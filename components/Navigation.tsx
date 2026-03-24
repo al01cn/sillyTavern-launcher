@@ -23,13 +23,13 @@ export default function Navigation({ t, lang, isDark, onToggleTheme }: Navigatio
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <LanguageSwitcher currentLocale={lang} />
-            {/* <button
+            <button
               onClick={onToggleTheme}
               className="p-2 rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               aria-label="Toggle Theme"
             >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button> */}
+              {!isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
             <a
               href={config.git.github}
               target="_blank"
