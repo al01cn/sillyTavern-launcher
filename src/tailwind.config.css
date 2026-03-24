@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "SF Pro Display", "BlinkMacSystemFont", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", "Arial", sans-serif;
+  --font-mono: "Inter", "SF Pro Display", "BlinkMacSystemFont", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", "Arial", monospace;
+  
+  --color-primary: #4DB7FF;
+  --color-primary-hover: #66C5FF;
+  --color-primary-active: #1FA4FF;
+  --color-primary-light: #E0F2FE;
+  --color-success: #4ADE80;
+  --color-warning: #FFB347;
+  --color-error: #FF6B6B;
+  --color-surface: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-border: #E2E8F0;
+  
+  --shadow-soft: 0 8px 30px rgba(0,0,0,0.04);
+  --shadow-float: 0 10px 40px rgba(77, 183, 255, 0.2);
+  --shadow-menu: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 20px 50px -12px rgba(0, 0, 0, 0.15);
+}

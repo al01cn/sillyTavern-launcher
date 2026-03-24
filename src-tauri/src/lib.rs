@@ -98,6 +98,10 @@ pub fn run() {
             sillytavern::get_sillytavern_config_options,
             sillytavern::update_sillytavern_config_options,
             sillytavern::open_sillytavern_config_file,
+            // 全局配置操作（新版本）
+            sillytavern::get_sillytavern_global_config_options,
+            sillytavern::update_sillytavern_global_config_options,
+            sillytavern::open_sillytavern_global_config_file,
             // SillyTavern 进程
             sillytavern::start_sillytavern,
             sillytavern::stop_sillytavern,

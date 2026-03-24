@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
+@import "./tailwind.config.css";
 @plugin "daisyui";
 
 :root {

@@ -1,3 +1,7 @@
 {
-    "workbench.settings.openDefaultKeybindings": false
+    "workbench.settings.openDefaultKeybindings": false,
+    "css.lint.unknownAtRules": "ignore",
+    "tailwindCSS.includeLanguages": {
+        "vue": "html"
+    }
 }
