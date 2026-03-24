@@ -1,6 +1,6 @@
 # SillyTavern Launcher Web
 
-专为 SillyTavern 打造的现代化启动器 Web 界面。基于 Next.js 构建，支持多语言国际化，提供优雅的 UI/UX 体验。
+SillyTavern Launcher GUI 官网。基于 Next.js 构建，支持多语言国际化，提供优雅的 UI/UX 体验。
 
 📦 **代码仓库**: 
 - [GitHub](https://github.com/al01cn/sillyTavern-launcher)
