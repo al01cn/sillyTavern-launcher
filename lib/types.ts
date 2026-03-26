@@ -9,6 +9,11 @@ export const translations = {
     dlWindows: "Download for Windows",
     dlMac: "Download for macOS",
     dlLinux: "Download for Linux",
+    dlAndroid: "Download for Android",
+    dlWindowsBeta: "Download for Windows Beta",
+    dlMacBeta: "Download for macOS Beta",
+    dlLinuxBeta: "Download for Linux Beta",
+    dlAndroidBeta: "Download for Android Beta",
     dlUnknown: "OS Not Supported",
     dlOther: "Other Systems",
     mobileWait: "Mobile Coming Soon",
@@ -31,8 +36,9 @@ export const translations = {
     download: "DOWNLOAD",
     noAssets: "No assets available for this release.",
     noData: "Release data unavailable.",
-    footerRights: "MTI LICENSE，AL01, copyright 2026",
-    macosWarning: "macOS Compatibility Notice: This application has not been tested on actual macOS devices due to developer's hardware limitations. It may or may not work properly on macOS."
+    footerRights: "MTI LICENSE, AL01, copyright 2026",
+    macosWarning: "macOS Compatibility Notice: This application has not been tested on actual macOS devices due to developer's hardware limitations. It may or may not work properly on macOS.",
+    androidArchWarning: "Android Architecture Compatibility Notice: Due to time constraints, the author has only tested the x86_64 platform. The stability of armeabi-v7a and arm64-v8a platforms remains uncertain."
   },
   zh: {
     navTitle: "酒馆启动器GUI",
@@ -43,6 +49,11 @@ export const translations = {
     dlWindows: "下载 Windows 版",
     dlMac: "下载 macOS 版",
     dlLinux: "下载 Linux 版",
+    dlAndroid: "下载 Android 版",
+    dlWindowsBeta: "下载 Windows 测试版",
+    dlMacBeta: "下载 macOS 测试版",
+    dlLinuxBeta: "下载 Linux 测试版",
+    dlAndroidBeta: "下载 Android 测试版",
     dlUnknown: "暂不支持当前系统",
     dlOther: "其他系统下载",
     mobileWait: "移动端敬请期待",
@@ -66,7 +77,8 @@ export const translations = {
     noAssets: "此版本没有可用的安装包。",
     noData: "无法获取发行版数据。",
     footerRights: "MTI 开源协议，灵狼 AL01, copyright 2026",
-    macosWarning: "macOS 兼容性提示：由于开发者缺乏 macOS 设备，此应用未在真实的 macOS 设备上进行测试。在 macOS 上可能无法正常运行。"
+    macosWarning: "macOS 兼容性提示：由于开发者缺乏 macOS 设备，此应用未在真实的 macOS 设备上进行测试。在 macOS 上可能无法正常运行。",
+    androidArchWarning: "Android 架构兼容性提示：作者因时间关系仅测试了 x86_64 平台，armeabi-v7a 和 arm64-v8a 平台的运行稳定性尚不明确。"
   }
 };
 

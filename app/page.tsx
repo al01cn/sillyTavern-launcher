@@ -11,8 +11,10 @@ import { useTheme } from '@/hooks/use-theme';
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
-  const [releases, setReleases] = useState<Release[]>([]);
+  const [releases, setReleases] = useState<Release[]>([]); // 移动端
+  const [pcReleases, setPcReleases] = useState<Release[]>([]); // PC 端
   const [loading, setLoading] = useState(true);
+  const [pcLoading, setPcLoading] = useState(true);
   const [useChinaMirror, setUseChinaMirror] = useState(false);
   const [os, setOs] = useState<OS>('unknown');
   const [lang, setLang] = useState<Lang>('zh');
@@ -37,34 +39,64 @@ export default function Home() {
     // Auto-detect OS
     setOs(detectOS());
 
-    const CACHE_KEY = 'st_launcher_releases_cache';
-    const CACHE_TIME_KEY = 'st_launcher_releases_time';
+    // 获取移动端 releases
+    const MOBILE_CACHE_KEY = 'st_launcher_mobile_releases_cache';
+    const MOBILE_CACHE_TIME_KEY = 'st_launcher_mobile_releases_time';
     const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+    const mobileCachedData = localStorage.getItem(MOBILE_CACHE_KEY);
+    const mobileCachedTime = localStorage.getItem(MOBILE_CACHE_TIME_KEY);
 
-    if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime) < CACHE_DURATION)) {
-      setReleases(JSON.parse(cachedData));
+    if (mobileCachedData && mobileCachedTime && (Date.now() - parseInt(mobileCachedTime) < CACHE_DURATION)) {
+      setReleases(JSON.parse(mobileCachedData));
       setLoading(false);
+    } else {
+      fetch('https://api.github.com/repos/al01cn/sillytavern-launcher-mobile/releases')
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setReleases(data);
+            localStorage.setItem(MOBILE_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(MOBILE_CACHE_TIME_KEY, Date.now().toString());
+          } else if (data.message && data.message.includes('rate limit')) {
+            if (mobileCachedData) setReleases(JSON.parse(mobileCachedData));
+          }
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch mobile releases:', err);
+          if (mobileCachedData) setReleases(JSON.parse(mobileCachedData));
+          setLoading(false);
+        });
+    }
+
+    // 获取 PC 端 releases
+    const PC_CACHE_KEY = 'st_launcher_pc_releases_cache';
+    const PC_CACHE_TIME_KEY = 'st_launcher_pc_releases_time';
+
+    const pcCachedData = localStorage.getItem(PC_CACHE_KEY);
+    const pcCachedTime = localStorage.getItem(PC_CACHE_TIME_KEY);
+
+    if (pcCachedData && pcCachedTime && (Date.now() - parseInt(pcCachedTime) < CACHE_DURATION)) {
+      setPcReleases(JSON.parse(pcCachedData));
+      setPcLoading(false);
     } else {
       fetch('https://api.github.com/repos/al01cn/sillyTavern-launcher/releases')
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            setReleases(data);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-            localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+            setPcReleases(data);
+            localStorage.setItem(PC_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(PC_CACHE_TIME_KEY, Date.now().toString());
           } else if (data.message && data.message.includes('rate limit')) {
-            // Rate limited, fallback to cache if exists
-            if (cachedData) setReleases(JSON.parse(cachedData));
+            if (pcCachedData) setPcReleases(JSON.parse(pcCachedData));
           }
-          setLoading(false);
+          setPcLoading(false);
         })
         .catch((err) => {
-          console.error('Failed to fetch releases:', err);
-          if (cachedData) setReleases(JSON.parse(cachedData));
-          setLoading(false);
+          console.error('Failed to fetch PC releases:', err);
+          if (pcCachedData) setPcReleases(JSON.parse(pcCachedData));
+          setPcLoading(false);
         });
     }
   }, []);
@@ -134,7 +166,8 @@ export default function Home() {
       <HeroSection 
         t={t} 
         os={os} 
-        releases={releases} 
+        releases={releases}
+        pcReleases={pcReleases}
         useChinaMirror={useChinaMirror} 
       />
       
@@ -147,7 +180,9 @@ export default function Home() {
         releases={releases} 
         loading={loading} 
         useChinaMirror={useChinaMirror} 
-        onToggleChinaMirror={() => setUseChinaMirror(!useChinaMirror)} 
+        onToggleChinaMirror={() => setUseChinaMirror(!useChinaMirror)}
+        pcReleases={pcReleases}
+        pcLoading={pcLoading}
       />
       
       <Footer t={t} lang={lang} />

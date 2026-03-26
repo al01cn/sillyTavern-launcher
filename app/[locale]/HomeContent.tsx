@@ -15,8 +15,10 @@ interface HomeContentProps {
 }
 
 export default function HomeContent({ initialLocale }: HomeContentProps) {
-  const [releases, setReleases] = useState<Release[]>([]);
+  const [releases, setReleases] = useState<Release[]>([]); // 移动端
+  const [pcReleases, setPcReleases] = useState<Release[]>([]); // PC 端
   const [loading, setLoading] = useState(true);
+  const [pcLoading, setPcLoading] = useState(true);
   const [useChinaMirror, setUseChinaMirror] = useState(false);
   const [os, setOs] = useState<OS>('unknown');
   const [lang, setLang] = useState<Lang>(initialLocale);
@@ -31,34 +33,64 @@ export default function HomeContent({ initialLocale }: HomeContentProps) {
     // 自动检测操作系统
     setOs(detectOS());
 
-    const CACHE_KEY = 'st_launcher_releases_cache';
-    const CACHE_TIME_KEY = 'st_launcher_releases_time';
+    // 获取移动端 releases
+    const MOBILE_CACHE_KEY = 'st_launcher_mobile_releases_cache';
+    const MOBILE_CACHE_TIME_KEY = 'st_launcher_mobile_releases_time';
     const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+    const mobileCachedData = localStorage.getItem(MOBILE_CACHE_KEY);
+    const mobileCachedTime = localStorage.getItem(MOBILE_CACHE_TIME_KEY);
 
-    if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime) < CACHE_DURATION)) {
-      setReleases(JSON.parse(cachedData));
+    if (mobileCachedData && mobileCachedTime && (Date.now() - parseInt(mobileCachedTime) < CACHE_DURATION)) {
+      setReleases(JSON.parse(mobileCachedData));
       setLoading(false);
+    } else {
+      fetch('https://api.github.com/repos/al01cn/sillytavern-launcher-mobile/releases')
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setReleases(data);
+            localStorage.setItem(MOBILE_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(MOBILE_CACHE_TIME_KEY, Date.now().toString());
+          } else if (data.message && data.message.includes('rate limit')) {
+            if (mobileCachedData) setReleases(JSON.parse(mobileCachedData));
+          }
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch mobile releases:', err);
+          if (mobileCachedData) setReleases(JSON.parse(mobileCachedData));
+          setLoading(false);
+        });
+    }
+
+    // 获取 PC 端 releases
+    const PC_CACHE_KEY = 'st_launcher_pc_releases_cache';
+    const PC_CACHE_TIME_KEY = 'st_launcher_pc_releases_time';
+
+    const pcCachedData = localStorage.getItem(PC_CACHE_KEY);
+    const pcCachedTime = localStorage.getItem(PC_CACHE_TIME_KEY);
+
+    if (pcCachedData && pcCachedTime && (Date.now() - parseInt(pcCachedTime) < CACHE_DURATION)) {
+      setPcReleases(JSON.parse(pcCachedData));
+      setPcLoading(false);
     } else {
       fetch('https://api.github.com/repos/al01cn/sillyTavern-launcher/releases')
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            setReleases(data);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-            localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+            setPcReleases(data);
+            localStorage.setItem(PC_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(PC_CACHE_TIME_KEY, Date.now().toString());
           } else if (data.message && data.message.includes('rate limit')) {
-            // Rate limited, fallback to cache if exists
-            if (cachedData) setReleases(JSON.parse(cachedData));
+            if (pcCachedData) setPcReleases(JSON.parse(pcCachedData));
           }
-          setLoading(false);
+          setPcLoading(false);
         })
         .catch((err) => {
-          console.error('Failed to fetch releases:', err);
-          if (cachedData) setReleases(JSON.parse(cachedData));
-          setLoading(false);
+          console.error('Failed to fetch PC releases:', err);
+          if (pcCachedData) setPcReleases(JSON.parse(pcCachedData));
+          setPcLoading(false);
         });
     }
   }, []);
@@ -128,7 +160,8 @@ export default function HomeContent({ initialLocale }: HomeContentProps) {
       <HeroSection 
         t={t} 
         os={os} 
-        releases={releases} 
+        releases={releases}
+        pcReleases={pcReleases}
         useChinaMirror={useChinaMirror} 
       />
       
@@ -150,6 +183,24 @@ export default function HomeContent({ initialLocale }: HomeContentProps) {
         </div>
       </div>
       
+      {/* Android Architecture Notice */}
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded-r-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400 dark:text-yellow-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="flex items-center text-sm text-yellow-800 dark:text-yellow-200">
+                {t.androidArchWarning}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div className="features-section">
         <FeaturesSection t={t} />
       </div>
@@ -159,7 +210,9 @@ export default function HomeContent({ initialLocale }: HomeContentProps) {
         releases={releases} 
         loading={loading} 
         useChinaMirror={useChinaMirror} 
-        onToggleChinaMirror={() => setUseChinaMirror(!useChinaMirror)} 
+        onToggleChinaMirror={() => setUseChinaMirror(!useChinaMirror)}
+        pcReleases={pcReleases}
+        pcLoading={pcLoading}
       />
       
       <Footer t={t} lang={lang} />
