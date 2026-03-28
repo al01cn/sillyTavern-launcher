@@ -72,19 +72,18 @@ const cancel = async () => {
 </script>
 
 <template>
-    <div :class="[
-        'absolute inset-0 z-200 flex items-center justify-center px-4 transition-all duration-300',
-        installState.show ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-    ]">
+    <div 
+        v-if="installState.show"
+        class="absolute inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-200"
+    >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md"></div>
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md pointer-events-auto" @click="close"></div>
 
         <!-- Modal Content -->
-        <div :class="[
-            'modal-content relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transition-all duration-300 transform flex flex-col',
-            installState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8',
-            'h-[600px]'
-        ]">
+        <div 
+            class="modal-content relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col pointer-events-auto h-[600px] animate-in zoom-in-95 duration-200"
+            @click.stop
+        >
             <!-- Header -->
             <div class="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <div>
@@ -92,15 +91,15 @@ const cancel = async () => {
                         <Loader2 v-if="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)" class="w-5 h-5 animate-spin text-blue-500" />
                         <CheckCircle2 v-else-if="installState.status === 'done'" class="w-6 h-6 text-emerald-500" />
                         <XCircle v-else-if="installState.status === 'error'" class="w-6 h-6 text-red-500" />
-                        <span>{{ installState.operation === 'delete' ? t('versions.deleteTitle', { version: installState.version }) : t('versions.installTitle', { version: installState.version }) }}</span>
+                        <span>{{ installState.operation === 'unbind' ? t('versions.unbindTitle', { version: installState.version }) : (installState.operation === 'delete' ? t('versions.deleteTitle', { version: installState.version }) : t('versions.installTitle', { version: installState.version })) }}</span>
                     </h3>
                     <p class="text-slate-500 text-sm mt-1">
                         {{ 
                             installState.status === 'downloading' ? t('versions.downloading') : 
                             installState.status === 'extracting' ? t('versions.extracting') : 
                             installState.status === 'installing' ? t('versions.installingDeps') : 
-                            installState.status === 'deleting' ? t('versions.deletingFiles') :
-                            installState.status === 'done' ? (installState.operation === 'delete' ? t('versions.deleteComplete') : t('versions.installComplete')) : 
+                            installState.status === 'deleting' ? (installState.operation === 'unbind' ? t('versions.unbindingFiles') : t('versions.deletingFiles')) :
+                            installState.status === 'done' ? (installState.operation === 'unbind' ? t('versions.unbindComplete') : (installState.operation === 'delete' ? t('versions.deleteComplete') : t('versions.installComplete'))) : 
                             t('versions.errorOccurred')
                         }}
                     </p>
@@ -112,7 +111,7 @@ const cancel = async () => {
                 <div class="px-4 h-10 bg-slate-800 border-b border-slate-700 flex items-center justify-between gap-2 text-xs text-slate-400 font-mono">
                     <div class="flex items-center gap-2">
                         <Terminal class="w-3 h-3" />
-                        <span>{{ installState.operation === 'delete' ? t('versions.deletionLogs') : t('versions.installationLogs') }}</span>
+                        <span>{{ installState.operation === 'unbind' ? t('versions.unbindingLogs') : (installState.operation === 'delete' ? t('versions.deletionLogs') : t('versions.installationLogs')) }}</span>
                     </div>
                 </div>
                 
@@ -141,6 +140,7 @@ const cancel = async () => {
                     {{ installState.isCanceling ? t('versions.canceling') : t('common.cancel') }}
                 </button>
                 <button 
+                    id="btn-dialog-close"
                     @click="close"
                     :disabled="['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)"
                     :class="[

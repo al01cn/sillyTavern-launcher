@@ -23,6 +23,7 @@
     "opener:allow-open-url",
     "process:default",
     "updater:default",
+    "clipboard-manager:default",
     "core:event:allow-listen",
     "core:event:allow-unlisten"
   ]

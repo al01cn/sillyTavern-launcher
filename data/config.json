@@ -3,16 +3,33 @@
   "theme": "auto",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 716,
-    "y": 243
+    "x": 460,
+    "y": 206
   },
   "githubProxy": {
     "enable": true,
     "url": "https://ghfast.top/"
   },
   "sillytavern": {
-    "version": "1.16.0",
-    "useGlobalConfig": true
+    "version": {
+      "path": "",
+      "version": "1.16.0",
+      "hasNodeModules": false
+    }
   },
-  "npmRegistry": "https://registry.npmmirror.com/"
+  "npmRegistry": "https://registry.npmmirror.com/",
+  "localSillytavernList": [
+    {
+      "path": "E:\\code_project\\app\\sillytavern",
+      "version": "1.16.0",
+      "hasNodeModules": true
+    }
+  ],
+  "scanCpuCores": null,
+  "regionAutoConfigured": true,
+  "initialSetupCompleted": false,
+  "enableAnimations": true,
+  "hasScannedOnce": false,
+  "autoRepairGit": true,
+  "setupCheckpoint": null
 }

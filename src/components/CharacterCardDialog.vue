@@ -143,7 +143,7 @@ const preferredBookSource = computed<'character_book' | 'worldInfo' | 'none'>(()
 const preferredBookLabel = computed(() => {
   if (preferredBookSource.value === 'character_book') return 'Character Book'
   if (preferredBookSource.value === 'worldInfo') return 'WorldInfo'
-  return '无'
+  return t('resources.none')
 })
 
 const preferredBookName = computed(() => {

@@ -6,23 +6,32 @@ let globalLoadConfigPromise: Promise<void> | null = null;
 <script setup lang="ts">
 import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter, useRoute } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl as open } from '@tauri-apps/plugin-opener';
 import { toast } from 'vue-sonner';
-import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple, PhShield, PhShieldCheck } from '@phosphor-icons/vue';
+import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple, PhShield, PhShieldCheck, PhGitBranch, PhSliders, PhTerminalWindow, PhX } from '@phosphor-icons/vue';
 import globalConfig from '../lib/config'
 import { checkUpdate } from '../lib/updater'
 import { setTheme } from '../lib/theme'
 import { getSystemLocale } from '../lang'
+import { startOneClickSetup, updateOneClickMessage, simulateClickEffect } from '../lib/useOneClick'
 
 const { t, locale } = useI18n();
-
+const router = useRouter();
+const route = useRoute();
 
 
 interface GithubProxyConfig {
   enable: boolean;
   url: String;
+}
+
+interface GitInfo {
+  version: string | null;
+  path: string | null;
+  source: 'system' | 'local' | 'none';
 }
 
 interface NodeInfo {
@@ -49,6 +58,11 @@ interface AppConfig {
   rememberWindowPosition: boolean;
   githubProxy: GithubProxyConfig;
   npmRegistry: string;
+  scanCpuCores: number | null;
+  regionAutoConfigured: boolean;
+  initialSetupCompleted: boolean;
+  enableAnimations: boolean;
+  setupCheckpoint: string | null;
 }
 
 interface ProxyItem {
@@ -100,16 +114,59 @@ const config = ref<AppConfig>({
     enable: false,
     url: 'https://ghfast.top/'
   },
-  npmRegistry: 'https://registry.npmmirror.com/'
+  npmRegistry: 'https://registry.npmmirror.com/',
+  scanCpuCores: null,
+  regionAutoConfigured: false,
+  initialSetupCompleted: false,
+  enableAnimations: true,
+  setupCheckpoint: null
 });
 
 const proxies = ref<ProxyItem[]>([]);
+const gitInfo = ref<GitInfo>({ version: null, path: null, source: 'none' });
+const installingGit = ref(false);
+const gitProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
 const nodeInfo = ref<NodeInfo>({ version: null, path: null, source: 'none' });
 const npmInfo = ref<NpmInfo>({ version: null, path: null, source: 'none' });
 const installingNode = ref(false);
 const nodeProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
 const isElevated = ref(false);
 const elevating = ref(false);
+const systemCpuCores = ref<number>(parseInt(localStorage.getItem('app_system_cpu_cores') || '0', 10));
+
+const gitLogs = ref<string[]>([]);
+const nodeLogs = ref<string[]>([]);
+const logDialogVisible = ref(false);
+const logDialogTitle = ref('');
+const currentLogs = ref<string[]>([]);
+const logContainer = ref<HTMLElement | null>(null);
+
+const showLogs = (type: 'git' | 'node') => {
+  if (type === 'git') {
+    logDialogTitle.value = t('settings.git') + ' ' + t('common.logs', '日志');
+    currentLogs.value = gitLogs.value;
+  } else {
+    logDialogTitle.value = t('settings.nodejs') + ' ' + t('common.logs', '日志');
+    currentLogs.value = nodeLogs.value;
+  }
+  logDialogVisible.value = true;
+  
+  nextTick(() => {
+    if (logContainer.value) {
+      logContainer.value.scrollTop = logContainer.value.scrollHeight;
+    }
+  });
+};
+
+watch(currentLogs, () => {
+  if (logDialogVisible.value) {
+    nextTick(() => {
+      if (logContainer.value) {
+        logContainer.value.scrollTop = logContainer.value.scrollHeight;
+      }
+    });
+  }
+}, { deep: true });
 
 const isNodeVersionValid = computed(() => {
   if (!nodeInfo.value.version) return false;
@@ -280,6 +337,26 @@ const selectProxy = (url: string) => {
   // watch will handle saving
 };
 
+const checkGit = async () => {
+  try {
+    const cachedGit = localStorage.getItem('app_settings_git_cache');
+    if (cachedGit) {
+      try {
+        gitInfo.value = JSON.parse(cachedGit);
+      } catch (e) { }
+    }
+
+    const res = await invoke<GitInfo>('check_git');
+
+    if (JSON.stringify(res) !== JSON.stringify(gitInfo.value)) {
+      gitInfo.value = res;
+      localStorage.setItem('app_settings_git_cache', JSON.stringify(res));
+    }
+  } catch (error) {
+    console.error('Failed to check git:', error);
+  }
+};
+
 const checkNode = async () => {
   try {
     // 优先从缓存读取
@@ -332,6 +409,20 @@ const checkElevation = async () => {
   }
 };
 
+const checkSystemCpuCores = async () => {
+  try {
+    const cachedCores = localStorage.getItem('app_system_cpu_cores');
+    if (cachedCores) {
+      systemCpuCores.value = parseInt(cachedCores, 10);
+    }
+    const cores = await invoke<number>('get_system_cpu_cores');
+    systemCpuCores.value = cores;
+    localStorage.setItem('app_system_cpu_cores', cores.toString());
+  } catch (error) {
+    console.error('Failed to get cpu cores:', error);
+  }
+};
+
 const requestElevation = async () => {
   if (elevating.value) return;
   elevating.value = true;
@@ -345,19 +436,67 @@ const requestElevation = async () => {
   }
 };
 
+const installGit = async () => {
+  if (installingGit.value) return;
+  installingGit.value = true;
+  gitLogs.value = [t('common.processing', 'Processing...')];
+  gitProgress.value = { status: 'starting', progress: 0, log: t('common.processing') };
+
+  if (route.query.action === 'one_click_setup') {
+    updateOneClickMessage(t('oneClick.gitDetecting'));
+    await invoke('save_app_config', { config: { ...config.value, setupCheckpoint: 'START' } });
+  }
+
+  try {
+    await invoke('install_git');
+    if (route.query.action === 'one_click_setup') {
+      updateOneClickMessage(t('oneClick.gitSuccess'));
+      await invoke('save_app_config', { config: { ...config.value, setupCheckpoint: 'GIT_DONE' } });
+    } else {
+      toast.success(t('settings.gitInstall') + ' ' + t('common.success'));
+    }
+    await checkGit();
+  } catch (error) {
+    console.error('Failed to install git:', error);
+    if (route.query.action === 'one_click_setup') {
+      updateOneClickMessage(t('common.failed') + ': ' + error);
+    } else {
+      toast.error(t('common.failed') + ': ' + error);
+    }
+    throw error;
+  } finally {
+    installingGit.value = false;
+  }
+};
+
 const installNode = async () => {
   if (installingNode.value) return;
   installingNode.value = true;
+  nodeLogs.value = [t('common.processing', 'Processing...')];
   nodeProgress.value = { status: 'starting', progress: 0, log: t('common.processing') };
+
+  if (route.query.action === 'one_click_setup') {
+    updateOneClickMessage(t('oneClick.nodeDetecting'));
+  }
 
   try {
     await invoke('install_nodejs');
-    toast.success(t('settings.nodejsInstall') + ' ' + t('common.success'));
     await checkNode();
     await checkNpm();
+    if (route.query.action === 'one_click_setup') {
+      updateOneClickMessage(t('oneClick.nodeSuccess'));
+      await invoke('save_app_config', { config: { ...config.value, setupCheckpoint: 'NODE_DONE' } });
+    } else {
+      toast.success(t('settings.nodejsInstall') + ' ' + t('common.success'));
+    }
   } catch (error) {
     console.error('Failed to install nodejs:', error);
-    toast.error(t('common.failed') + ': ' + error);
+    if (route.query.action === 'one_click_setup') {
+      updateOneClickMessage(t('common.failed') + ': ' + error);
+    } else {
+      toast.error(t('common.failed') + ': ' + error);
+    }
+    throw error;
   } finally {
     installingNode.value = false;
   }
@@ -384,16 +523,92 @@ watch(() => config.value.theme, (newTheme) => {
   setTheme(newTheme)
 })
 
-onMounted(async () => {
-  await loadConfig();
+onMounted(() => {
+  loadConfig();
   fetchProxies();
-  checkNode();
+  checkGit().then(() => {
+    checkNode().then(() => {
+      // 如果是通过一键安装NodeJS进来的，自动触发安装
+      if (route.query.action === 'install_node' || route.query.action === 'one_click_setup') {
+        if (route.query.action === 'one_click_setup') {
+          startOneClickSetup(t('oneClick.startWait'));
+        }
+        
+        const doNodeInstall = () => {
+          setTimeout(() => {
+            document.getElementById('node-settings')?.scrollIntoView({ behavior: 'smooth' });
+            
+            setTimeout(() => {
+              if (!isNodeVersionValid.value || nodeInfo.value.source === 'local') {
+                simulateClickEffect('btn-install-node');
+                installNode().then(() => {
+                  if (route.query.action === 'one_click_setup') {
+                    setTimeout(() => {
+                      router.push('/versions?action=one_click_setup_st');
+                    }, 3000);
+                  }
+                }).catch(() => {
+                  if (route.query.action === 'one_click_setup') {
+                    setTimeout(() => {
+                      router.push('/versions?action=one_click_setup_st');
+                    }, 3000);
+                  }
+                });
+              } else if (route.query.action === 'one_click_setup') {
+                updateOneClickMessage(t('oneClick.nodeInstalled'));
+                setTimeout(() => {
+                  router.push('/versions?action=one_click_setup_st');
+                }, 3000);
+              }
+            }, 500); // 留出一点滚动动画的时间
+          }, 300);
+        };
+
+        const checkAndInstallGit = () => {
+          setTimeout(() => {
+            document.getElementById('git-settings')?.scrollIntoView({ behavior: 'smooth' });
+            
+            setTimeout(() => {
+              if (!gitInfo.value.version && gitInfo.value.source !== 'local') {
+                simulateClickEffect('btn-install-git');
+                installGit().then(() => {
+                  setTimeout(doNodeInstall, 3000);
+                }).catch(() => {
+                  // Git安装失败也继续尝试安装Node，也许系统后续不需要Git
+                  setTimeout(doNodeInstall, 3000);
+                });
+              } else {
+                updateOneClickMessage(t('oneClick.gitInstalled'));
+                setTimeout(doNodeInstall, 3000);
+              }
+            }, 500); // 留出一点滚动动画的时间
+          }, 300);
+        };
+
+        if (route.query.action === 'one_click_setup') {
+          // 在开始整个自动化流程前等待3秒（此时弹窗中显示 AI自动化执行中 的初始缓冲文本）
+          setTimeout(() => {
+            checkAndInstallGit();
+          }, 3000);
+        } else if (route.query.action === 'install_node') {
+          doNodeInstall();
+          // 移除URL参数
+          router.replace({ query: {} });
+        }
+      }
+    });
+  });
   checkNpm();
 
-  await checkElevation();
-  await listen<DownloadProgress>('download-progress', (event) => {
+  checkElevation();
+  checkSystemCpuCores();
+  listen<DownloadProgress>('download-progress', (event) => {
     if (installingNode.value) {
       nodeProgress.value = event.payload;
+      nodeLogs.value.push(event.payload.log);
+    } else if (installingGit.value) {
+      gitProgress.value = event.payload;
+      gitLogs.value.push(event.payload.log);
     }
   });
 });
@@ -444,6 +659,39 @@ const openLink = (url: string) => {
 
       <!-- General Settings -->
       <div v-if="activeTab === 'general'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+        <!-- Basic Settings -->
+        <section class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <PhSliders :size="20" class="text-teal-500" weight="duotone" />
+            {{ t('settings.basic') }}
+          </h2>
+
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-500">
+                  <PhArrowsClockwise :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.scanCpuCores') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.scanCpuCoresDesc') }}</div>
+                </div>
+              </div>
+              <select v-model="config.scanCpuCores"
+                :disabled="systemCpuCores === 0"
+                class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[140px] outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                <template v-if="systemCpuCores === 0">
+                  <option :value="config.scanCpuCores">{{ t('common.loading') }}</option>
+                </template>
+                <template v-else>
+                  <option :value="null">{{ t('settings.scanCpuCoresAuto') }}</option>
+                  <option v-for="n in systemCpuCores" :key="n" :value="n">{{ n }}</option>
+                </template>
+              </select>
+            </div>
+          </div>
+        </section>
 
         <!-- Interface Settings -->
         <section class="space-y-4">
@@ -512,11 +760,91 @@ const openLink = (url: string) => {
                 </div>
               </label>
             </div>
+
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+
+            <!-- Animations Toggle -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/30 flex items-center justify-center text-pink-500">
+                  <PhPalette :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.animations') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.animationsDesc') }}</div>
+                </div>
+              </div>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="config.enableAnimations" class="sr-only peer">
+                <div
+                  class="relative w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500">
+                </div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Git Settings -->
+        <section id="git-settings" class="space-y-4">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 w-fit relative group">
+            <PhGitBranch :size="20" class="text-orange-600" weight="duotone" />
+            {{ t('settings.git') }}
+            <PhInfo :size="16" class="text-slate-400 cursor-help ml-1" />
+            <div class="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 w-max max-w-[200px] sm:max-w-xs bg-slate-800 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 whitespace-normal text-left">
+              {{ t('settings.gitTooltip') }}
+            </div>
+          </h2>
+
+          <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                  <PhGitBranch :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.gitEnv') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    <span v-if="gitInfo.version">
+                      {{ t('settings.gitVersion') }}: {{ gitInfo.version }} ({{ gitInfo.source === 'local' ? t('settings.gitLocal') : t('settings.gitSystem') }})
+                      <div v-if="gitInfo.path" class="mt-1 text-slate-400 dark:text-slate-500 break-all select-all">
+                        {{ t('settings.gitPath') }}: {{ gitInfo.path }}
+                      </div>
+                    </span>
+                    <span v-else>{{ t('settings.gitNotFound') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="!gitInfo.version || gitInfo.source === 'local'" class="flex items-center gap-2">
+                <button v-if="installingGit" @click="showLogs('git')"
+                  class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700 rounded-md transition-colors"
+                  :title="t('common.logs', '日志')">
+                  <PhTerminalWindow :size="16" weight="duotone" />
+                </button>
+                <button id="btn-install-git" @click="installGit" :disabled="installingGit"
+                  class="px-3 py-1.5 text-xs font-medium bg-orange-50 dark:bg-orange-900/30 text-orange-600 rounded-md hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
+                  <PhArrowsClockwise v-if="installingGit" :size="14" class="animate-spin" />
+                  <PhDownloadSimple v-else :size="14" />
+                  {{ installingGit ? t('settings.gitInstalling') : (gitInfo.version ? t('settings.gitReinstall') : t('settings.gitInstall')) }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="installingGit" class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>{{ gitProgress.log }}</span>
+                <span>{{ Math.round(gitProgress.progress * 100) }}%</span>
+              </div>
+              <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-orange-500 h-1.5 rounded-full transition-all duration-300"
+                  :style="{ width: `${gitProgress.progress * 100}%` }"></div>
+              </div>
+            </div>
           </div>
         </section>
 
         <!-- NodeJs Settings -->
-        <section class="space-y-4">
+        <section id="node-settings" class="space-y-4">
           <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <PhPackage :size="20" class="text-green-600" weight="duotone" />
             {{ t('settings.nodejs') }}
@@ -546,7 +874,12 @@ const openLink = (url: string) => {
               </div>
 
               <div v-if="!isNodeVersionValid || nodeInfo.source === 'local'" class="flex items-center gap-2">
-                <button @click="installNode" :disabled="installingNode"
+                <button v-if="installingNode" @click="showLogs('node')"
+                  class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700 rounded-md transition-colors"
+                  :title="t('common.logs', '日志')">
+                  <PhTerminalWindow :size="16" weight="duotone" />
+                </button>
+                <button id="btn-install-node" @click="installNode" :disabled="installingNode"
                   class="px-3 py-1.5 text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-600 rounded-md hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
                   <PhArrowsClockwise v-if="installingNode" :size="14" class="animate-spin" />
                   <PhDownloadSimple v-else :size="14" />
@@ -774,13 +1107,10 @@ const openLink = (url: string) => {
           <div class="max-w-md w-full mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 flex flex-col items-center gap-2">
             <div class="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-sm">
               <PhInfo :size="18" weight="fill" />
-              {{ locale === 'zh-CN' ? '重要提醒' : 'Important Notice' }}
+              {{ t('settings.importantNotice') }}
             </div>
             <p class="text-xs text-amber-700 dark:text-amber-500/90 leading-relaxed text-center">
-              {{ locale === 'zh-CN' 
-                ? '本软件完全免费且开源。如果您是通过付费、打赏或在各平台（如某宝、某鱼等）购买到的，请立即申请退款并举报相应商家。' 
-                : 'This software is completely free and open-source. If you paid for this or bought it from any marketplace, please request a refund immediately and report the seller.' 
-              }}
+              {{ t('settings.freeSoftwareNotice') }}
             </p>
           </div>
 
@@ -800,6 +1130,29 @@ const openLink = (url: string) => {
       </div>
 
     </div>
+
+    <!-- Log Dialog -->
+    <div v-if="logDialogVisible" class="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="logDialogVisible = false"></div>
+      <div class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700 mx-4 max-h-[80vh] animate-in zoom-in-95 duration-200">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <h3 class="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <PhTerminalWindow :size="18" class="text-slate-500" />
+            {{ logDialogTitle }}
+          </h3>
+          <button @click="logDialogVisible = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <PhX :size="16" weight="bold" />
+          </button>
+        </div>
+        <div ref="logContainer" class="flex-1 overflow-y-auto p-4 bg-[#1e1e1e] custom-scrollbar font-mono text-sm leading-relaxed">
+          <div v-for="(log, idx) in currentLogs" :key="idx" class="text-green-400 mb-1 break-all">
+            <span class="text-slate-500 mr-2">></span>{{ log }}
+          </div>
+          <div v-if="currentLogs.length === 0" class="text-slate-500 italic">暂无日志</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 

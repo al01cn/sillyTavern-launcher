@@ -40,14 +40,67 @@ pub fn get_current_lang(app: &AppHandle) -> Lang {
 
 pub fn read_app_config_from_disk(app: &AppHandle) -> AppConfig {
     let config_path = get_config_path(app);
-    if !config_path.exists() {
-        return AppConfig::default();
-    }
-    let content = match fs::read_to_string(&config_path) {
-        Ok(content) => content,
-        Err(_) => return AppConfig::default(),
+    
+    let mut config = if !config_path.exists() {
+        AppConfig::default()
+    } else {
+        let content = match fs::read_to_string(&config_path) {
+            Ok(content) => content,
+            Err(_) => return AppConfig::default(),
+        };
+        
+        let mut json_val: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
+        
+        // Migration: If sillytavern.version is a string, convert it to LocalTavernItem object
+        if let Some(st) = json_val.get_mut("sillytavern") {
+            if let Some(version_val) = st.get_mut("version") {
+                if version_val.is_string() {
+                    let ver_str = version_val.as_str().unwrap().to_string();
+                    let mut new_ver_obj = serde_json::Map::new();
+                    new_ver_obj.insert("version".to_string(), serde_json::Value::String(ver_str));
+                    new_ver_obj.insert("path".to_string(), serde_json::Value::String(String::new()));
+                    
+                    *version_val = serde_json::Value::Object(new_ver_obj);
+                } else if let Some(ver_obj) = version_val.as_object_mut() {
+                    // Cleanup: If sillytavern.version.path matches the default online path, set it to ""
+                    if let (Some(path_val), Some(v_val)) = (ver_obj.get("path"), ver_obj.get("version")) {
+                        if let (Some(path_str), Some(ver_str)) = (path_val.as_str(), v_val.as_str()) {
+                            if !path_str.is_empty() {
+                                let data_dir = config_path.parent().unwrap_or(std::path::Path::new("."));
+                                let default_path = data_dir.join("sillytavern").join(ver_str);
+                                
+                                let is_match = if let (Ok(p1), Ok(p2)) = (std::fs::canonicalize(path_str), std::fs::canonicalize(&default_path)) {
+                                    p1 == p2
+                                } else {
+                                    let c1: Vec<_> = std::path::Path::new(path_str).components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+                                    let c2: Vec<_> = default_path.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+                                    c1 == c2
+                                };
+                                
+                                if is_match {
+                                    ver_obj.insert("path".to_string(), serde_json::Value::String(String::new()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        serde_json::from_value::<AppConfig>(json_val).unwrap_or_default()
     };
-    serde_json::from_str::<AppConfig>(&content).unwrap_or_default()
+    
+    if !config.region_auto_configured {
+        let locale = sys_locale::get_locale().unwrap_or_else(|| "".to_string()).to_lowercase();
+        if locale.starts_with("zh") || locale.ends_with("cn") || locale.ends_with("hk") || locale.ends_with("mo") || locale.ends_with("tw") {
+            config.github_proxy.enable = true;
+            config.npm_registry = "https://registry.npmmirror.com/".to_string();
+        }
+        config.region_auto_configured = true;
+        let _ = write_app_config_to_disk(app, &config);
+    }
+    
+    config
 }
 
 pub fn write_app_config_to_disk(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
@@ -67,18 +120,21 @@ pub fn write_app_config_to_disk(app: &AppHandle, config: &AppConfig) -> Result<(
 
 pub fn apply_saved_window_position(app: &AppHandle) {
     let config = read_app_config_from_disk(app);
-    if !config.remember_window_position {
-        return;
-    }
-    let Some(position) = config.window_position else {
-        return;
-    };
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    let _ = window.set_position(Position::Physical(PhysicalPosition::new(
-        position.x, position.y,
-    )));
+
+    if config.remember_window_position {
+        if let Some(position) = config.window_position {
+            let _ = window.set_position(Position::Physical(PhysicalPosition::new(
+                position.x, position.y,
+            )));
+            return;
+        }
+    }
+
+    // 默认居中
+    let _ = window.center();
 }
 
 pub fn setup_window_position_tracking(app: &AppHandle) {
@@ -148,21 +204,55 @@ pub fn open_directory(
     let target_dir = match dir_type.as_str() {
         "root" => data_dir,
         "logs" => data_dir.join("logs"),
-        "tavern" => data_dir.join("sillytavern"),
+        "tavern" => {
+            let cfg = read_app_config_from_disk(&app);
+            if !cfg.sillytavern.version.version.is_empty() {
+                if !cfg.sillytavern.version.path.is_empty() {
+                    PathBuf::from(&cfg.sillytavern.version.path)
+                } else {
+                    data_dir.join("sillytavern").join(&cfg.sillytavern.version.version)
+                }
+            } else {
+                data_dir.join("sillytavern")
+            }
+        },
         "data" => data_dir.join("st_data"),
         "node" => {
             if let Some(path) = custom_path {
                 let path_buf = PathBuf::from(path);
                 if path_buf.is_file() {
-                    path_buf
-                        .parent()
-                        .unwrap_or(&data_dir.join("node"))
-                        .to_path_buf()
+                    let mut p = path_buf.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+                    // 如果是在 bin 目录下，再往上一层
+                    if p.file_name().map_or(false, |n| n == "bin") {
+                        if let Some(parent) = p.parent() {
+                            p = parent.to_path_buf();
+                        }
+                    }
+                    p
                 } else {
                     path_buf
                 }
             } else {
                 data_dir.join("node")
+            }
+        }
+        "git" => {
+            if let Some(path) = custom_path {
+                let path_buf = PathBuf::from(path);
+                if path_buf.is_file() {
+                    let mut p = path_buf.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+                    // 如果在 cmd 或 bin 目录下，通常是 Git 的安装子目录，往上一层
+                    if p.file_name().map_or(false, |n| n == "cmd" || n == "bin") {
+                        if let Some(parent) = p.parent() {
+                            p = parent.to_path_buf();
+                        }
+                    }
+                    p
+                } else {
+                    path_buf
+                }
+            } else {
+                data_dir.join("git")
             }
         }
         _ => return Err(format!("Unknown directory type: {}", dir_type)),
@@ -172,13 +262,13 @@ pub fn open_directory(
         fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
     }
 
+    tracing::info!("最终打开目录: {:?}", target_dir);
+
     #[cfg(target_os = "windows")]
     {
+        let win_path = target_dir.to_string_lossy().replace('/', "\\");
         let mut cmd = std::process::Command::new("explorer");
-        cmd.arg(target_dir);
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        cmd.stdin(std::process::Stdio::null());
+        cmd.arg(&win_path);
         cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
@@ -254,4 +344,9 @@ pub async fn fetch_github_proxies() -> Result<Vec<crate::types::ProxyItem>, Stri
 #[tauri::command]
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+#[tauri::command]
+pub fn get_system_cpu_cores() -> usize {
+    num_cpus::get()
 }

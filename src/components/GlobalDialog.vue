@@ -25,16 +25,16 @@ const handleMaskClick = () => {
 </script>
 
 <template>
-    <div :class="[
-        'absolute inset-0 z-[300] flex items-center justify-center px-4 transition-all duration-300',
-        dialogState.show ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-    ]">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md" @click="handleMaskClick"></div>
+    <div 
+        v-if="dialogState.show"
+        class="absolute inset-0 z-[300] flex items-center justify-center px-4 animate-in fade-in duration-200"
+    >
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md pointer-events-auto" @click="handleMaskClick"></div>
 
-        <div :class="[
-            'modal-content relative bg-white w-full max-w-85 rounded-4xl shadow-modal border border-slate-100 overflow-hidden transition-all duration-300 transform',
-            dialogState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
-        ]">
+        <div 
+            class="modal-content relative bg-white w-full max-w-[21.25rem] rounded-4xl shadow-modal border border-slate-100 overflow-hidden pointer-events-auto animate-in zoom-in-95 duration-200"
+            @click.stop
+        >
             <!-- Close Button -->
             <button 
                 @click="handleAction('close')"

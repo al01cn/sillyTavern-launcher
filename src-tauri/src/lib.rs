@@ -4,6 +4,8 @@
 pub mod character;
 pub mod config;
 pub mod extensions;
+pub mod finderst;
+pub mod git;
 pub mod node;
 pub mod sillytavern;
 pub mod types;
@@ -30,10 +32,19 @@ use crate::utils::{ensure_standard_layout, init_logger};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             app.manage(ProcessState {
                 kill_tx: Arc::new(Mutex::new(None)),
+                child_pid: Arc::new(Mutex::new(None)),
             });
             app.manage(InstallState {
                 cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -76,17 +87,23 @@ pub fn run() {
             config::get_app_version,
             config::open_directory,
             config::fetch_github_proxies,
+            config::get_system_cpu_cores,
             // Node.js / npm
             node::check_nodejs,
             node::check_npm,
             node::install_nodejs,
+            // Git
+            git::check_git,
+            git::install_git,
             // SillyTavern 版本管理
             sillytavern::fetch_sillytavern_releases,
             sillytavern::get_installed_sillytavern_versions,
             sillytavern::get_installed_versions_info,
             sillytavern::switch_sillytavern_version,
+            sillytavern::link_existing_sillytavern,
             sillytavern::install_sillytavern_version,
             sillytavern::install_sillytavern_dependencies,
+            sillytavern::check_local_tavern_dependencies,
             sillytavern::cancel_install,
             sillytavern::delete_sillytavern_version,
             sillytavern::check_sillytavern_empty,
@@ -112,6 +129,8 @@ pub fn run() {
             extensions::delete_extension,
             extensions::toggle_extension_auto_update,
             extensions::open_extension_folder,
+            extensions::install_extension_git,
+            extensions::repair_extension_git,
             extensions::open_specific_extension_folder,
             extensions::verify_extension_zip,
             extensions::install_extension_zip,
@@ -133,7 +152,32 @@ pub fn run() {
             // 提权支持
             elevation::is_elevated,
             elevation::elevate_process,
+            // 本地酒馆扫描
+            finderst::scan_local_sillytavern,
+            finderst::cancel_scan_local_sillytavern,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => {
+                let app = app_handle.clone();
+                let _ = std::thread::spawn(move || {
+                    if let Ok(rt) = tokio::runtime::Runtime::new() {
+                        rt.block_on(async {
+                            // 停止本地酒馆扫描
+                            let _ = finderst::cancel_scan_local_sillytavern().await;
+                            
+                            // 获取 ProcessState 并停止酒馆
+                            let state = app.state::<ProcessState>();
+                            let _ = crate::sillytavern::stop_sillytavern(state).await;
+
+                            // 获取 InstallState 并取消可能的安装任务
+                            let install_state = app.state::<InstallState>();
+                            install_state.cancel_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                        });
+                    }
+                }).join();
+            }
+            _ => {}
+        });
 }

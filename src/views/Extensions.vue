@@ -7,13 +7,30 @@
         <p class="text-slate-600 dark:text-slate-400 text-sm mt-1">{{ t('extensions.subtitle') }}</p>
       </div>
       <div class="flex items-center gap-3">
-        <button 
-          @click="handleInstallPlugin"
-          class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-800 dark:hover:bg-slate-600 shadow-lg shadow-slate-200 dark:shadow-slate-900 active:scale-95"
-        >
-          <Download class="w-4 h-4" />
-          {{ t('extensions.installExtension') }}
-        </button>
+        <div class="flex items-center gap-4">
+          <!-- Auto Repair Toggle -->
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 transition-colors">
+            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ t('extensions.autoRepairGit') }}</span>
+            <button 
+              @click="toggleAutoRepair"
+              class="relative inline-flex h-4.5 w-8.5 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="autoRepairGit ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'"
+            >
+              <span 
+                class="inline-block h-2.5 w-2.5 transform rounded-full bg-white transition duration-200 ease-in-out shadow-sm"
+                :class="autoRepairGit ? 'translate-x-4.5' : 'translate-x-1.5'"
+              />
+            </button>
+          </div>
+
+          <button 
+            @click="handleInstallPlugin"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-800 dark:hover:bg-slate-600 shadow-lg shadow-slate-200 dark:shadow-slate-900 active:scale-95"
+          >
+            <Download class="w-4 h-4" />
+            {{ t('extensions.installExtension') }}
+          </button>
+        </div>
         <button 
           @click="openExtensionFolder"
           class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 shadow-sm"
@@ -25,26 +42,30 @@
     </div>
 
     <!-- Version Selection -->
-    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 flex items-center justify-center">
-          <Puzzle class="w-5 h-5" />
+    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500">
+            <Puzzle class="w-4 h-4" />
+          </div>
+          <div>
+            <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('extensions.currentTavernVersion') }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="selectedVersion">
+                {{ t('settings.gitVersion') }}: {{ selectedVersion.version === 'unknown' ? t('versions.unknownVersion') : selectedVersion.version }}
+                <span class="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide inline-block"
+                      :class="selectedVersion.path ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'">
+                  {{ selectedVersion.path ? t('settings.localSillytavern') : t('settings.onlineDownload') }}
+                </span>
+                <div v-if="selectedVersion.path" class="mt-1 flex items-center gap-1 text-slate-400 dark:text-slate-500 break-all select-all">
+                  <Folder class="w-3 h-3 flex-shrink-0" />
+                  {{ selectedVersion.path }}
+                </div>
+              </span>
+              <span v-else>{{ t('versions.notSet') }}</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <h3 class="font-bold text-slate-800 dark:text-slate-100">{{ t('extensions.currentTavernVersion') }}</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ t('extensions.checkCompatibility') }}</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <div class="px-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300">
-          {{ selectedVersion || t('versions.notSet') }}
-        </div>
-        <router-link 
-          to="/versions"
-          class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors ml-1"
-        >
-          {{ t('extensions.goSwitch') }}
-        </router-link>
       </div>
     </div>
 
@@ -142,6 +163,16 @@
                       {{ t('extensions.visitHomepage') }}
                     </a>
                     <button 
+                      v-if="!ext.is_system && !ext.has_git && (ext.manifest.auto_update || isRepoUrl(ext.manifest.homePage))"
+                      @click="repairGit(ext)"
+                      class="px-2 py-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-md transition-colors flex items-center gap-1 shadow-sm"
+                      :title="t('extensions.repairAutoUpdate')"
+                    >
+                      <Wrench class="w-3 h-3" v-if="repairingId !== ext.id" />
+                      <Loader2 class="w-3 h-3 animate-spin text-amber-500" v-else />
+                      {{ t('extensions.repairAutoUpdate') }}
+                    </button>
+                    <button 
                       @click="openSpecificExtensionFolder(ext.dir_path)"
                       class="px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors flex items-center gap-1"
                       :title="t('extensions.openDirectory')"
@@ -202,7 +233,7 @@
         <!-- Pagination Controls -->
         <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
           <span class="text-sm text-slate-500">
-            共 {{ filteredExtensions.length }} 个扩展
+            {{ t('extensions.totalExtensions', { count: filteredExtensions.length }) }}
           </span>
           <div class="flex items-center gap-2">
             <button 
@@ -242,42 +273,21 @@ import { useI18n } from 'vue-i18n';
 import { 
     Download, FolderOpen, Puzzle, RefreshCw, Loader2, 
     User, Globe, Folder, AlertTriangle, Trash2,
-    ChevronLeft, ChevronRight, ShieldCheck
+    ChevronLeft, ChevronRight, ShieldCheck, Wrench
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Dialog } from '../lib/useDialog';
-import { openInstallExtensionDialog } from '../lib/useExtensionInstall';
+import { openInstallExtensionDialog, openRepairLogDialog, closeInstallExtensionDialog } from '../lib/useExtensionInstall';
+import { useExtensions, ExtensionInfo } from '../lib/useExtensions';
 
 const { t } = useI18n();
 
-interface ExtensionManifest {
-    display_name?: string;
-    author?: string;
-    version?: string;
-    homePage?: string;
-    auto_update?: boolean;
-    minimum_client_version?: string;
-}
+const { extensions, loading, fetchExtensions, updateExtensionCache } = useExtensions();
 
-interface ExtensionInfo {
-    id: string;
-    manifest: ExtensionManifest;
-    dir_path: string;
-    enabled: boolean;
-    is_system: boolean;
-    scope: string;
-}
-
-interface InstalledVersionInfo {
-    version: string;
-    has_node_modules: boolean;
-}
-
-const extensions = ref<ExtensionInfo[]>([]);
-const installedVersions = ref<InstalledVersionInfo[]>([]);
-const selectedVersion = ref('');
-const loading = ref(false);
+const selectedVersion = ref<{version: string, path: string} | null>(null);
 const showOfficial = ref(false);
+const autoRepairGit = ref(true);
+const repairingId = ref<string | null>(null);
 
 // Filtered and sorted extensions
 const filteredExtensions = computed(() => {
@@ -286,10 +296,7 @@ const filteredExtensions = computed(() => {
         result = result.filter(ext => !ext.is_system);
     }
     
-    // Sort logic: 
-    // 1. User scope extensions first
-    // 2. Global third-party extensions next
-    // 3. System extensions last
+    // Sort logic
     return [...result].sort((a, b) => {
         const getPriority = (ext: ExtensionInfo) => {
             if (ext.scope === 'user') return 1;
@@ -328,12 +335,12 @@ const nextPage = () => {
     }
 };
 
-// A simple semver compare to check minimum_client_version
+// basic semver compare to check minimum_client_version
 const isCompatible = (minVersion?: string) => {
-    if (!minVersion || !selectedVersion.value) return true;
+    if (!minVersion || !selectedVersion.value?.version) return true;
     
     // basic semver compare
-    const v1 = selectedVersion.value.replace(/[^0-9.]/g, '').split('.').map(Number);
+    const v1 = selectedVersion.value.version.replace(/[^0-9.]/g, '').split('.').map(Number);
     const v2 = minVersion.replace(/[^0-9.]/g, '').split('.').map(Number);
     
     for (let i = 0; i < Math.max(v1.length, v2.length); i++) {
@@ -347,9 +354,7 @@ const isCompatible = (minVersion?: string) => {
 
 const loadVersions = async () => {
     try {
-        installedVersions.value = await invoke('get_installed_versions_info');
-        
-        let versionFromConfig = '';
+        let versionFromConfig: {version: string, path: string} | null = null;
         const cachedConfig = localStorage.getItem('app_settings_config_cache');
         if (cachedConfig) {
             try {
@@ -367,16 +372,17 @@ const loadVersions = async () => {
             }
         }
         
-        if (versionFromConfig) {
-            // Set to current version if it exists in installed list
-            if (installedVersions.value.some(v => v.version === versionFromConfig)) {
-                selectedVersion.value = versionFromConfig;
-            } else if (installedVersions.value.length > 0) {
-                selectedVersion.value = installedVersions.value[0].version;
+        if (versionFromConfig && versionFromConfig.version) {
+            selectedVersion.value = versionFromConfig;
+        } else {
+            const installed: any[] = await invoke('get_installed_versions_info');
+            if (installed.length > 0) {
+                selectedVersion.value = { version: installed[0].version, path: '' };
             }
-        } else if (installedVersions.value.length > 0) {
-            selectedVersion.value = installedVersions.value[0].version;
         }
+
+        const config: any = await invoke('get_app_config');
+        autoRepairGit.value = config.auto_repair_git ?? true;
     } catch (e) {
         console.error(e);
     }
@@ -384,48 +390,21 @@ const loadVersions = async () => {
 
 const refresh = async (forceUpdate = false) => {
     if (!selectedVersion.value) return;
-    
-    const cacheKey = `extensions_cache_${selectedVersion.value}`;
-    
-    // 如果不是强制更新，优先尝试从缓存中加载扩展列表，实现秒开
-    if (!forceUpdate) {
-        const cachedExtensions = localStorage.getItem(cacheKey);
-        if (cachedExtensions) {
-            try {
-                const parsed = JSON.parse(cachedExtensions);
-                if (Array.isArray(parsed)) {
-                    extensions.value = parsed;
-                }
-            } catch (e) {
-                console.error('扩展缓存解析失败:', e);
-            }
-        }
-    }
-
-    loading.value = true;
     try {
-        const fetchedExtensions = await invoke<ExtensionInfo[]>('get_extensions', { version: selectedVersion.value });
-        const fetchedString = JSON.stringify(fetchedExtensions);
-        const currentCache = localStorage.getItem(cacheKey);
-        
-        // 如果数据有变化或者是强制更新，才更新列表和缓存
-        if (fetchedString !== currentCache || forceUpdate) {
-            extensions.value = fetchedExtensions;
-            localStorage.setItem(cacheKey, fetchedString);
-            // 只有当数据真正发生变化时，才考虑重置页码（可选，或者保留当前页）
-            if (forceUpdate) {
-                currentPage.value = 1;
-            }
+        await fetchExtensions(selectedVersion.value, forceUpdate);
+        if (forceUpdate) {
+            currentPage.value = 1;
         }
     } catch (e) {
-        console.error(e);
         toast.error(t('extensions.fetchFailed') + ': ' + String(e));
-    } finally {
-        loading.value = false;
     }
 };
 
 const openExtensionFolder = async () => {
+    if (!selectedVersion.value) {
+        toast.warning(t('extensions.selectVersionWarning'));
+        return;
+    }
     Dialog.warning({
         title: t('extensions.selectDirectory'),
         msg: t('extensions.selectDirectoryMsg'),
@@ -433,6 +412,7 @@ const openExtensionFolder = async () => {
         thirdBtnText: t('home.global'),
         showCancel: false,
         onConfirm: async () => {
+            if (!selectedVersion.value) return;
             try {
                 await invoke('open_extension_folder', { scope: 'user', version: selectedVersion.value });
             } catch (e) {
@@ -442,10 +422,7 @@ const openExtensionFolder = async () => {
             }
         },
         onThirdBtn: async () => {
-            if (!selectedVersion.value) {
-                toast.warning(t('extensions.selectVersionWarning'));
-                return;
-            }
+            if (!selectedVersion.value) return;
             try {
                 await invoke('open_extension_folder', { scope: 'global', version: selectedVersion.value });
             } catch (e) {
@@ -472,6 +449,10 @@ const openSpecificExtensionFolder = async (dirPath: string) => {
 };
 
 const handleInstallPlugin = () => {
+    if (!selectedVersion.value) {
+        toast.warning(t('extensions.selectVersionWarning'));
+        return;
+    }
     openInstallExtensionDialog(selectedVersion.value, () => {
         refresh(true);
     });
@@ -486,15 +467,8 @@ const openUrl = async (url?: string) => {
     }
 };
 
-const updateCache = () => {
-    if (!selectedVersion.value) return;
-    const cacheKey = `extensions_cache_${selectedVersion.value}`;
-    localStorage.setItem(cacheKey, JSON.stringify(extensions.value));
-};
-
 const toggleEnable = async (ext: ExtensionInfo) => {
     const newStatus = !ext.enabled;
-    // Optimistic update
     ext.enabled = newStatus;
     try {
         await invoke('toggle_extension_enable', {
@@ -502,10 +476,9 @@ const toggleEnable = async (ext: ExtensionInfo) => {
             enable: newStatus,
             dirPath: ext.dir_path
         });
-        updateCache();
+        updateExtensionCache(selectedVersion.value!);
         toast.success(t(newStatus ? 'extensions.extensionEnabled' : 'extensions.extensionDisabled', { name: ext.manifest.display_name || ext.id }));
     } catch (e) {
-        // Revert on failure
         ext.enabled = !newStatus;
         toast.error(t('extensions.toggleEnableFailed') + ': ' + String(e));
     }
@@ -525,10 +498,8 @@ const deleteExtension = (ext: ExtensionInfo) => {
                     dirPath: ext.dir_path
                 });
                 toast.success(t('extensions.extensionDeleted', { name: extName }));
-                // Remove from list
                 extensions.value = extensions.value.filter(e => e.id !== ext.id);
-                updateCache();
-                // Adjust page if necessary
+                updateExtensionCache(selectedVersion.value!);
                 if (paginatedExtensions.value.length === 0 && currentPage.value > 1) {
                     currentPage.value--;
                 }
@@ -538,18 +509,13 @@ const deleteExtension = (ext: ExtensionInfo) => {
                 Dialog.close();
             }
         },
-        onCancel: () => {
-            Dialog.close();
-        },
-        onClose: () => {
-            Dialog.close();
-        }
+        onCancel: () => Dialog.close(),
+        onClose: () => Dialog.close()
     });
 };
 
 const toggleAutoUpdate = async (ext: ExtensionInfo) => {
     const newValue = !ext.manifest.auto_update;
-    // Optimistic update
     ext.manifest.auto_update = newValue;
     try {
         await invoke('toggle_extension_auto_update', { 
@@ -557,16 +523,68 @@ const toggleAutoUpdate = async (ext: ExtensionInfo) => {
             autoUpdate: newValue,
             dirPath: ext.dir_path
         });
-        updateCache();
+        updateExtensionCache(selectedVersion.value!);
         toast.success(t(newValue ? 'extensions.autoUpdateEnabled' : 'extensions.autoUpdateDisabled'));
     } catch (e) {
-        // Revert on failure
         ext.manifest.auto_update = !newValue;
         toast.error(t('extensions.toggleAutoUpdateFailed') + ': ' + String(e));
     }
 };
 
+const toggleAutoRepair = async () => {
+    const newVal = !autoRepairGit.value;
+    autoRepairGit.value = newVal;
+    localStorage.setItem('autoRepairGit', String(newVal));
+    try {
+        const config: any = await invoke('get_app_config');
+        config.autoRepairGit = newVal;
+        await invoke('save_app_config', { config });
+    } catch (e) {
+        console.error(e);
+        autoRepairGit.value = !newVal;
+    }
+};
+
+const isRepoUrl = (url?: string) => {
+    if (!url || url === 'None' || url.trim() === '') return false;
+    const u = url.toLowerCase();
+    return u.includes('github.com') || u.includes('gitee.com') || u.includes('gitlab.com') || u.endsWith('.git');
+};
+
+const repairGit = async (ext: ExtensionInfo) => {
+    if (repairingId.value) return;
+    repairingId.value = ext.id;
+    openRepairLogDialog();
+    try {
+        await invoke('repair_extension_git', { 
+            id: ext.id, 
+            scope: ext.scope 
+        });
+        toast.success(t('extensions.repairGitSuccess'));
+        setTimeout(() => closeInstallExtensionDialog(), 3000);
+        refresh(true);
+    } catch (e) {
+        toast.error(t('extensions.repairGitFailed') + ': ' + String(e));
+    } finally {
+        repairingId.value = null;
+    }
+};
+
 onMounted(async () => {
+    const localCache = localStorage.getItem('autoRepairGit');
+    if (localCache !== null) {
+        autoRepairGit.value = localCache === 'true';
+    }
+
+    try {
+        const config: any = await invoke('get_app_config');
+        if (config.autoRepairGit !== undefined) {
+             autoRepairGit.value = config.autoRepairGit;
+             localStorage.setItem('autoRepairGit', String(config.autoRepairGit));
+        }
+    } catch (e) {
+        console.error('Failed to load auto repair config:', e);
+    }
     await loadVersions();
     if (selectedVersion.value) {
         refresh();

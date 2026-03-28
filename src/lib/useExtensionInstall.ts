@@ -2,11 +2,12 @@ import { reactive } from 'vue';
 
 export const installExtensionState = reactive({
     show: false,
-    version: '',
+    version: null as {version: string, path: string} | null,
     onSuccess: undefined as (() => void) | undefined,
+    logOnly: false,
 });
 
-export const openInstallExtensionDialog = (version: string, onSuccess?: () => void) => {
+export const openInstallExtensionDialog = (version: {version: string, path: string}, onSuccess?: () => void) => {
     installExtensionState.version = version;
     installExtensionState.onSuccess = onSuccess;
     installExtensionState.show = true;
@@ -15,7 +16,13 @@ export const openInstallExtensionDialog = (version: string, onSuccess?: () => vo
 export const closeInstallExtensionDialog = () => {
     installExtensionState.show = false;
     setTimeout(() => {
-        installExtensionState.version = '';
+        installExtensionState.version = null;
         installExtensionState.onSuccess = undefined;
+        installExtensionState.logOnly = false;
     }, 300);
+};
+
+export const openRepairLogDialog = () => {
+    installExtensionState.logOnly = true;
+    installExtensionState.show = true;
 };

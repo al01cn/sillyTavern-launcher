@@ -42,9 +42,11 @@ pub fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathB
                     vec![
                         cli.to_string_lossy().to_string(),
                         "install".to_string(),
-                        "--production".to_string(),
+                        "--no-save".to_string(),
                         "--no-audit".to_string(),
                         "--no-fund".to_string(),
+                        "--omit=dev".to_string(),
+                        "--loglevel=silly".to_string(),
                         format!("--registry={}", registry),
                     ],
                 ));
@@ -63,9 +65,11 @@ pub fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathB
                 npm_exec,
                 vec![
                     "install".to_string(),
-                    "--production".to_string(),
+                    "--no-save".to_string(),
                     "--no-audit".to_string(),
                     "--no-fund".to_string(),
+                    "--omit=dev".to_string(),
+                    "--loglevel=silly".to_string(),
                     format!("--registry={}", registry),
                 ],
             ));
@@ -92,9 +96,11 @@ pub fn get_npm_install_command(data_dir: &Path, registry: &str) -> Option<(PathB
             PathBuf::from(system_npm),
             vec![
                 "install".to_string(),
-                "--production".to_string(),
+                "--no-save".to_string(),
                 "--no-audit".to_string(),
                 "--no-fund".to_string(),
+                "--omit=dev".to_string(),
+                "--loglevel=silly".to_string(),
                 format!("--registry={}", registry),
             ],
         ));
@@ -165,12 +171,25 @@ pub async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), S
         }
         emit_progress("installing", 0.1, "正在安装依赖，请稍候...");
 
-        // 将本地 node 目录加入 PATH
+        // 将本地 node 和 git 目录加入 PATH
         let node_bin_dir = data_dir.join("node");
         let path_env = std::env::var_os("PATH").unwrap_or_default();
         let mut paths = std::env::split_paths(&path_env).collect::<Vec<_>>();
-        paths.insert(0, node_bin_dir.join("bin"));
-        paths.insert(0, node_bin_dir);
+        if node_bin_dir.exists() {
+            paths.insert(0, node_bin_dir.join("bin"));
+            paths.insert(0, node_bin_dir);
+        }
+
+        let git_dir = data_dir.join("git");
+        let git_bin_dir = if cfg!(target_os = "windows") {
+            git_dir.join("cmd")
+        } else {
+            git_dir.join("bin")
+        };
+        if git_bin_dir.exists() {
+            paths.insert(0, git_bin_dir);
+        }
+
         let new_path_env = std::env::join_paths(paths).unwrap_or(path_env);
 
         let mut command = Command::new(&cmd);
@@ -178,6 +197,7 @@ pub async fn run_npm_install(app: &AppHandle, target_dir: &Path) -> Result<(), S
             .args(&args)
             .current_dir(target_dir)
             .env("PATH", new_path_env)
+            .env("NODE_DEBUG", "make-fetch-happen,request")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -367,7 +387,7 @@ pub async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
                 }
                 return Ok(NodeInfo {
                     version: Some(version),
-                    path: Some(local_node_path.to_string_lossy().to_string()),
+                    path: Some(local_node_path.to_string_lossy().replace('\\', "/")),
                     source: "local".to_string(),
                 });
             }
@@ -408,7 +428,7 @@ pub async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
                     if let Some(first_line) = path_str.lines().next() {
                         let trimmed = first_line.trim();
                         if !trimmed.is_empty() {
-                            node_path = trimmed.to_string();
+                            node_path = trimmed.replace('\\', "/");
                         }
                     }
                 }
@@ -481,7 +501,7 @@ pub async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                     }
                     return Ok(NpmInfo {
                         version: Some(version),
-                        path: Some(npm_cmd.to_string_lossy().to_string()),
+                        path: Some(npm_cmd.to_string_lossy().replace('\\', "/")),
                         source: "local".to_string(),
                     });
                 }
@@ -524,7 +544,7 @@ pub async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                     tracing::info!("找到本地 NPM (cli.js): {}", version);
                     return Ok(NpmInfo {
                         version: Some(version),
-                        path: Some(cli.to_string_lossy().to_string()),
+                        path: Some(cli.to_string_lossy().replace('\\', "/")),
                         source: "local".to_string(),
                     });
                 }
@@ -572,7 +592,7 @@ pub async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {
                     if let Some(first_line) = path_str.lines().next() {
                         let trimmed = first_line.trim();
                         if !trimmed.is_empty() {
-                            npm_path = trimmed.to_string();
+                            npm_path = trimmed.replace('\\', "/");
                         }
                     }
                 }
@@ -699,6 +719,7 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
+    let mut last_emit = std::time::Instant::now();
 
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|e| e.to_string())?;
@@ -706,22 +727,40 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
 
-        let progress = if total_size > 0 {
-            (downloaded as f64) / (total_size as f64)
-        } else {
-            0.0
-        };
+        if last_emit.elapsed() > std::time::Duration::from_millis(150) || downloaded == total_size {
+            let progress = if total_size > 0 {
+                (downloaded as f64) / (total_size as f64)
+            } else {
+                0.0
+            };
 
-        let mb_downloaded = downloaded as f64 / 1_048_576.0;
-        emit_progress(
-            "downloading",
-            progress,
-            &match lang {
-                Lang::ZhCn => format!("已下载: {:.2} MB", mb_downloaded),
-                Lang::EnUs => format!("Downloaded: {:.2} MB", mb_downloaded),
-            },
-        );
+            let mb_downloaded = downloaded as f64 / 1_048_576.0;
+            let mb_total = total_size as f64 / 1_048_576.0;
+            emit_progress(
+                "downloading",
+                progress,
+                &match lang {
+                    Lang::ZhCn => {
+                        if total_size > 0 {
+                            format!("已下载: {:.2} MB / {:.2} MB", mb_downloaded, mb_total)
+                        } else {
+                            format!("已下载: {:.2} MB", mb_downloaded)
+                        }
+                    }
+                    Lang::EnUs => {
+                        if total_size > 0 {
+                            format!("Downloaded: {:.2} MB / {:.2} MB", mb_downloaded, mb_total)
+                        } else {
+                            format!("Downloaded: {:.2} MB", mb_downloaded)
+                        }
+                    }
+                },
+            );
+            last_emit = std::time::Instant::now();
+        }
     }
+
+    drop(file);
 
     emit_progress(
         "extracting",

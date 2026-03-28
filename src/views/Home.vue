@@ -1,13 +1,43 @@
 <template>
   <div class="h-full flex flex-col gap-6 text-slate-800 dark:text-slate-200">
+    <!-- 断点续传提示 -->
+    <div v-if="setupCheckpoint && setupCheckpoint !== 'DONE' && !initialSetupCompleted" 
+         class="mx-1 px-5 py-4 bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500 shadow-sm"
+    >
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+          <HistoryIcon class="w-6 h-6 animate-pulse" />
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-800 dark:text-slate-100">{{ t('oneClick.resumeTitle') }}</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {{ t('oneClick.resumeDesc') }}: 
+            <span class="font-medium text-blue-600 dark:text-blue-400">{{ getCheckpointName(setupCheckpoint) }}</span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <button @click="clearSetupCheckpoint" class="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors px-3 py-2">
+          {{ t('common.ignore') }}
+        </button>
+        <button @click="handleResumeSetup" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all">
+          {{ t('oneClick.resumeButton') }}
+        </button>
+      </div>
+    </div>
+
     <!-- 顶部 Banner -->
-    <div class="w-full h-48 sm:h-56 rounded-2xl overflow-hidden shadow-sm relative group shrink-0">
+    <div
+      class="w-full h-48 sm:h-56 rounded-2xl overflow-hidden shadow-sm relative group shrink-0"
+    >
       <img src="../assets/images/banner.png" alt="Banner" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
       <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
 
     <!-- 中部 快捷目录和版本信息 -->
-    <div class="flex-1 flex flex-col md:flex-row gap-6">
+    <div
+      class="flex-1 flex flex-col md:flex-row gap-6"
+    >
       
       <!-- 左侧：快捷目录 -->
       <div class="flex-[3] bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
@@ -15,10 +45,12 @@
           <FolderOpenIcon class="w-5 h-5 mr-2 text-primary" />
           {{ t('home.quickDirectories') }}
         </h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <button 
-            v-for="btn in dirs" :key="btn.id"
-            class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-800 hover:text-primary hover:-translate-y-1 hover:shadow-sm transition-all duration-300 group"
+        <div
+          class="grid grid-cols-2 sm:grid-cols-3 gap-4"
+        >
+          <button
+            v-for="(btn) in dirs" :key="btn.id"
+            class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-800 hover:text-primary transition-colors group"
             @click="btn.action"
           >
             <component :is="btn.icon" class="w-8 h-8 text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors duration-300" />
@@ -29,9 +61,10 @@
 
       <!-- 右侧：版本信息与一键启动 -->
       <div class="flex-[2] flex flex-col gap-6">
-        
+
         <!-- 版本信息 -->
-        <div class="flex-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col justify-center">
+        <div
+          class="flex-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col justify-center">
           <div class="flex items-center justify-between mb-5">
             <h2 class="text-lg font-bold flex items-center text-slate-800 dark:text-slate-200">
               <InfoIcon class="w-5 h-5 mr-2 text-primary" />
@@ -63,19 +96,51 @@
               <span class="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">
                 <BeerIcon class="w-4 h-4" /> {{ t('home.tavernVersion') }}
               </span>
-              <span class="font-bold text-slate-700 dark:text-slate-300">{{ tavernVersion || t('home.notInstalled') }}</span>
+              <span class="font-bold text-slate-700 dark:text-slate-300">{{ tavernVersion === 'unknown' ? t('versions.unknownVersion') : (tavernVersion || t('home.notInstalled')) }}</span>
             </div>
           </div>
         </div>
         
-        <!-- 一键启动按钮 -->
-        <button 
-          class="btn shrink-0 h-24 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden"
+        <!-- 一键启动按钮 / 安装NodeJs按钮 -->
+        <button
+          v-if="!initialSetupCompleted && (nodeVersion === t('home.notInstalled') || !nodeVersion) && (tavernVersion === t('home.notInstalled') || !tavernVersion)"
+          :disabled="checkingEnv"
+          class="btn shrink-0 min-h-[6rem] py-3 h-auto rounded-2xl shadow-md hover:shadow-lg border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden bg-primary hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed"
+          @click="router.push('/settings?action=one_click_setup')"
+        >
+          <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+          <div class="flex items-center gap-2 z-10">
+            <PlayIcon class="w-7 h-7 fill-current" />
+            <span class="text-2xl font-bold tracking-widest">{{ t('home.oneClickSetup') }}</span>
+          </div>
+          <span class="text-xs font-medium opacity-90 z-10">
+            {{ t('home.oneClickSetupDesc') }}
+          </span>
+        </button>
+        <button
+          v-else-if="nodeVersion === t('home.notInstalled') || !nodeVersion"
+          :disabled="checkingEnv"
+          class="btn shrink-0 min-h-[6rem] py-3 h-auto rounded-2xl shadow-md hover:shadow-lg border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden bg-orange-500 hover:bg-orange-600 disabled:opacity-70 disabled:cursor-not-allowed"
+          @click="router.push('/settings?action=install_node')"
+        >
+          <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+          <div class="flex items-center gap-2 z-10">
+            <DownloadIcon class="w-7 h-7 fill-current" />
+            <span class="text-2xl font-bold tracking-widest">{{ t('settings.nodejsInstall') }}</span>
+          </div>
+          <span class="text-xs font-medium opacity-90 z-10">
+            {{ t('home.nodeRequiredDesc') }}
+          </span>
+        </button>
+        <button
+          v-else
+          :disabled="checkingEnv"
+          class="btn shrink-0 min-h-[6rem] py-3 h-auto rounded-2xl shadow-md hover:shadow-lg border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
           :class="status === 1 || status === 2 ? 'bg-error hover:bg-error/90' : 'bg-primary hover:bg-primary/90'"
           @click="handleToggleProcess"
         >
           <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
-          
+
           <div class="flex items-center gap-2 z-10">
             <StopCircleIcon v-if="status === 1 || status === 2" class="w-7 h-7 fill-current animate-pulse" />
             <PlayIcon v-else class="w-7 h-7 fill-current" />
@@ -107,8 +172,12 @@ import {
   Database as DatabaseIcon,
   Puzzle as PuzzleIcon,
   Info as InfoIcon,
-  Terminal as TerminalIcon
+  Terminal as TerminalIcon,
+  Download as DownloadIcon,
+  GitBranch as GitIcon,
+  History as HistoryIcon,
 } from 'lucide-vue-next'
+
 import { consoleStatus as status, serverUrl, startProcess, stopProcess } from '../lib/consoleState'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Dialog } from '../lib/useDialog'
@@ -120,10 +189,45 @@ const appVersion = ref('')
 const nodeVersion = ref('')
 const tavernVersion = ref('')
 const nodePath = ref('')
+const gitPath = ref('')
+const initialSetupCompleted = ref(false)
+const checkingEnv = ref(true)
+const setupCheckpoint = ref<string | null>(null)
+
+const getCheckpointName = (cp: string) => {
+    if (cp === 'START') return t('oneClick.gitDetecting');
+    if (cp === 'GIT_DONE') return t('oneClick.nodeDetecting');
+    if (cp === 'NODE_DONE') return t('oneClick.fetchingVersions');
+    if (cp.startsWith('ST_INSTALLED')) return t('oneClick.installingDeps');
+    return cp;
+};
+
+const clearSetupCheckpoint = async () => {
+    try {
+        const config: any = await invoke('get_app_config');
+        config.setupCheckpoint = null;
+        await invoke('save_app_config', { config });
+        setupCheckpoint.value = null;
+    } catch (e) {}
+};
+
+const handleResumeSetup = () => {
+    if (!setupCheckpoint.value) return;
+    if (setupCheckpoint.value === 'START' || setupCheckpoint.value === 'GIT_DONE') {
+        router.push('/settings?action=one_click_setup');
+    } else {
+        router.push('/versions?action=one_click_setup_st');
+    }
+};
 
 const openDir = async (dirType: string) => {
   try {
-    const customPath = dirType === 'node' && nodePath.value ? nodePath.value : null
+    let customPath = null;
+    if (dirType === 'node' && nodePath.value) {
+      customPath = nodePath.value;
+    } else if (dirType === 'git' && gitPath.value) {
+      customPath = gitPath.value;
+    }
     await invoke('open_directory', { dirType, customPath })
   } catch (error) {
     console.error(`Failed to open ${dirType} directory:`, error)
@@ -140,7 +244,7 @@ const openExtensionFolder = async () => {
         onConfirm: async () => {
             try {
                 // Read current configured version
-                let version = tavernVersion.value;
+                let version: any = null;
                 const cachedConfig = localStorage.getItem('app_settings_config_cache');
                 if (cachedConfig) {
                     try {
@@ -154,6 +258,10 @@ const openExtensionFolder = async () => {
                     if (config?.sillytavern?.version) {
                         version = config.sillytavern.version;
                     }
+                }
+                if (!version || version.version === t('home.notInstalled')) {
+                    toast.warning(t('home.noTavernInstalled'));
+                    return;
                 }
                 await invoke('open_extension_folder', { scope: 'user', version });
             } catch (e) {
@@ -164,7 +272,7 @@ const openExtensionFolder = async () => {
         },
         onThirdBtn: async () => {
             try {
-                let version = tavernVersion.value;
+                let version: any = null;
                 const cachedConfig = localStorage.getItem('app_settings_config_cache');
                 if (cachedConfig) {
                     try {
@@ -179,7 +287,7 @@ const openExtensionFolder = async () => {
                         version = config.sillytavern.version;
                     }
                 }
-                if (!version || version === t('home.notInstalled')) {
+                if (!version || version.version === t('home.notInstalled')) {
                     toast.warning(t('home.noTavernInstalled'));
                     return;
                 }
@@ -206,9 +314,11 @@ const dirs = [
   { id: 'tavern', label: t('home.tavernDir'), icon: BeerIcon, action: () => openDir('tavern') },
   { id: 'extension', label: t('home.extensionDir'), icon: PuzzleIcon, action: openExtensionFolder },
   { id: 'node', label: t('home.nodeDir'), icon: BoxIcon, action: () => openDir('node') },
+  { id: 'git', label: t('home.gitDir'), icon: GitIcon, action: () => openDir('git') },
 ]
 
 const fetchVersions = async () => {
+  checkingEnv.value = true;
   // 优先从缓存读取
   const cachedAppVersion = localStorage.getItem('app_settings_app_version_cache');
   if (cachedAppVersion) appVersion.value = cachedAppVersion;
@@ -226,11 +336,28 @@ const fetchVersions = async () => {
   if (cachedConfig) {
     try {
       const parsedConfig = JSON.parse(cachedConfig);
-      if (parsedConfig?.sillytavern?.version) {
-        tavernVersion.value = parsedConfig.sillytavern.version;
+      if (parsedConfig?.sillytavern?.version?.version) {
+        tavernVersion.value = parsedConfig.sillytavern.version.version;
       }
+      if (parsedConfig?.initialSetupCompleted !== undefined) {
+        initialSetupCompleted.value = parsedConfig.initialSetupCompleted;
+      } else {
+        initialSetupCompleted.value = false;
+      }
+      setupCheckpoint.value = parsedConfig?.setupCheckpoint || null;
     } catch(e) {}
   }
+
+  // Fetch app config
+  try {
+    const config: any = await invoke('get_app_config');
+    if (config?.initialSetupCompleted !== undefined) {
+      initialSetupCompleted.value = config.initialSetupCompleted;
+    } else {
+      initialSetupCompleted.value = false;
+    }
+    setupCheckpoint.value = config.setupCheckpoint || null;
+  } catch (e) {}
 
   // 后台静默获取最新数据并更新缓存
   try {
@@ -253,23 +380,30 @@ const fetchVersions = async () => {
       localStorage.setItem('app_settings_node_cache', JSON.stringify(nodeInfo));
     }
   } catch (e) {
-    if (nodeVersion.value !== t('home.notInstalled')) {
+      if (nodeVersion.value !== t('home.notInstalled')) {
       nodeVersion.value = t('home.notInstalled');
     }
   }
 
   try {
-    const tavernVer = await invoke<string>('get_tavern_version');
-    if (tavernVer !== tavernVersion.value) {
-      tavernVersion.value = tavernVer;
+    const gitInfo: any = await invoke('check_git');
+    gitPath.value = gitInfo.path || '';
+  } catch (e) {
+    console.error(e);
+  }
+
+  try {
+    const tavernVerItem: any = await invoke('get_tavern_version');
+    if (tavernVerItem.version !== tavernVersion.value) {
+      tavernVersion.value = tavernVerItem.version;
       
       // 合并到全局配置缓存中
       const currentCachedConfig = localStorage.getItem('app_settings_config_cache');
-      let mergedConfig: any = { sillytavern: { version: tavernVer } };
+      let mergedConfig: any = { sillytavern: { version: tavernVerItem } };
       if (currentCachedConfig) {
         try {
           const parsed = JSON.parse(currentCachedConfig);
-          mergedConfig = { ...parsed, sillytavern: { ...(parsed.sillytavern || {}), version: tavernVer } };
+          mergedConfig = { ...parsed, sillytavern: { ...(parsed.sillytavern || {}), version: tavernVerItem } };
         } catch(e) {}
       }
       localStorage.setItem('app_settings_config_cache', JSON.stringify(mergedConfig));
@@ -279,6 +413,8 @@ const fetchVersions = async () => {
       tavernVersion.value = t('home.notInstalled');
     }
   }
+
+  checkingEnv.value = false;
 }
 
 const handleToggleProcess = async () => {

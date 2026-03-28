@@ -25,7 +25,7 @@ use crate::utils::get_config_path;
 
 /// SillyTavern 默认配置模板（YAML 格式）
 /// 用于在配置文件不存在时自动创建
-const DEFAULT_CONFIG_TEMPLATE: &str = r#"dataRoot: ./
+pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"dataRoot: ./
 listen: true
 listenAddress:
   ipv4: 0.0.0.0
@@ -208,8 +208,8 @@ pub async fn get_installed_sillytavern_versions(app: AppHandle) -> Result<Vec<St
         let mut versions = Vec::new();
         if let Ok(entries) = fs::read_dir(&st_dir) {
             for entry in entries.flatten() {
-                if let Ok(ft) = entry.file_type() {
-                    if ft.is_dir() {
+                if let Ok(_ft) = entry.file_type() {
+                    if entry.path().is_dir() {
                         if let Ok(name) = entry.file_name().into_string() {
                             if !name.starts_with('.') { versions.push(name); }
                         }
@@ -239,13 +239,30 @@ pub async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<Installed
         let mut versions = Vec::new();
         if let Ok(entries) = fs::read_dir(&st_dir) {
             for entry in entries.flatten() {
-                if let Ok(ft) = entry.file_type() {
-                    if ft.is_dir() {
+                if let Ok(_ft) = entry.file_type() {
+                    let path = entry.path();
+                    if path.is_dir() {
                         if let Ok(name) = entry.file_name().into_string() {
                             if !name.starts_with('.') {
-                                let nm = entry.path().join("node_modules");
+                                let nm = path.join("node_modules");
                                 let has_node_modules = nm.exists() && fs::read_dir(&nm).map(|mut d| d.next().is_some()).unwrap_or(false);
-                                versions.push(InstalledVersionInfo { version: name, has_node_modules });
+                                
+                                let mut is_link = false;
+                                if let Ok(m) = fs::symlink_metadata(&path) {
+                                    if m.file_type().is_symlink() {
+                                        is_link = true;
+                                    } else {
+                                        #[cfg(target_os = "windows")]
+                                        {
+                                            use std::os::windows::fs::MetadataExt;
+                                            if m.file_attributes() & 0x400 != 0 {
+                                                is_link = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                versions.push(InstalledVersionInfo { version: name, has_node_modules, is_link });
                             }
                         }
                     }
@@ -263,22 +280,30 @@ pub async fn get_installed_versions_info(app: AppHandle) -> Result<Vec<Installed
 // ─── 版本切换 ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn switch_sillytavern_version(app: AppHandle, version: String) -> Result<(), String> {
+pub async fn switch_sillytavern_version(app: AppHandle, version: crate::types::LocalTavernItem) -> Result<(), String> {
     let lang = get_current_lang(&app);
     match lang {
-        Lang::ZhCn => tracing::info!("切换酒馆版本到: {}", version),
-        Lang::EnUs => tracing::info!("Switching version to: {}", version),
+        Lang::ZhCn => tracing::info!("切换酒馆版本到: {}", version.version),
+        Lang::EnUs => tracing::info!("Switching version to: {}", version.version),
     }
     let mut config = read_app_config_from_disk(&app);
-    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let version_dir = data_dir.join("sillytavern").join(&version);
+    
+    let version_to_save = version.clone();
+    
+    let version_dir = if version_to_save.path.is_empty() {
+        let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+        data_dir.join("sillytavern").join(&version_to_save.version)
+    } else {
+        PathBuf::from(&version_to_save.path)
+    };
+    
     if !version_dir.exists() {
         match lang {
-            Lang::ZhCn => { tracing::error!("版本 {} 不存在", version); return Err(format!("版本 {} 不存在", version)); }
-            Lang::EnUs => { tracing::error!("Version {} not found", version); return Err(format!("Version {} not found", version)); }
+            Lang::ZhCn => { tracing::error!("版本 {} 的路径不存在", version_to_save.version); return Err(format!("版本 {} 的路径不存在", version_to_save.version)); }
+            Lang::EnUs => { tracing::error!("Version path for {} not found", version_to_save.version); return Err(format!("Version path for {} not found", version_to_save.version)); }
         }
     }
-    config.sillytavern.version = version;
+    config.sillytavern.version = version_to_save;
     write_app_config_to_disk(&app, &config)
 }
 
@@ -325,7 +350,21 @@ pub async fn install_sillytavern_version(
 
     let temp_zip = std::env::temp_dir().join(format!("sillytavern_{}.zip", version));
     let client = reqwest::Client::builder().user_agent("sillyTavern-launcher").build().map_err(|e| e.to_string())?;
-    let response = client.get(&url).send().await.map_err(|e| { match lang { Lang::ZhCn => tracing::error!("请求下载失败: {}", e), Lang::EnUs => tracing::error!("Download failed: {}", e) } e.to_string() })?;
+    
+    let proxy = crate::utils::GithubProxy::new(&app).await;
+    let (fastest_url, response) = proxy.get_fastest_stream(client, &url).await.map_err(|e| {
+        match lang {
+            Lang::ZhCn => tracing::error!("请求下载失败: {}", e),
+            Lang::EnUs => tracing::error!("Download failed: {}", e),
+        }
+        e
+    })?;
+
+    match lang {
+        Lang::ZhCn => tracing::info!("使用下载节点: {}", fastest_url),
+        Lang::EnUs => tracing::info!("Using download mirror: {}", fastest_url),
+    }
+
     let total_size = response.content_length().unwrap_or(0);
 
     let mut file = tokio::fs::File::create(&temp_zip).await.map_err(|e| e.to_string())?;
@@ -344,12 +383,19 @@ pub async fn install_sillytavern_version(
         use tokio::io::AsyncWriteExt;
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
-        if last_emit.elapsed() > std::time::Duration::from_millis(200) || downloaded == total_size {
+        if last_emit.elapsed() > std::time::Duration::from_millis(150) || downloaded == total_size {
             let progress = if total_size > 0 { downloaded as f64 / total_size as f64 } else { 0.0 };
-            emit("downloading", progress, &match lang { Lang::ZhCn => format!("已下载: {:.2} MB", downloaded as f64 / 1_048_576.0), Lang::EnUs => format!("Downloaded: {:.2} MB", downloaded as f64 / 1_048_576.0) });
+            let mb_downloaded = downloaded as f64 / 1_048_576.0;
+            let mb_total = total_size as f64 / 1_048_576.0;
+            emit("downloading", progress, &match lang { 
+                Lang::ZhCn => if total_size > 0 { format!("已下载: {:.2} MB / {:.2} MB", mb_downloaded, mb_total) } else { format!("已下载: {:.2} MB", mb_downloaded) }, 
+                Lang::EnUs => if total_size > 0 { format!("Downloaded: {:.2} MB / {:.2} MB", mb_downloaded, mb_total) } else { format!("Downloaded: {:.2} MB", mb_downloaded) } 
+            });
             last_emit = std::time::Instant::now();
         }
     }
+
+    drop(file);
 
     emit("extracting", 0.0, match lang { Lang::ZhCn => "下载完成，准备解压...", Lang::EnUs => "Download complete, extracting..." });
 
@@ -398,10 +444,12 @@ pub async fn install_sillytavern_version(
 
     let app2 = app.clone();
     let st_dir2 = st_dir.clone();
+    let version_clone = version.clone();
     tokio::spawn(async move {
         if let Err(e) = run_npm_install(&app2, &st_dir2).await {
             let _ = app2.emit("install-progress", DownloadProgress { status: "error".to_string(), progress: 0.0, log: match lang { Lang::ZhCn => format!("安装依赖失败: {}", e), Lang::EnUs => format!("Failed to install dependencies: {}", e) } });
         } else {
+            let _ = generate_default_settings_for_version(&app2, &version_clone);
             let _ = app2.emit("install-progress", DownloadProgress { status: "done".to_string(), progress: 1.0, log: match lang { Lang::ZhCn => "安装完成！".to_string(), Lang::EnUs => "Installation complete!".to_string() } });
         }
     });
@@ -412,16 +460,48 @@ pub async fn install_sillytavern_version(
 // ─── 单独安装依赖 ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
+pub async fn check_local_tavern_dependencies(_app: AppHandle, path: String) -> Result<bool, String> {
+    let st_dir = PathBuf::from(&path);
+    let nm = st_dir.join("node_modules");
+    let has_nm = nm.exists() && std::fs::read_dir(&nm).map(|mut d| d.next().is_some()).unwrap_or(false);
+    Ok(has_nm)
+}
+
+#[tauri::command]
 pub async fn install_sillytavern_dependencies(app: AppHandle, version: String) -> Result<(), String> {
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let st_dir = data_dir.join("sillytavern").join(&version);
-    if !st_dir.exists() { return Err(format!("Version {} not found", version)); }
+    
+    // Support installing dependencies for local path
+    let st_dir = if version.contains('/') || version.contains('\\') || version.contains(':') {
+        PathBuf::from(&version)
+    } else {
+        data_dir.join("sillytavern").join(&version)
+    };
+    
+    if !st_dir.exists() { return Err(format!("Version/Path {} not found", version)); }
     let lang = get_current_lang(&app);
     let app2 = app.clone();
+    let version_clone = version.clone();
     tokio::spawn(async move {
         if let Err(e) = run_npm_install(&app2, &st_dir).await {
             let _ = app2.emit("install-progress", DownloadProgress { status: "error".to_string(), progress: 0.0, log: match lang { Lang::ZhCn => format!("安装依赖失败: {}", e), Lang::EnUs => format!("Failed to install dependencies: {}", e) } });
         } else {
+            // Get actual version from package.json if it is a local path
+            let actual_version = if version_clone.contains('/') || version_clone.contains('\\') || version_clone.contains(':') {
+                if let Ok(content) = std::fs::read_to_string(st_dir.join("package.json")) {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
+                        v.get("version").and_then(|v| v.as_str()).unwrap_or("unknown").to_string()
+                    } else {
+                        "unknown".to_string()
+                    }
+                } else {
+                    "unknown".to_string()
+                }
+            } else {
+                version_clone.clone()
+            };
+
+            let _ = generate_default_settings_for_version(&app2, &actual_version);
             let _ = app2.emit("install-progress", DownloadProgress { status: "done".to_string(), progress: 1.0, log: match lang { Lang::ZhCn => "依赖安装完成！".to_string(), Lang::EnUs => "Dependency installation complete!".to_string() } });
         }
     });
@@ -458,43 +538,81 @@ pub async fn delete_sillytavern_version(app: AppHandle, version: String) -> Resu
     let vc = version.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        let _ = app2.emit("install-progress", DownloadProgress { status: "deleting".to_string(), progress: 0.1, log: match lang { Lang::ZhCn => format!("开始删除版本 {}...", vc), Lang::EnUs => format!("Deleting version {}...", vc) } });
+        let meta = fs::symlink_metadata(&vdir).ok();
+        let mut is_link = false;
+        if let Some(m) = meta {
+            if m.file_type().is_symlink() {
+                is_link = true;
+            } else {
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::fs::MetadataExt;
+                    let attrs = m.file_attributes();
+                    if attrs & 0x400 != 0 {
+                        is_link = true;
+                    }
+                }
+            }
+        }
+
+        let _ = app2.emit("install-progress", DownloadProgress { 
+            status: "deleting".to_string(), 
+            progress: 0.1, 
+            log: match lang { 
+                Lang::ZhCn => if is_link { format!("开始解绑版本 {}...", vc) } else { format!("开始删除版本 {}...", vc) }, 
+                Lang::EnUs => if is_link { format!("Unbinding version {}...", vc) } else { format!("Deleting version {}...", vc) } 
+            } 
+        });
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        let mut samples = Vec::new();
-        if let Ok(entries) = fs::read_dir(&vdir) {
-            for e in entries.flatten() { if let Ok(n) = e.file_name().into_string() { samples.push(n); } }
-        }
-        let total = samples.len();
-        for (i, name) in samples.iter().enumerate() {
-            std::thread::sleep(std::time::Duration::from_millis(15));
-            let _ = app2.emit("install-progress", DownloadProgress { status: "deleting".to_string(), progress: 0.3 + 0.5 * (i as f64 / total as f64), log: match lang { Lang::ZhCn => format!("已删除：{}/{}", vc, name), Lang::EnUs => format!("Deleted: {}/{}", vc, name) } });
-        }
+        if is_link {
+            #[cfg(target_os = "windows")]
+            let _ = fs::remove_dir(&vdir).or_else(|_| fs::remove_file(&vdir));
+            #[cfg(not(target_os = "windows"))]
+            let _ = fs::remove_file(&vdir);
+        } else {
+            let mut samples = Vec::new();
+            if let Ok(entries) = fs::read_dir(&vdir) {
+                for e in entries.flatten() { if let Ok(n) = e.file_name().into_string() { samples.push(n); } }
+            }
+            let total = samples.len();
+            for (i, name) in samples.iter().enumerate() {
+                std::thread::sleep(std::time::Duration::from_millis(15));
+                let _ = app2.emit("install-progress", DownloadProgress { status: "deleting".to_string(), progress: 0.3 + 0.5 * (i as f64 / total as f64), log: match lang { Lang::ZhCn => format!("已删除：{}/{}", vc, name), Lang::EnUs => format!("Deleted: {}/{}", vc, name) } });
+            }
 
-        fn fast_remove(dir: &Path) -> io::Result<()> {
-            if dir.is_dir() {
-                if let Ok(entries) = fs::read_dir(dir) {
-                    for e in entries.flatten() {
-                        let p = e.path();
-                        if let Ok(ft) = e.file_type() {
-                            if ft.is_dir() { let _ = fast_remove(&p); }
-                            else if fs::remove_file(&p).is_err() {
-                                #[cfg(target_os = "windows")] {
-                                    if let Ok(mut perms) = fs::metadata(&p).map(|m| m.permissions()) {
-                                        if perms.readonly() { perms.set_readonly(false); let _ = fs::set_permissions(&p, perms); let _ = fs::remove_file(&p); }
+            fn fast_remove(dir: &Path) -> io::Result<()> {
+                if dir.is_dir() {
+                    if let Ok(entries) = fs::read_dir(dir) {
+                        for e in entries.flatten() {
+                            let p = e.path();
+                            if let Ok(_ft) = e.file_type() {
+                                if p.is_dir() { let _ = fast_remove(&p); }
+                                else if fs::remove_file(&p).is_err() {
+                                    #[cfg(target_os = "windows")] {
+                                        if let Ok(mut perms) = fs::metadata(&p).map(|m| m.permissions()) {
+                                            if perms.readonly() { perms.set_readonly(false); let _ = fs::set_permissions(&p, perms); let _ = fs::remove_file(&p); }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    let _ = fs::remove_dir(dir);
                 }
-                let _ = fs::remove_dir(dir);
+                Ok(())
             }
-            Ok(())
+            let _ = fast_remove(&vdir);
+            if vdir.exists() { fs::remove_dir_all(&vdir)?; }
         }
-        let _ = fast_remove(&vdir);
-        if vdir.exists() { fs::remove_dir_all(&vdir)?; }
-        let _ = app2.emit("install-progress", DownloadProgress { status: "deleting".to_string(), progress: 1.0, log: match lang { Lang::ZhCn => format!("版本 {} 已全部删除", vc), Lang::EnUs => format!("Version {} deleted", vc) } });
+        let _ = app2.emit("install-progress", DownloadProgress { 
+            status: "deleting".to_string(), 
+            progress: 1.0, 
+            log: match lang { 
+                Lang::ZhCn => if is_link { format!("版本 {} 解绑成功", vc) } else { format!("版本 {} 已全部删除", vc) }, 
+                Lang::EnUs => if is_link { format!("Version {} unbound", vc) } else { format!("Version {} deleted", vc) } 
+            } 
+        });
         Ok::<(), io::Error>(())
     }).await;
 
@@ -529,55 +647,160 @@ pub async fn check_sillytavern_empty(app: AppHandle) -> Result<bool, String> {
     Ok(!has_valid)
 }
 
+// ─── 链接已有版本 ──────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn link_existing_sillytavern(app: AppHandle, package_json_path: String) -> Result<String, String> {
+    let lang = get_current_lang(&app);
+    let pkg_path = PathBuf::from(&package_json_path);
+    if !pkg_path.exists() {
+        return Err(match lang {
+            Lang::ZhCn => "文件不存在".to_string(),
+            Lang::EnUs => "File does not exist".to_string(),
+        });
+    }
+
+    let target_dir = pkg_path.parent().ok_or_else(|| match lang {
+        Lang::ZhCn => "无法获取父目录".to_string(),
+        Lang::EnUs => "Cannot get parent directory".to_string(),
+    })?.to_path_buf();
+
+    let content = fs::read_to_string(&pkg_path).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    let version = v.get("version")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| match lang {
+            Lang::ZhCn => "在 package.json 中未找到 version 字段".to_string(),
+            Lang::EnUs => "Version field not found in package.json".to_string(),
+        })?
+        .to_string();
+
+    if version.trim().is_empty() || version.contains("..") || version.contains('/') || version.contains('\\') {
+        return Err(match lang {
+            Lang::ZhCn => "无效的版本号".to_string(),
+            Lang::EnUs => "Invalid version number".to_string(),
+        });
+    }
+
+    let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let st_dir = data_dir.join("sillytavern");
+    if !st_dir.exists() {
+        fs::create_dir_all(&st_dir).map_err(|e| e.to_string())?;
+    }
+
+    let link_path = st_dir.join(&version);
+    if link_path.exists() {
+        let meta = fs::symlink_metadata(&link_path).ok();
+        let mut is_link = false;
+        if let Some(m) = meta {
+            if m.file_type().is_symlink() {
+                is_link = true;
+            } else {
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::fs::MetadataExt;
+                    let attrs = m.file_attributes();
+                    if attrs & 0x400 != 0 {
+                        is_link = true;
+                    }
+                }
+            }
+        }
+        
+        if is_link {
+            #[cfg(target_os = "windows")]
+            let _ = fs::remove_dir(&link_path).or_else(|_| fs::remove_file(&link_path));
+            #[cfg(not(target_os = "windows"))]
+            let _ = fs::remove_file(&link_path);
+        } else {
+            return Err(match lang {
+                Lang::ZhCn => "该版本已存在且不是链接目录，请先手动删除".to_string(),
+                Lang::EnUs => "Version already exists and is not a link, please delete it first".to_string(),
+            });
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let status = std::process::Command::new("cmd")
+            .args(&["/C", "mklink", "/J", link_path.to_str().unwrap(), target_dir.to_str().unwrap()])
+            .creation_flags(0x08000000)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(match lang {
+                Lang::ZhCn => "创建目录链接失败".to_string(),
+                Lang::EnUs => "Failed to create directory junction".to_string(),
+            });
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::os::unix::fs::symlink(&target_dir, &link_path).map_err(|e| match lang {
+            Lang::ZhCn => format!("创建软链接失败: {}", e),
+            Lang::EnUs => format!("Failed to create symlink: {}", e),
+        })?;
+    }
+
+    Ok(version)
+}
+
 // ─── ST 当前版本 ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn get_tavern_version(app: AppHandle) -> Result<String, String> {
+pub async fn get_tavern_version(app: AppHandle) -> Result<crate::types::LocalTavernItem, String> {
     let _lang = get_current_lang(&app);
     let app2 = app.clone();
     tokio::task::spawn_blocking(move || {
         let config = read_app_config_from_disk(&app2);
-        let ver = config.sillytavern.version;
-        if ver.is_empty() { return Err("未设置".to_string()); }
-        let data_dir = get_config_path(&app2).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-        let ver_dir = data_dir.join("sillytavern").join(&ver);
+        let ver_item = config.sillytavern.version;
+        if ver_item.version.is_empty() { return Err("未设置".to_string()); }
+        let ver_dir = if ver_item.path.is_empty() {
+            let data_dir = get_config_path(&app2).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+            data_dir.join("sillytavern").join(&ver_item.version)
+        } else {
+            PathBuf::from(&ver_item.path)
+        };
         if !ver_dir.exists() { return Err("未安装".to_string()); }
         let pkg = ver_dir.join("package.json");
         if pkg.exists() {
             if let Ok(content) = fs::read_to_string(&pkg) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
                     if let Some(v) = parsed.get("version").and_then(|v| v.as_str()) {
-                        return Ok(v.to_string());
+                        let mut item = ver_item.clone();
+                        item.version = v.to_string();
+                        return Ok(item);
                     }
                 }
             }
         }
-        Ok(ver)
+        Ok(ver_item)
     }).await.map_err(|e| e.to_string())?
 }
 
 // ─── ST 配置文件路径 ────────────────────────────────────────────────────────────
 
-fn get_st_config_path(app: &AppHandle, version: &str, _use_global: bool) -> Result<PathBuf, String> {
-    if version.trim().is_empty() { return Err("版本号不能为空".to_string()); }
-    
+fn get_st_config_path(app: &AppHandle, _version: &str) -> Result<PathBuf, String> {
     let data_dir = get_config_path(app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
     let st_data = data_dir.join("st_data");
-    
-    // 1. 自动创建全局数据目录
-    if !st_data.exists() { 
+
+    // 自动创建全局数据目录
+    if !st_data.exists() {
         std::fs::create_dir_all(&st_data)
-            .map_err(|e| format!("无法创建全局数据目录：{}", e))?; 
+            .map_err(|e| format!("无法创建全局数据目录：{}", e))?;
     }
-    
+
     let global = st_data.join("config.yaml");
-    
-    // 2. 【新增】如果全局配置不存在，直接使用模板创建
+
+    // 如果全局配置不存在，直接使用模板创建
     if !global.exists() {
         std::fs::write(&global, DEFAULT_CONFIG_TEMPLATE)
             .map_err(|e| format!("无法创建默认配置文件：{}", e))?;
     }
-    
+
     Ok(global)
 }
 
@@ -610,8 +833,7 @@ pub async fn read_sillytavern_config(app: AppHandle, version: String) -> Result<
     let lang = get_current_lang(&app);
     let app2 = app.clone();
     tokio::task::spawn_blocking(move || {
-        let cfg = read_app_config_from_disk(&app2);
-        let path = get_st_config_path(&app2, &version, cfg.sillytavern.use_global_config)?;
+        let path = get_st_config_path(&app2, &version)?;
         fs::read_to_string(&path).map_err(|e| match lang { Lang::ZhCn => format!("读取失败: {}", e), Lang::EnUs => format!("Read failed: {}", e) })
     }).await.map_err(|e| e.to_string())?
 }
@@ -621,16 +843,14 @@ pub async fn write_sillytavern_config(app: AppHandle, version: String, content: 
     let lang = get_current_lang(&app);
     let app2 = app.clone();
     tokio::task::spawn_blocking(move || {
-        let cfg = read_app_config_from_disk(&app2);
-        let path = get_st_config_path(&app2, &version, cfg.sillytavern.use_global_config)?;
+        let path = get_st_config_path(&app2, &version)?;
         fs::write(&path, content).map_err(|e| match lang { Lang::ZhCn => format!("写入失败: {}", e), Lang::EnUs => format!("Write failed: {}", e) })
     }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub fn get_sillytavern_config_path(app: AppHandle, version: String) -> Result<String, String> {
-    let cfg = read_app_config_from_disk(&app);
-    let path = get_st_config_path(&app, &version, cfg.sillytavern.use_global_config)?;
+    let path = get_st_config_path(&app, &version)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -841,8 +1061,7 @@ pub async fn get_sillytavern_config_options(app: AppHandle, version: String) -> 
     let lang = get_current_lang(&app);
     let app2 = app.clone();
     tokio::task::spawn_blocking(move || {
-        let cfg = read_app_config_from_disk(&app2);
-        let path = get_st_config_path(&app2, &version, cfg.sillytavern.use_global_config)?;
+        let path = get_st_config_path(&app2, &version)?;
         let content = fs::read_to_string(&path).map_err(|e| match lang { Lang::ZhCn => format!("读取失败: {}", e), Lang::EnUs => format!("Read failed: {}", e) })?;
         parse_tavern_config_payload(&content)
     }).await.map_err(|e| e.to_string())?
@@ -853,8 +1072,7 @@ pub async fn update_sillytavern_config_options(app: AppHandle, version: String, 
     let lang = get_current_lang(&app);
     let app2 = app.clone();
     tokio::task::spawn_blocking(move || {
-        let cfg = read_app_config_from_disk(&app2);
-        let path = get_st_config_path(&app2, &version, cfg.sillytavern.use_global_config)?;
+        let path = get_st_config_path(&app2, &version)?;
         let content = fs::read_to_string(&path).map_err(|e| match lang { Lang::ZhCn => format!("读取失败: {}", e), Lang::EnUs => format!("Read failed: {}", e) })?;
         let mut root: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|e| match lang { Lang::ZhCn => format!("解析配置失败: {}", e), Lang::EnUs => format!("Parse failed: {}", e) })?;
         let m = root.as_mapping_mut().ok_or("配置文件格式无效，根节点必须是对象".to_string())?;
@@ -884,8 +1102,7 @@ pub async fn update_sillytavern_config_options(app: AppHandle, version: String, 
 
 #[tauri::command]
 pub fn open_sillytavern_config_file(app: AppHandle, version: String) -> Result<(), String> {
-    let cfg = read_app_config_from_disk(&app);
-    let path = get_st_config_path(&app, &version, cfg.sillytavern.use_global_config)?;
+    let path = get_st_config_path(&app, &version)?;
     #[cfg(target_os = "windows")] { let mut cmd = std::process::Command::new("explorer"); cmd.arg(path); use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); cmd.spawn().map_err(|e| format!("打开失败: {}", e))?; }
     #[cfg(target_os = "macos")] { std::process::Command::new("open").arg(path).spawn().map_err(|e| format!("打开失败: {}", e))?; }
     #[cfg(target_os = "linux")] { std::process::Command::new("xdg-open").arg(path).spawn().map_err(|e| format!("打开失败: {}", e))?; }
@@ -998,6 +1215,56 @@ pub fn open_sillytavern_global_config_file(app: AppHandle) -> Result<(), String>
 
 // ─── 启动 / 停止 / 状态 ────────────────────────────────────────────────────────
 
+pub fn generate_default_settings_for_version(app: &AppHandle, version: &str) -> Result<(), String> {
+    let lang = get_current_lang(app);
+
+    let data_dir = get_config_path(app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
+    let st_data = data_dir.join("st_data");
+    
+    if !st_data.exists() { 
+        std::fs::create_dir_all(&st_data).map_err(|e| match lang {
+            Lang::ZhCn => format!("无法创建全局数据目录：{}", e),
+            Lang::EnUs => format!("Failed to create global data directory: {}", e)
+        })?; 
+    }
+
+    // 初始化 default-user/settings.json
+    let default_user_dir = st_data.join("default-user");
+    if !default_user_dir.exists() {
+        std::fs::create_dir_all(&default_user_dir).map_err(|e| match lang {
+            Lang::ZhCn => format!("无法创建 default-user 目录：{}", e),
+            Lang::EnUs => format!("Failed to create default-user directory: {}", e)
+        })?;
+    }
+    let default_settings_path = default_user_dir.join("settings.json");
+    if !default_settings_path.exists() {
+        if let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(crate::types::DEFAULT_SETTINGS_JSON) {
+            if let Some(obj) = settings.as_object_mut() {
+                obj.insert("currentVersion".to_string(), serde_json::json!(version));
+            }
+            let mut buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+            let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+            let content_to_write = if serde::Serialize::serialize(&settings, &mut ser).is_ok() {
+                String::from_utf8(buf).unwrap_or_else(|_| crate::types::DEFAULT_SETTINGS_JSON.to_string())
+            } else {
+                crate::types::DEFAULT_SETTINGS_JSON.to_string()
+            };
+            std::fs::write(&default_settings_path, content_to_write).map_err(|e| match lang {
+                Lang::ZhCn => format!("无法写入 settings.json：{}", e),
+                Lang::EnUs => format!("Failed to write settings.json: {}", e)
+            })?;
+        } else {
+            std::fs::write(&default_settings_path, crate::types::DEFAULT_SETTINGS_JSON).map_err(|e| match lang {
+                Lang::ZhCn => format!("无法写入 settings.json：{}", e),
+                Lang::EnUs => format!("Failed to write settings.json: {}", e)
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessState>) -> Result<(), String> {
     let lang = get_current_lang(&app);
@@ -1006,18 +1273,77 @@ pub async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessSt
         return match lang { Lang::ZhCn => Err("进程已经在运行中了".to_string()), Lang::EnUs => Err("Process is already running".to_string()) };
     }
 
+    // 检查端口是否被占用 (默认端口 11451)
+    let port = 11451u16;
+    let ipv4_addr = format!("127.0.0.1:{}", port);
+    let ipv6_addr = format!("[::]:{}", port);
+
+    let port_in_use = match tokio::net::TcpListener::bind(&ipv6_addr).await {
+        Ok(listener) => { drop(listener); false },
+        Err(_) => true
+    } || match tokio::net::TcpListener::bind(&ipv4_addr).await {
+        Ok(listener) => { drop(listener); false },
+        Err(_) => true
+    };
+
+    if port_in_use {
+        // 端口被占用,尝试停止可能残留的进程
+        tracing::warn!("Port {} is in use, trying to cleanup existing process", port);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let mut cmd = std::process::Command::new("powershell");
+            cmd.args(["-Command", &format!("Get-NetTCPConnection -LocalPort {} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}", port)])
+               .creation_flags(0x08000000);
+            let _ = cmd.output();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("sh")
+                .args(["-c", &format!("lsof -ti:{} | xargs kill -9 2>/dev/null || true", port)])
+                .output();
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("sh")
+                .args(["-c", &format!("lsof -ti:{} | xargs kill -9 2>/dev/null || true", port)])
+                .output();
+        }
+
+        // 等待一下让进程终止
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // 再次检查端口
+        let still_in_use = match tokio::net::TcpListener::bind(&ipv6_addr).await {
+            Ok(listener) => { drop(listener); false },
+            Err(_) => true
+        } || match tokio::net::TcpListener::bind(&ipv4_addr).await {
+            Ok(listener) => { drop(listener); false },
+            Err(_) => true
+        };
+
+        if still_in_use {
+            return match lang { Lang::ZhCn => Err(format!("端口 {} 仍被占用,请手动检查并关闭占用进程", port)), Lang::EnUs => Err(format!("Port {} is still in use. Please check and close the process manually.", port)) };
+        }
+    }
+
     let config = read_app_config_from_disk(&app);
-    let version = config.sillytavern.version;
-    if version.is_empty() {
+    let version_item = config.sillytavern.version;
+    if version_item.version.is_empty() {
         return match lang { Lang::ZhCn => Err("未选择酒馆版本，请先在版本页面选择或安装".to_string()), Lang::EnUs => Err("No version selected".to_string()) };
     }
 
     let data_dir = get_config_path(&app).parent().unwrap_or(&PathBuf::from(".")).to_path_buf();
-    let st_dir = data_dir.join("sillytavern").join(&version);
+    let st_dir = if version_item.path.is_empty() {
+        data_dir.join("sillytavern").join(&version_item.version)
+    } else {
+        PathBuf::from(&version_item.path)
+    };
     let st_data = data_dir.join("st_data");
     
     if !st_data.exists() { std::fs::create_dir_all(&st_data).map_err(|e| format!("无法创建全局数据目录：{}", e))?; }
-    if !st_dir.exists() { return match lang { Lang::ZhCn => Err(format!("版本 {} 的目录不存在", version)), Lang::EnUs => Err(format!("Directory for version {} not found", version)) }; }
+    
+    if !st_dir.exists() { return match lang { Lang::ZhCn => Err(format!("版本 {} 的目录不存在", version_item.version)), Lang::EnUs => Err(format!("Directory for version {} not found", version_item.version)) }; }
     
     let mut node_path = if cfg!(target_os = "windows") { data_dir.join("node").join("node.exe") } else { data_dir.join("node").join("bin/node") };
     if !node_path.exists() { node_path = PathBuf::from("node"); }
@@ -1026,26 +1352,271 @@ pub async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessSt
     if !server_js.exists() { return match lang { Lang::ZhCn => Err("找不到 server.js，酒馆文件可能损坏".to_string()), Lang::EnUs => Err("server.js not found".to_string()) }; }
     
     let global_cfg = st_data.join("config.yaml");
+    // 使用 display() 而不是 canonicalize() 来避免 \\?\ 前缀
+    let global_cfg_str = global_cfg.to_string_lossy().to_string();
     let st_data_str = st_data.to_string_lossy().to_string();
-    
+
+    // 调试日志: 打印配置路径和数据路径
+    tracing::info!("SillyTavern dataRoot: {}", st_data_str);
+    tracing::info!("SillyTavern configPath: {}", global_cfg_str);
+    tracing::info!("SillyTavern global_cfg exists: {}", global_cfg.exists());
+
     let mut std_cmd = std::process::Command::new(&node_path);
+
+    // 如果启用了 GitHub 加速，注入拦截脚本
+    if config.github_proxy.enable && !config.github_proxy.url.is_empty() {
+        let proxy_url = config.github_proxy.url.trim_end_matches('/');
+        // 创建临时的拦截脚本文件
+        let interceptor_script = format!(r#"
+// GitHub URL 拦截器 - 自动重写 GitHub 链接到镜像
+import https from 'https';
+import http from 'http';
+const originalHttpsRequest = https.request;
+const originalHttpsGet = https.get;
+const originalHttpRequest = http.request;
+const originalHttpGet = http.get;
+
+const PROXY_URL = '{}';
+
+function rewriteGitHubUrl(url) {{
+    if (!url || typeof url !== 'string') return url;
+
+    // 不重写 API 请求
+    if (url.includes('api.github.com')) return url;
+
+    // 只重写 GitHub 相关的 URL
+    if (url.includes('github.com') || url.includes('raw.githubusercontent.com')) {{
+        return PROXY_URL + '/' + url;
+    }}
+
+    return url;
+}}
+
+// 拦截 https.request
+https.request = function(url, options, callback) {{
+    let req;
+    if (typeof url === 'string') {{
+        const rewrittenUrl = rewriteGitHubUrl(url);
+        req = originalHttpsRequest.call(https, rewrittenUrl, options, callback);
+    }} else if (url && typeof url === 'object') {{
+        if (url.href) {{
+            const newUrl = Object.assign({{}}, url);
+            newUrl.href = rewriteGitHubUrl(url.href);
+            // 同步修改 host/hostname 等其他可能被使用的字段
+            if (newUrl.href !== url.href) {{
+                try {{
+                    const parsed = new URL(newUrl.href);
+                    newUrl.host = parsed.host;
+                    newUrl.hostname = parsed.hostname;
+                    newUrl.pathname = parsed.pathname;
+                    newUrl.protocol = parsed.protocol;
+                    newUrl.port = parsed.port;
+                }} catch (e) {{}}
+            }}
+            req = originalHttpsRequest.call(https, newUrl, options, callback);
+        }} else {{
+            req = originalHttpsRequest.call(https, url, options, callback);
+        }}
+    }} else {{
+        req = originalHttpsRequest.call(https, url, options, callback);
+    }}
+
+    // 拦截 request 的 write 方法，确保 URL 也被重写
+    const originalWrite = req.write;
+    req.write = function(chunk, encoding, callback) {{
+        if (chunk && typeof chunk === 'string') {{
+            try {{
+                const data = JSON.parse(chunk);
+                if (data.url && typeof data.url === 'string') {{
+                    const rewrittenUrl = rewriteGitHubUrl(data.url);
+                    if (rewrittenUrl !== data.url) {{
+                        data.url = rewrittenUrl;
+                        chunk = JSON.stringify(data);
+                    }}
+                }}
+            }} catch (e) {{
+                // 忽略解析错误
+            }}
+        }}
+        return originalWrite.call(req, chunk, encoding, callback);
+    }};
+
+    return req;
+}};
+
+// 拦截 https.get
+https.get = function(url, options, callback) {{
+    if (typeof url === 'string') {{
+        const rewrittenUrl = rewriteGitHubUrl(url);
+        return originalHttpsGet.call(https, rewrittenUrl, options, callback);
+    }} else if (url && typeof url === 'object') {{
+        if (url.href) {{
+            const newUrl = Object.assign({{}}, url);
+            newUrl.href = rewriteGitHubUrl(url.href);
+            if (newUrl.href !== url.href) {{
+                try {{
+                    const parsed = new URL(newUrl.href);
+                    newUrl.host = parsed.host;
+                    newUrl.hostname = parsed.hostname;
+                    newUrl.pathname = parsed.pathname;
+                    newUrl.protocol = parsed.protocol;
+                    newUrl.port = parsed.port;
+                }} catch (e) {{}}
+            }}
+            return originalHttpsGet.call(https, newUrl, options, callback);
+        }}
+        return originalHttpsGet.call(https, url, options, callback);
+    }}
+    return originalHttpsGet.call(https, url, options, callback);
+}};
+
+// 拦截 http.request（部分 GitHub 资源可能使用 HTTP）
+http.request = function(url, options, callback) {{
+    if (typeof url === 'string') {{
+        const rewrittenUrl = rewriteGitHubUrl(url);
+        return originalHttpRequest.call(http, rewrittenUrl, options, callback);
+    }} else if (url && typeof url === 'object') {{
+        if (url.href) {{
+            const newUrl = Object.assign({{}}, url);
+            newUrl.href = rewriteGitHubUrl(url.href);
+            if (newUrl.href !== url.href) {{
+                try {{
+                    const parsed = new URL(newUrl.href);
+                    newUrl.host = parsed.host;
+                    newUrl.hostname = parsed.hostname;
+                    newUrl.pathname = parsed.pathname;
+                    newUrl.protocol = parsed.protocol;
+                    newUrl.port = parsed.port;
+                }} catch (e) {{}}
+            }}
+            return originalHttpRequest.call(http, newUrl, options, callback);
+        }}
+        return originalHttpRequest.call(http, url, options, callback);
+    }}
+    return originalHttpRequest.call(http, url, options, callback);
+}};
+
+// 拦截 http.get
+http.get = function(url, options, callback) {{
+    if (typeof url === 'string') {{
+        const rewrittenUrl = rewriteGitHubUrl(url);
+        return originalHttpGet.call(http, rewrittenUrl, options, callback);
+    }} else if (url && typeof url === 'object') {{
+        if (url.href) {{
+            const newUrl = Object.assign({{}}, url);
+            newUrl.href = rewriteGitHubUrl(url.href);
+            if (newUrl.href !== url.href) {{
+                try {{
+                    const parsed = new URL(newUrl.href);
+                    newUrl.host = parsed.host;
+                    newUrl.hostname = parsed.hostname;
+                    newUrl.pathname = parsed.pathname;
+                    newUrl.protocol = parsed.protocol;
+                    newUrl.port = parsed.port;
+                }} catch (e) {{}}
+            }}
+            return originalHttpGet.call(http, newUrl, options, callback);
+        }}
+        return originalHttpGet.call(http, url, options, callback);
+    }}
+    return originalHttpGet.call(http, url, options, callback);
+}};
+
+console.log('[GitHub Proxy] URL interceptor loaded, proxy:', PROXY_URL);
+"#, proxy_url);
+
+        let interceptor_path = data_dir.join("github-proxy-interceptor.js");
+        std::fs::write(&interceptor_path, interceptor_script)
+            .map_err(|e| format!("Failed to create interceptor script: {}", e))?;
+
+        // Windows 路径需要转换为 file:// URL 格式
+        let interceptor_path_str = interceptor_path.to_string_lossy().to_string();
+        #[cfg(target_os = "windows")]
+        let interceptor_url = format!("file:///{}", interceptor_path_str.replace('\\', "/"));
+        #[cfg(not(target_os = "windows"))]
+        let interceptor_url = format!("file://{}", interceptor_path_str);
+
+        // 使用 --import 参数在启动时加载拦截脚本 (ESM 模式)
+        std_cmd.arg("--import").arg(&interceptor_url);
+    }
+
     std_cmd.arg(&server_js);
     std_cmd.arg("--dataRoot").arg(&st_data_str);
-        
-    if config.sillytavern.use_global_config && global_cfg.exists() {
-        std_cmd.arg("--configPath").arg(global_cfg.to_string_lossy().as_ref());
+    
+    // 强制指定 configPath
+    std_cmd.arg("--configPath").arg(&global_cfg_str);
+    tracing::info!("SillyTavern will use config path: {}", global_cfg_str);
+
+    let path_env = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = std::env::split_paths(&path_env).collect::<Vec<_>>();
+    
+    let node_bin_dir = data_dir.join("node");
+    if node_bin_dir.exists() {
+        paths.insert(0, node_bin_dir.join("bin"));
+        paths.insert(0, node_bin_dir);
     }
+
+    // 检查系统是否有 Git，如果没有才添加 MinGit 到 PATH
+    let system_git_exists = std::process::Command::new("git")
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok();
+
+    if !system_git_exists {
+        let git_dir = data_dir.join("git");
+        let git_bin_dir = if cfg!(target_os = "windows") { git_dir.join("cmd") } else { git_dir.join("bin") };
+        if git_bin_dir.exists() {
+            paths.insert(0, git_bin_dir);
+        }
+    }
+
+    let new_path_env = std::env::join_paths(paths).unwrap_or(path_env);
 
     std_cmd.current_dir(&st_dir)
         .env("SILLYTAVERN_DATA_DIR", &st_data_str)
-        .stdin(std::process::Stdio::null())
+        .env("PATH", new_path_env);
+
+    // 如果启用了 GitHub 加速，同时也为子进程中的 Git 配置 URL 重写环境变量
+    if config.github_proxy.enable && !config.github_proxy.url.is_empty() {
+        let proxy_url = config.github_proxy.url.trim_end_matches('/');
+        // 设置 Git 的 URL 重写规则，将 https://github.com/ 替换为代理地址
+        // 例如：GIT_CONFIG_COUNT=1, GIT_CONFIG_KEY_0=url.https://ghfast.top/https://github.com/.insteadOf, GIT_CONFIG_VALUE_0=https://github.com/
+        std_cmd.env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", format!("url.{}/https://github.com/.insteadOf", proxy_url))
+            .env("GIT_CONFIG_VALUE_0", "https://github.com/");
+    }
+
+    std_cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
     #[cfg(target_os = "windows")] { use std::os::windows::process::CommandExt; std_cmd.creation_flags(0x08000000); }
 
+    // 打印完整的启动命令
+    if let Some(program) = std_cmd.get_program().to_str() {
+        let args: Vec<String> = std_cmd.get_args()
+            .filter_map(|a| a.to_str())
+            .map(|s| s.to_string())
+            .collect();
+        tracing::info!("SillyTavern start command: {} {}", program, args.join(" "));
+    }
+
     let mut cmd = tokio::process::Command::from(std_cmd);
+    cmd.kill_on_drop(true);
     let mut child = cmd.spawn().map_err(|e| match lang { Lang::ZhCn => format!("启动进程失败: {}", e), Lang::EnUs => format!("Failed to start: {}", e) })?;
+
+    *state.child_pid.lock().await = child.id();
+
+    if let Some(pid) = child.id() {
+        let msg = match lang {
+            Lang::ZhCn => format!("INFO: 启动成功! 进程PID: {}", pid),
+            Lang::EnUs => format!("INFO: Started successfully! Process PID: {}", pid),
+        };
+        let _ = app.emit("process-log", msg);
+    }
 
     let stdout = child.stdout.take().ok_or("无法获取标准输出")?;
     let stderr = child.stderr.take().ok_or("无法获取标准错误")?;
@@ -1073,12 +1644,14 @@ pub async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessSt
 
     let app3 = app.clone();
     let kill_tx_arc = state.inner().kill_tx.clone();
+    let child_pid_arc = state.inner().child_pid.clone();
     tokio::spawn(async move {
         tokio::select! {
             _ = child.wait() => { let _ = app3.emit("process-log", "INFO: 进程已退出".to_string()); }
             _ = kill_rx.recv() => { let _ = child.kill().await; let _ = app3.emit("process-log", "INFO: 进程已被终止".to_string()); }
         }
         *kill_tx_arc.lock().await = None;
+        *child_pid_arc.lock().await = None;
         let _ = app3.emit("process-exit", ());
     });
 
@@ -1087,9 +1660,37 @@ pub async fn start_sillytavern(app: AppHandle, state: tauri::State<'_, ProcessSt
 
 #[tauri::command]
 pub async fn stop_sillytavern(state: tauri::State<'_, ProcessState>) -> Result<(), String> {
-    tracing::info!("尝试停止酒馆...");
     let mut guard = state.kill_tx.lock().await;
-    if let Some(tx) = guard.take() { let _ = tx.send(()).await; }
+    let mut pid_guard = state.child_pid.lock().await;
+
+    if guard.is_none() && pid_guard.is_none() {
+        return Ok(());
+    }
+
+    tracing::info!("尝试停止酒馆...");
+    if let Some(tx) = guard.take() { 
+        let _ = tx.send(()).await; 
+    }
+    
+    // 直接清理进程树（尤其是退出软件时可能因为异步不执行完毕）
+    if let Some(pid) = pid_guard.take() {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let mut cmd = std::process::Command::new("taskkill");
+            cmd.args(["/F", "/PID", &pid.to_string(), "/T"])
+               .creation_flags(0x08000000);
+            let _ = cmd.output();
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = std::process::Command::new("kill")
+                .arg("-9")
+                .arg(pid.to_string())
+                .output();
+        }
+    }
+
     Ok(())
 }
 

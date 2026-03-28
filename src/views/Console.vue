@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { 
   TerminalSquare, 
   Play, 
@@ -10,10 +11,12 @@ import {
   XCircle,
   Trash2
 } from 'lucide-vue-next'
-import { consoleStatus as status, consoleLogs as logs, serverUrl, startProcess, stopProcess, clearLogs } from '../lib/consoleState'
+import { consoleStatus as status, consoleLogs as logs, serverUrl, processPid, startProcess, stopProcess, clearLogs } from '../lib/consoleState'
 import { openUrl } from '@tauri-apps/plugin-opener'
-
+import { updateOneClickMessage, startOneClickSetup, finishOneClickSetup, simulateClickEffect } from '../lib/useOneClick'
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const logsContainer = ref<HTMLElement | null>(null)
 
 // 自动滚动到底部
@@ -29,6 +32,32 @@ watch(logs, () => {
 
 onMounted(() => {
   scrollToBottom()
+  
+  if (route.query.action === 'one_click_start') {
+    startOneClickSetup(t('oneClick.starting'));
+    setTimeout(() => {
+      simulateClickEffect('btn-console-start');
+      startProcess()
+    }, 1000);
+  }
+})
+
+watch(status, (newStatus) => {
+  if (route.query.action === 'one_click_start') {
+    if (newStatus === 2) { // 运行中
+      updateOneClickMessage(t('oneClick.started'));
+      setTimeout(() => {
+        finishOneClickSetup();
+        router.replace({ query: {} });
+      }, 3000);
+    } else if (newStatus === 4 || newStatus === 3) { // 错误或停止
+      updateOneClickMessage(t('oneClick.startFailed'));
+      setTimeout(() => {
+        finishOneClickSetup();
+        router.replace({ query: {} });
+      }, 3000);
+    }
+  }
 })
 
 const formatTime = (time: number) => {
@@ -120,7 +149,12 @@ const handleOpenUrl = async (url: string) => {
           </span>
         </div>
         
-        <!-- 访问链接 -->
+        <!-- PID 和 访问链接 -->
+        <div v-if="(status === 1 || status === 2) && processPid" class="flex items-center gap-2 ml-2">
+          <div class="h-4 w-px bg-[#2a2d3d]"></div>
+          <span class="text-xs font-mono text-slate-400">PID: {{ processPid }}</span>
+        </div>
+        
         <div v-if="status === 2 && serverUrl" class="flex items-center gap-2 ml-2">
           <div class="h-4 w-px bg-[#2a2d3d]"></div>
           <button 
@@ -159,6 +193,7 @@ const handleOpenUrl = async (url: string) => {
         
         <!-- 启动按钮 -->
         <button 
+          id="btn-console-start"
           @click="startProcess"
           :disabled="status === 1 || status === 2"
           class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

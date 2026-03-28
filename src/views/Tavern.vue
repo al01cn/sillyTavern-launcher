@@ -286,7 +286,7 @@ const removeBypass = (index: number) => {
 const selectCertFile = async () => {
   try {
     const selected = await open({
-      title: '选择证书文件',
+      title: t('tavern.selectCertFile'),
       multiple: false,
       filters: [{
         name: 'Certificate Files',
@@ -304,7 +304,7 @@ const selectCertFile = async () => {
 const selectKeyFile = async () => {
   try {
     const selected = await open({
-      title: '选择私钥文件',
+      title: t('tavern.selectKeyFile'),
       multiple: false,
       filters: [{
         name: 'Key Files',
@@ -1013,7 +1013,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <label class="input-label">{{ t('tavern.memoryCacheCapacity') }}</label>
                 <input type="number" v-model="memoryCacheCapacityValue" class="form-input"
                   :placeholder="t('tavern.memoryCacheCapacityDesc')" min="0" />
-                <span class="text-[10px] text-slate-400 mt-1">MB (兆字节)</span>
+                <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.mbMegabytes') }}</span>
               </div>
             </div>
           </div>
@@ -1087,7 +1087,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               </div>
         
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">安全选项</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.securityOptions') }}</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label class="checkbox-pill">
                     <input type="checkbox" v-model="tavernConfig.disableCsrfProtection">
@@ -1197,7 +1197,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
   </div>
 </template>
 
-<style scoped>
+<style>
 @reference "../style.css";
 
 .config-card {

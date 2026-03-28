@@ -40,6 +40,9 @@ Desktop.ini
 *.sw?
 *.ntvs*
 *.njsproj
+.codebuddy
+.workbuddy
+.lingma
 
 # =========================
 # Logs

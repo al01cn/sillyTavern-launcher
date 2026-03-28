@@ -3,7 +3,10 @@ import { onMounted } from 'vue';
 import Oheader from './layouts/Oheader.vue';
 import { Toaster } from 'vue-sonner'
 import { invoke } from '@tauri-apps/api/core';
-// import { Dialog } from './lib/useDialog';
+import { confirm } from '@tauri-apps/plugin-dialog';
+
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useI18n } from 'vue-i18n';
 import GlobalDialog from './components/GlobalDialog.vue';
 import InstallDialog from './components/InstallDialog.vue';
 import InstallExtensionDialog from './components/InstallExtensionDialog.vue';
@@ -11,13 +14,43 @@ import CharacterCardDialog from './components/CharacterCardDialog.vue';
 import UploadCharacterCardDialog from './components/UploadCharacterCardDialog.vue';
 import WorldInfoDialog from './components/WorldInfoDialog.vue';
 import UploadWorldInfoDialog from './components/UploadWorldInfoDialog.vue';
-import { initConsoleState, consoleStatus } from './lib/consoleState';
+import OneClickCapsule from './components/OneClickCapsule.vue';
+import { initConsoleState, consoleStatus, stopProcess } from './lib/consoleState';
 import { checkUpdate } from './lib/updater';
+
+const { t } = useI18n();
 onMounted(async () => {
   await initConsoleState();
-  
-  // 检查自动更新
-  checkUpdate().catch(console.error);
+
+  setTimeout(() => {
+    // 检查自动更新
+    checkUpdate().catch(console.error);
+  }, 1500);
+
+  // 拦截关闭窗口事件
+  const appWindow = getCurrentWindow();
+  appWindow.onCloseRequested(async (event) => {
+    if (consoleStatus.value === 1 || consoleStatus.value === 2) {
+      event.preventDefault();
+
+      const yes = await confirm(
+        t('home.tavernIsRunningCloseApp'),
+        {
+          title: t('home.confirmClose'),
+          kind: 'warning',
+          okLabel: t('common.confirm'),
+          cancelLabel: t('common.cancel')
+        }
+      );
+
+      if (yes) {
+        try {
+          await stopProcess();
+        } catch (e) { }
+        await appWindow.destroy();
+      }
+    }
+  });
 
   // 检查是否已经在运行
   try {
@@ -51,6 +84,9 @@ onMounted(async () => {
       <WorldInfoDialog />
       <!-- 世界书导入框 -->
       <UploadWorldInfoDialog />
+
+      <!-- 一键安装悬浮球 -->
+      <OneClickCapsule />
     </template>
     <Toaster />
   </Oheader>

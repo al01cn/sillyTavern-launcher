@@ -1,4 +1,9 @@
 <div align="center">
+<img src="./src/assets/images/banner.png">
+
+---
+
+<img src="./public/logo.png" style="width: 100px; height: 100px;">
 
 # SillyTavern Launcher GUI
 
@@ -9,6 +14,7 @@
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&logo=vue.js)](https://vuejs.org/)
 [![Rust](https://img.shields.io/badge/Rust-latest-CE422B?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/al01cn/sillytavern-launcher)](https://github.com/al01cn/sillytavern-launcher/releases)
 
 [中文文档](#-中文文档) · [English Docs](#-english-documentation)
 
@@ -28,20 +34,20 @@
 
 ### ✨ 功能特性
 
-| 功能模块 | 说明 |
-|----------|------|
-| 🚀 **一键启停** | 一键启动/停止 SillyTavern 服务，实时查看控制台日志 |
-| 📦 **版本管理** | 可视化安装、切换、卸载任意 SillyTavern 版本（稳定版 / 开发版） |
-| 🧩 **扩展管理** | 浏览、启用/禁用、安装（支持 ZIP 离线包）、删除扩展 |
-| ⚙️ **酒馆配置** | 可视化编辑 `config.yaml`（端口、代理、白名单、备份、缩略图等） |
-| 🌐 **Node.js 管理** | 自动检测系统 Node.js / npm，支持一键下载内置私有 Node 环境 |
-| 🎭 **角色卡管理** | 浏览、预览、导入、删除角色卡（PNG 格式） |
-| 📚 **世界书管理** | 浏览、导入、删除世界书（JSON 格式） |
-| 🔄 **自动更新** | 基于 GitHub Releases 的静默自动更新（可关闭提醒） |
-| 🌍 **多语言** | 内置简体中文 / English，可跟随系统自动切换 |
-| 🎨 **主题切换** | 深色 / 浅色主题，支持跟随系统 |
-| 🔧 **GitHub 代理** | 内置多节点代理加速，解决 GitHub 下载慢的问题 |
-| 💾 **窗口记忆** | 可选记住上次窗口位置 |
+| 功能模块            | 说明                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| 🚀 **一键启停**     | 一键启动/停止 SillyTavern 服务，实时查看控制台日志             |
+| 📦 **版本管理**     | 可视化安装、切换、卸载任意 SillyTavern 版本（稳定版 / 开发版） |
+| 🧩 **扩展管理**     | 浏览、启用/禁用、安装（支持 ZIP 离线包）、删除扩展             |
+| ⚙️ **酒馆配置**     | 可视化编辑 `config.yaml`（端口、代理、白名单、备份、缩略图等） |
+| 🌐 **Node.js 管理** | 自动检测系统 Node.js / npm，支持一键下载内置私有 Node 环境     |
+| 🎭 **角色卡管理**   | 浏览、预览、导入、删除角色卡（PNG 格式）                       |
+| 📚 **世界书管理**   | 浏览、导入、删除世界书（JSON 格式）                            |
+| 🔄 **自动更新**     | 基于 GitHub Releases 的静默自动更新（可关闭提醒）              |
+| 🌍 **多语言**       | 内置简体中文 / English，可跟随系统自动切换                     |
+| 🎨 **主题切换**     | 深色 / 浅色主题，支持跟随系统                                  |
+| 🔧 **GitHub 代理**  | 内置多节点代理加速，解决 GitHub 下载慢的问题                   |
+| 💾 **窗口记忆**     | 可选记住上次窗口位置                                           |
 
 ---
 
@@ -52,11 +58,11 @@
 1. 前往 [GitHub Releases](https://github.com/al01cn/sillyTavern-launcher/releases) 页面
 2. 根据你的操作系统下载对应的安装包：
 
-   | 系统 | 文件格式 |
-   |------|----------|
-   | Windows | `.msi` 或 `.exe` |
-   | macOS | `.dmg` |
-   | Linux | `.AppImage` 或 `.deb` |
+   | 系统    | 文件格式              |
+   | ------- | --------------------- |
+   | Windows | `.msi` 或 `.exe`      |
+   | macOS   | `.dmg`                |
+   | Linux   | `.AppImage` 或 `.deb` |
 
 3. 运行安装程序完成安装，然后直接启动即可
 
@@ -67,16 +73,16 @@
 
 ### 🛠️ 技术栈
 
-| 层次 | 技术 |
-|------|------|
-| **前端框架** | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/) |
-| **UI 组件** | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/) |
-| **图标库** | [Lucide Vue Next](https://lucide.dev/) + [@phosphor-icons/vue](https://phosphoricons.com/) + [@iconify/vue](https://iconify.design/) |
-| **国际化** | [vue-i18n v11](https://vue-i18n.intlify.dev/) |
-| **通知** | [vue-sonner](https://vue-sonner.vercel.app/) |
-| **后端框架** | [Tauri v2](https://v2.tauri.app/) + [Rust](https://www.rust-lang.org/) |
-| **主要 Rust 库** | `tokio`、`reqwest`、`serde`、`serde_yaml`、`serde_json`、`zip`、`tracing` |
-| **包管理工具** | [Bun](https://bun.sh/)（推荐） |
+| 层次             | 技术                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **前端框架**     | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/)                              |
+| **UI 组件**      | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)                                                      |
+| **图标库**       | [Lucide Vue Next](https://lucide.dev/) + [@phosphor-icons/vue](https://phosphoricons.com/) + [@iconify/vue](https://iconify.design/) |
+| **国际化**       | [vue-i18n v11](https://vue-i18n.intlify.dev/)                                                                                        |
+| **通知**         | [vue-sonner](https://vue-sonner.vercel.app/)                                                                                         |
+| **后端框架**     | [Tauri v2](https://v2.tauri.app/) + [Rust](https://www.rust-lang.org/)                                                               |
+| **主要 Rust 库** | `tokio`、`reqwest`、`serde`、`serde_yaml`、`serde_json`、`zip`、`tracing`                                                            |
+| **包管理工具**   | [Bun](https://bun.sh/)（推荐）                                                                                                       |
 
 ---
 
@@ -143,11 +149,11 @@ SillyTavern-Launcher/
 
 #### 前置依赖
 
-| 依赖 | 版本要求 | 说明 |
-|------|----------|------|
-| [Rust](https://www.rust-lang.org/zh-CN/) | 1.80+ | 含 Cargo，Tauri 后端必须 |
-| [Node.js](https://nodejs.org/zh-cn) / [Bun](https://bun.sh/) | Node 18+ / Bun 1+ | 推荐使用 Bun |
-| Tauri 系统依赖 | — | [查看官方文档](https://v2.tauri.app/zh-cn/start/prerequisites/) |
+| 依赖                                                         | 版本要求          | 说明                                                            |
+| ------------------------------------------------------------ | ----------------- | --------------------------------------------------------------- |
+| [Rust](https://www.rust-lang.org/zh-CN/)                     | 1.80+             | 含 Cargo，Tauri 后端必须                                        |
+| [Node.js](https://nodejs.org/zh-cn) / [Bun](https://bun.sh/) | Node 18+ / Bun 1+ | 推荐使用 Bun                                                    |
+| Tauri 系统依赖                                               | —                 | [查看官方文档](https://v2.tauri.app/zh-cn/start/prerequisites/) |
 
 > **Windows 用户**额外需要：安装 [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/zh-hans/visual-cpp-build-tools/) 或 Visual Studio。
 
@@ -214,12 +220,12 @@ lib.rs          ← 入口（模块声明 + run()）
 
 长耗时操作（下载、解压、npm 安装）通过 **Tauri Event**（`emit`）向前端推送进度：
 
-| 事件名 | 说明 |
-|--------|------|
-| `install-progress` | 版本安装/删除进度 |
-| `download-progress` | Node.js 下载/解压进度 |
-| `process-log` | SillyTavern 进程实时日志 |
-| `process-exit` | SillyTavern 进程退出通知 |
+| 事件名              | 说明                     |
+| ------------------- | ------------------------ |
+| `install-progress`  | 版本安装/删除进度        |
+| `download-progress` | Node.js 下载/解压进度    |
+| `process-log`       | SillyTavern 进程实时日志 |
+| `process-exit`      | SillyTavern 进程退出通知 |
 
 ---
 
@@ -275,20 +281,20 @@ lib.rs          ← 入口（模块声明 + run()）
 
 ### ✨ Features
 
-| Module | Description |
-|--------|-------------|
-| 🚀 **One-Click Launch** | Start/stop SillyTavern instantly with real-time console log streaming |
-| 📦 **Version Manager** | Install, switch, or uninstall any SillyTavern version (stable / release) |
-| 🧩 **Extension Manager** | Browse, enable/disable, install (from ZIP), and delete extensions |
-| ⚙️ **Tavern Config** | Visual editor for `config.yaml` (port, proxy, whitelist, backups, etc.) |
-| 🌐 **Node.js Manager** | Auto-detects system Node.js, supports one-click private Node.js install |
-| 🎭 **Character Cards** | Browse, preview, import, and delete character PNG cards |
-| 📚 **World Info** | Browse, import, and delete World Info JSON files |
-| 🔄 **Auto Update** | Silent updates via GitHub Releases (configurable reminder) |
-| 🌍 **i18n** | Built-in Chinese / English with automatic system locale detection |
-| 🎨 **Themes** | Dark / Light mode with system follow support |
-| 🔧 **GitHub Proxy** | Built-in multi-node acceleration for GitHub downloads |
-| 💾 **Window Memory** | Optionally remember last window position |
+| Module                   | Description                                                              |
+| ------------------------ | ------------------------------------------------------------------------ |
+| 🚀 **One-Click Launch**  | Start/stop SillyTavern instantly with real-time console log streaming    |
+| 📦 **Version Manager**   | Install, switch, or uninstall any SillyTavern version (stable / release) |
+| 🧩 **Extension Manager** | Browse, enable/disable, install (from ZIP), and delete extensions        |
+| ⚙️ **Tavern Config**     | Visual editor for `config.yaml` (port, proxy, whitelist, backups, etc.)  |
+| 🌐 **Node.js Manager**   | Auto-detects system Node.js, supports one-click private Node.js install  |
+| 🎭 **Character Cards**   | Browse, preview, import, and delete character PNG cards                  |
+| 📚 **World Info**        | Browse, import, and delete World Info JSON files                         |
+| 🔄 **Auto Update**       | Silent updates via GitHub Releases (configurable reminder)               |
+| 🌍 **i18n**              | Built-in Chinese / English with automatic system locale detection        |
+| 🎨 **Themes**            | Dark / Light mode with system follow support                             |
+| 🔧 **GitHub Proxy**      | Built-in multi-node acceleration for GitHub downloads                    |
+| 💾 **Window Memory**     | Optionally remember last window position                                 |
 
 ---
 
@@ -299,11 +305,11 @@ lib.rs          ← 入口（模块声明 + run()）
 1. Go to the [GitHub Releases](https://github.com/al01cn/sillyTavern-launcher/releases) page
 2. Download the installer for your operating system:
 
-   | OS | File Format |
-   |----|-------------|
-   | Windows | `.msi` or `.exe` |
-   | macOS | `.dmg` |
-   | Linux | `.AppImage` or `.deb` |
+   | OS      | File Format           |
+   | ------- | --------------------- |
+   | Windows | `.msi` or `.exe`      |
+   | macOS   | `.dmg`                |
+   | Linux   | `.AppImage` or `.deb` |
 
 3. Run the installer and launch the app
 
@@ -314,15 +320,15 @@ lib.rs          ← 入口（模块声明 + run()）
 
 ### 🛠️ Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/) |
-| **UI** | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/) |
-| **Icons** | Lucide Vue Next + Phosphor Icons + Iconify |
-| **i18n** | vue-i18n v11 |
-| **Backend** | [Tauri v2](https://v2.tauri.app/) + [Rust](https://www.rust-lang.org/) |
-| **Key Rust crates** | `tokio`, `reqwest`, `serde`, `serde_yaml`, `zip`, `tracing` |
-| **Package manager** | [Bun](https://bun.sh/) (recommended) |
+| Layer               | Technology                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Frontend**        | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/) |
+| **UI**              | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)                         |
+| **Icons**           | Lucide Vue Next + Phosphor Icons + Iconify                                                              |
+| **i18n**            | vue-i18n v11                                                                                            |
+| **Backend**         | [Tauri v2](https://v2.tauri.app/) + [Rust](https://www.rust-lang.org/)                                  |
+| **Key Rust crates** | `tokio`, `reqwest`, `serde`, `serde_yaml`, `zip`, `tracing`                                             |
+| **Package manager** | [Bun](https://bun.sh/) (recommended)                                                                    |
 
 ---
 
@@ -372,11 +378,11 @@ SillyTavern-Launcher/
 
 #### Prerequisites
 
-| Dependency | Required | Notes |
-|------------|----------|-------|
-| [Rust](https://www.rust-lang.org/) | 1.80+ | Includes Cargo |
-| [Node.js](https://nodejs.org/) or [Bun](https://bun.sh/) | Node 18+ / Bun 1+ | Bun recommended |
-| Tauri system deps | — | See [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/) |
+| Dependency                                               | Required          | Notes                                                                |
+| -------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- |
+| [Rust](https://www.rust-lang.org/)                       | 1.80+             | Includes Cargo                                                       |
+| [Node.js](https://nodejs.org/) or [Bun](https://bun.sh/) | Node 18+ / Bun 1+ | Bun recommended                                                      |
+| Tauri system deps                                        | —                 | See [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/) |
 
 #### Clone & Install
 
@@ -406,12 +412,12 @@ Build output: `src-tauri/target/release/bundle/`
 
 All frontend operations communicate with the Rust backend via **Tauri Commands** (`invoke`). Long-running tasks (download, extract, npm install) emit progress events back to the frontend:
 
-| Event | Description |
-|-------|-------------|
-| `install-progress` | ST version install/delete progress |
-| `download-progress` | Node.js download/extract progress |
-| `process-log` | SillyTavern real-time stdout/stderr |
-| `process-exit` | SillyTavern process exit notification |
+| Event               | Description                           |
+| ------------------- | ------------------------------------- |
+| `install-progress`  | ST version install/delete progress    |
+| `download-progress` | Node.js download/extract progress     |
+| `process-log`       | SillyTavern real-time stdout/stderr   |
+| `process-exit`      | SillyTavern process exit notification |
 
 ---
 

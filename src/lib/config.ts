@@ -39,11 +39,6 @@ export default {
                 url: 'https://new1.588686.xyz/register?aff=p4f6',
             },
             {
-                icon: "https://i.ibb.co/pjd8dC8Y/7fcf0b96-69dd-4306-8d67-a1abde2ae423.png",
-                name: 'Soul公益站',
-                url: 'https://sunlea.de/',
-            },
-            {
                 icon: "https://zipline.chat-linmou.online/u/a3nEt5.jpg",
                 name: 'GuDuFree',
                 url: 'https://gudufree.yeelam.site/register?aff=YVo4',

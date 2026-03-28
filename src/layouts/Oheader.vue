@@ -4,30 +4,68 @@ import { useI18n } from 'vue-i18n';
 import { PhMinus, PhX, PhPlay, PhList, PhClock, PhPlug, PhWrench, PhFolderOpen, PhTerminalWindow, PhGear } from '@phosphor-icons/vue';
 import config from '../lib/config'
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { installState } from '../lib/useInstall';
+import { invoke } from '@tauri-apps/api/core';
+import { installState, resetInstallState } from '../lib/useInstall';
+import { oneClickState, finishOneClickSetup } from '../lib/useOneClick';
 import { Dialog } from '../lib/useDialog';
 import { consoleStatus } from '../lib/consoleState';
 
 const { t, locale } = useI18n();
 const appWindow = getCurrentWindow();
 let unlistenClose: (() => void) | null = null;
+let isForceClosing = false;
 
-const checkCanClose = () => {
-    if (installState.show && ['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)) {
+const requestClose = async () => {
+    if (isForceClosing) {
+        await appWindow.close();
+        return;
+    }
+
+    const isRunningTask = (installState.show && ['downloading', 'extracting', 'installing', 'deleting'].includes(installState.status)) || oneClickState.isActive;
+    
+    if (isRunningTask) {
         Dialog.warning({
             title: t('common.warning'),
-            msg: locale.value === 'zh-CN' ? '正在下载或删除版本，请等待完成' : 'Downloading or deleting version, please wait',
-            showCancel: false,
-            confirmText: t('common.iKnow')
-        });
-        return false;
-    }
-    return true;
-};
+            msg: locale.value === 'zh-CN' 
+                ? '自动化流程或安装任务正在进行中。强制关闭将中断所有进度并退回初始状态，确定要关闭吗？' 
+                : 'Automation or installation tasks are running. Force closing will interrupt all progress and reset to the initial state. Are you sure you want to close?',
+            showCancel: true,
+            confirmText: locale.value === 'zh-CN' ? '确认关闭' : 'Force Close',
+            cancelText: t('common.cancel'),
+            onConfirm: async () => {
+                isForceClosing = true;
+                // 停止后端任务
+                try {
+                    await invoke('cancel_install');
+                } catch (e) {
+                    console.error(e);
+                }
+                // 退回初始状态
+                resetInstallState();
+                if (oneClickState.isActive) {
+                    finishOneClickSetup();
+                }
+                
+                // 主动停止酒馆进程
+                try {
+                    await invoke('stop_sillytavern');
+                } catch (e) {
+                    console.error('Failed to stop sillytavern on close:', e);
+                }
 
-const close = async () => {
-    if (!checkCanClose()) return;
-    await appWindow.close();
+                await appWindow.close();
+            }
+        });
+    } else {
+        isForceClosing = true;
+        // 主动停止酒馆进程
+        try {
+            await invoke('stop_sillytavern');
+        } catch (e) {
+            console.error('Failed to stop sillytavern on close:', e);
+        }
+        await appWindow.close();
+    }
 };
 
 const minimize = async () => {
@@ -36,8 +74,9 @@ const minimize = async () => {
 
 onMounted(async () => {
     unlistenClose = await appWindow.onCloseRequested(async (event) => {
-        if (!checkCanClose()) {
+        if (!isForceClosing) {
             event.preventDefault();
+            requestClose();
         }
     });
 });
@@ -68,7 +107,7 @@ onUnmounted(() => {
                         class="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                         <PhMinus class="w-4 h-4" />
                     </button>
-                    <button @click="close()"
+                    <button @click="requestClose()"
                         :class="`h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-red-500 hover:text-white transition-colors`">
                         <PhX class="w-4 h-4" />
                     </button>
