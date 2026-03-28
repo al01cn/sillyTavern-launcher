@@ -74,7 +74,4 @@ updater.key.pub
 # =========================
 # App Specific Data (SillyTavern)
 # =========================
-data/logs/*
-data/sillytavern/*
-data/node/*
-data/st_data/*
+data/

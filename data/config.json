@@ -3,8 +3,8 @@
   "theme": "auto",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 460,
-    "y": 206
+    "x": 641,
+    "y": 214
   },
   "githubProxy": {
     "enable": true,
@@ -22,6 +22,11 @@
     {
       "path": "E:\\code_project\\app\\sillytavern",
       "version": "1.16.0",
+      "hasNodeModules": true
+    },
+    {
+      "path": "E:\\Tools\\SillyTavern-1.14.0",
+      "version": "1.14.0",
       "hasNodeModules": true
     }
   ],

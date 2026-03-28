@@ -474,9 +474,10 @@ const handleSelectExistingTavern = async () => {
         }
 
         try {
-            const fileContent = await invoke<string>('read_local_file', { path: packageJsonPath });
+            const fileBytes = await invoke<number[]>('read_local_file', { path: packageJsonPath });
+            const fileContent = new TextDecoder().decode(new Uint8Array(fileBytes));
             const packageData = JSON.parse(fileContent);
-            if (packageData.name !== 'sillytavern') {
+            if (packageData.name?.toLowerCase() !== 'sillytavern') {
                 toast.error(t('versions.notTavernDir'));
                 return;
             }

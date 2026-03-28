@@ -77,6 +77,24 @@ export async function stopProcess() {
   }
 }
 
+// 预加载 GitHub 加速列表
+const preloadGithubProxies = async () => {
+  try {
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const lastFetchTime = localStorage.getItem('app_settings_proxies_last_fetch');
+    const now = Date.now();
+
+    // 如果没有缓存或者缓存已过期，则预加载
+    if (!lastFetchTime || (now - Number(lastFetchTime) >= THREE_DAYS_MS)) {
+      await invoke('fetch_github_proxies');
+      localStorage.setItem('app_settings_proxies_last_fetch', now.toString());
+    }
+  } catch (error) {
+    // 静默失败，不影响启动
+    console.error('预加载 GitHub 加速列表失败:', error);
+  }
+};
+
 let isInitialized = false
 export async function initConsoleState() {
   if (isInitialized) return
@@ -84,6 +102,7 @@ export async function initConsoleState() {
 
   setTimeout(() => {
     initReleases();
+    preloadGithubProxies();
   }, 2000);
 
   await listen<string>('process-log', (event) => {

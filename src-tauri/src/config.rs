@@ -291,6 +291,15 @@ pub fn open_directory(
     Ok(())
 }
 
+// 静态回退列表
+const FALLBACK_PROXIES: &[&str] = &[
+    "https://ghfast.top/",
+    "https://ghproxy.net/",
+    "https://mirror.ghproxy.com/",
+    "https://gh.api.99988866.xyz/",
+    "https://gh.llkk.cc/",
+];
+
 #[tauri::command]
 pub async fn fetch_github_proxies() -> Result<Vec<crate::types::ProxyItem>, String> {
     let client = reqwest::Client::builder()
@@ -299,46 +308,80 @@ pub async fn fetch_github_proxies() -> Result<Vec<crate::types::ProxyItem>, Stri
         .build()
         .map_err(|e| e.to_string())?;
 
-    let response: crate::types::ProxyResponse = client
+    // 尝试从 API 获取
+    let response = client
         .get("https://api.akams.cn/github")
         .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
 
-    if response.code == 200 {
-        let mut proxies = response.data;
+    let proxies = match response {
+        Ok(resp) => {
+            let json: Result<crate::types::ProxyResponse, _> = resp.json().await;
+            match json {
+                Ok(data) if data.code == 200 => {
+                    let mut proxies = data.data;
 
-        // 添加 ghfast.top 到列表并测试延迟
-        let ghfast_url = "https://ghfast.top/";
-        if !proxies.iter().any(|p| p.url == ghfast_url) {
-            let test_url = format!("{}https://github.com", ghfast_url);
-            let start = std::time::Instant::now();
-            let latency = match client.head(&test_url).send().await {
-                Ok(_) => start.elapsed().as_millis() as u32,
-                Err(_) => 9999,
-            };
+                    // 添加 ghfast.top 到列表并测试延迟
+                    let ghfast_url = "https://ghfast.top/";
+                    if !proxies.iter().any(|p| p.url == ghfast_url) {
+                        let test_url = format!("{}https://github.com", ghfast_url);
+                        let start = std::time::Instant::now();
+                        let latency = match client.head(&test_url).send().await {
+                            Ok(_) => start.elapsed().as_millis() as u32,
+                            Err(_) => 9999,
+                        };
 
-            proxies.insert(
-                0,
-                crate::types::ProxyItem {
-                    url: ghfast_url.to_string(),
-                    server: "ghfast.top".to_string(),
-                    ip: "".to_string(),
-                    location: "Default".to_string(),
-                    latency,
-                    speed: 0.0,
-                    tag: "推荐".to_string(),
-                },
-            );
+                        proxies.insert(
+                            0,
+                            crate::types::ProxyItem {
+                                url: ghfast_url.to_string(),
+                                server: "ghfast.top".to_string(),
+                                ip: "".to_string(),
+                                location: "Default".to_string(),
+                                latency,
+                                speed: 0.0,
+                                tag: "推荐".to_string(),
+                            },
+                        );
+                    }
+                    proxies
+                }
+                _ => use_fallback_proxies(&client).await,
+            }
         }
+        Err(_) => use_fallback_proxies(&client).await,
+    };
 
-        Ok(proxies)
-    } else {
-        Err(format!("API Error: {}", response.msg))
+    Ok(proxies)
+}
+
+async fn use_fallback_proxies(client: &reqwest::Client) -> Vec<crate::types::ProxyItem> {
+    let mut proxies = Vec::new();
+
+    for url in FALLBACK_PROXIES {
+        let test_url = format!("{}https://github.com", url);
+        let start = std::time::Instant::now();
+        let latency = match client.head(&test_url).send().await {
+            Ok(_) => start.elapsed().as_millis() as u32,
+            Err(_) => 9999,
+        };
+
+        // 从 URL 中提取服务器名称
+        let server = url.trim_start_matches("https://").trim_end_matches("/");
+
+        proxies.push(crate::types::ProxyItem {
+            url: url.to_string(),
+            server: server.to_string(),
+            ip: "".to_string(),
+            location: "回退".to_string(),
+            latency,
+            speed: 0.0,
+            tag: "备用".to_string(),
+        });
     }
+
+    proxies.sort_by(|a, b| a.latency.cmp(&b.latency));
+    proxies
 }
 
 #[tauri::command]

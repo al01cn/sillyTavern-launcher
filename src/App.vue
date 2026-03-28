@@ -19,6 +19,7 @@ import { initConsoleState, consoleStatus, stopProcess } from './lib/consoleState
 import { checkUpdate } from './lib/updater';
 
 const { t } = useI18n();
+
 onMounted(async () => {
   await initConsoleState();
 
