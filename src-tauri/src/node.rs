@@ -357,6 +357,9 @@ pub async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         Lang::ZhCn => tracing::info!("检查 Node.js 环境"),
         Lang::EnUs => tracing::info!("Checking Node.js environment"),
     }
+    let config = read_app_config_from_disk(&app);
+    let use_system_node = config.use_system_node;
+
     let data_dir = get_config_path(&app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
@@ -369,93 +372,163 @@ pub async fn check_nodejs(app: AppHandle) -> Result<NodeInfo, String> {
         node_dir.join("bin/node")
     };
 
-    if local_node_path.exists() {
-        let mut command = std::process::Command::new(&local_node_path);
+    // 检测系统 Node 的辅助闭包
+    let check_system = || -> Option<NodeInfo> {
+        let mut command = std::process::Command::new("node");
         command.arg("-v");
         #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-
+        { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
         if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                match lang {
-                    Lang::ZhCn => tracing::info!("找到本地 Node.js: {}", version),
-                    Lang::EnUs => tracing::info!("Found local Node.js: {}", version),
-                }
-                return Ok(NodeInfo {
-                    version: Some(version),
-                    path: Some(local_node_path.to_string_lossy().replace('\\', "/")),
-                    source: "local".to_string(),
-                });
-            }
-        }
-    }
-
-    let cmd = "node";
-    let mut command = std::process::Command::new(cmd);
-    command.arg("-v");
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-
-    if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
-        if output.status.success() {
-            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-            let path_cmd = if cfg!(target_os = "windows") {
-                "where"
-            } else {
-                "which"
-            };
-            let mut node_path = "system".to_string();
-
-            let mut path_command = std::process::Command::new(path_cmd);
-            path_command.arg("node");
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                path_command.creation_flags(0x08000000);
-            }
-
-            if let Ok(path_output) = path_command.stdin(std::process::Stdio::null()).output() {
-                if path_output.status.success() {
-                    let path_str = String::from_utf8_lossy(&path_output.stdout);
-                    if let Some(first_line) = path_str.lines().next() {
-                        let trimmed = first_line.trim();
-                        if !trimmed.is_empty() {
-                            node_path = trimmed.replace('\\', "/");
+                let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+                let mut node_path = "system".to_string();
+                let mut path_command = std::process::Command::new(path_cmd);
+                path_command.arg("node");
+                #[cfg(target_os = "windows")]
+                { use std::os::windows::process::CommandExt; path_command.creation_flags(0x08000000); }
+                if let Ok(path_output) = path_command.stdin(std::process::Stdio::null()).output() {
+                    if path_output.status.success() {
+                        let path_str = String::from_utf8_lossy(&path_output.stdout);
+                        if let Some(first_line) = path_str.lines().next() {
+                            let trimmed = first_line.trim();
+                            if !trimmed.is_empty() {
+                                node_path = trimmed.replace('\\', "/");
+                            }
                         }
                     }
                 }
+                return Some(NodeInfo { version: Some(version), path: Some(node_path), source: "system".to_string() });
             }
-
-            match lang {
-                Lang::ZhCn => tracing::info!("找到系统 Node.js: {}", version),
-                Lang::EnUs => tracing::info!("Found system Node.js: {}", version),
-            }
-            return Ok(NodeInfo {
-                version: Some(version),
-                path: Some(node_path),
-                source: "system".to_string(),
-            });
         }
+        None
+    };
+
+    // 检测内置 Node 的辅助闭包
+    let check_local = || -> Option<NodeInfo> {
+        if local_node_path.exists() {
+            let mut command = std::process::Command::new(&local_node_path);
+            command.arg("-v");
+            #[cfg(target_os = "windows")]
+            { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
+            if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
+                if output.status.success() {
+                    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    return Some(NodeInfo {
+                        version: Some(version),
+                        path: Some(local_node_path.to_string_lossy().replace('\\', "/")),
+                        source: "local".to_string(),
+                    });
+                }
+            }
+        }
+        None
+    };
+
+    // 根据配置决定优先顺序
+    let (first, second): (Box<dyn Fn() -> Option<NodeInfo>>, Box<dyn Fn() -> Option<NodeInfo>>) =
+        if use_system_node {
+            (Box::new(check_system), Box::new(check_local))
+        } else {
+            (Box::new(check_local), Box::new(check_system))
+        };
+
+    if let Some(info) = first() {
+        match lang {
+            Lang::ZhCn => tracing::info!("找到 Node.js ({}): {:?}", info.source, info.version),
+            Lang::EnUs => tracing::info!("Found Node.js ({}): {:?}", info.source, info.version),
+        }
+        return Ok(info);
+    }
+    if let Some(info) = second() {
+        match lang {
+            Lang::ZhCn => tracing::info!("找到 Node.js ({}): {:?}", info.source, info.version),
+            Lang::EnUs => tracing::info!("Found Node.js ({}): {:?}", info.source, info.version),
+        }
+        return Ok(info);
     }
 
     match lang {
         Lang::ZhCn => tracing::warn!("未找到 Node.js 环境"),
         Lang::EnUs => tracing::warn!("Node.js environment not found"),
     }
-    Ok(NodeInfo {
-        version: None,
-        path: None,
-        source: "none".to_string(),
-    })
+    Ok(NodeInfo { version: None, path: None, source: "none".to_string() })
 }
+
+/// 同时检测系统 Node 和内置 Node，用于前端展示切换按钮
+#[tauri::command]
+pub async fn check_nodejs_both(app: AppHandle) -> Result<serde_json::Value, String> {
+    let data_dir = get_config_path(&app)
+        .parent()
+        .unwrap_or(&PathBuf::from("."))
+        .to_path_buf();
+    let node_dir = data_dir.join("node");
+    let local_node_path = if cfg!(target_os = "windows") {
+        node_dir.join("node.exe")
+    } else {
+        node_dir.join("bin/node")
+    };
+
+    // 检测系统 Node（排除内置 Node 路径，避免把内置 Node 误识别为系统 Node）
+    let system_node: Option<NodeInfo> = {
+        let mut cmd = std::process::Command::new("node");
+        cmd.arg("-v").stdin(std::process::Stdio::null());
+        #[cfg(target_os = "windows")]
+        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+        if let Ok(out) = cmd.output() {
+            if out.status.success() {
+                let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+                let mut node_path = "system".to_string();
+                let mut pc = std::process::Command::new(path_cmd);
+                pc.arg("node").stdin(std::process::Stdio::null());
+                #[cfg(target_os = "windows")]
+                { use std::os::windows::process::CommandExt; pc.creation_flags(0x08000000); }
+                if let Ok(po) = pc.output() {
+                    if po.status.success() {
+                        let ps = String::from_utf8_lossy(&po.stdout);
+                        if let Some(l) = ps.lines().next() {
+                            let t = l.trim();
+                            if !t.is_empty() { node_path = t.replace('\\', "/"); }
+                        }
+                    }
+                }
+                // 若 where/which 找到的路径与内置 Node 路径相同，则视为没有独立的系统 Node
+                let local_norm = local_node_path.to_string_lossy().replace('\\', "/").to_lowercase();
+                let found_norm = node_path.to_lowercase();
+                if found_norm == local_norm {
+                    None
+                } else {
+                    Some(NodeInfo { version: Some(ver), path: Some(node_path), source: "system".to_string() })
+                }
+            } else { None }
+        } else { None }
+    };
+
+    // 检测内置 Node
+    let local_node: Option<NodeInfo> = if local_node_path.exists() {
+        let mut cmd = std::process::Command::new(&local_node_path);
+        cmd.arg("-v").stdin(std::process::Stdio::null());
+        #[cfg(target_os = "windows")]
+        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+        if let Ok(out) = cmd.output() {
+            if out.status.success() {
+                let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                Some(NodeInfo {
+                    version: Some(ver),
+                    path: Some(local_node_path.to_string_lossy().replace('\\', "/")),
+                    source: "local".to_string(),
+                })
+            } else { None }
+        } else { None }
+    } else { None };
+
+    Ok(serde_json::json!({
+        "system": system_node,
+        "local": local_node,
+    }))
+}
+
 
 #[tauri::command]
 pub async fn check_npm(app: AppHandle) -> Result<NpmInfo, String> {

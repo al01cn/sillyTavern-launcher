@@ -13,6 +13,9 @@ pub struct ProcessState {
 
 pub struct InstallState {
     pub cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+    /// 当前正在运行的 git 子进程 PID（install_extension_git / repair_extension_git 的 git clone/fetch）
+    /// 程序退出时可以 kill 掉它，避免留下孤儿进程
+    pub git_child_pid: Arc<Mutex<Option<u32>>>,
 }
 
 // ─────────────────────────────────────────────
@@ -76,6 +79,12 @@ pub struct AppConfig {
     pub has_scanned_once: bool,
     pub auto_repair_git: bool,
     pub setup_checkpoint: Option<String>,
+    /// 优先使用系统 Node（true = 系统优先，false = 内置优先）
+    pub use_system_node: bool,
+    /// 优先使用系统 Git（true = 系统优先，false = 内置优先）
+    pub use_system_git: bool,
+    /// 酒馆启动模式：normal / desktop / debug
+    pub launch_mode: String,
 }
 
 impl Default for WindowPosition {
@@ -119,6 +128,9 @@ impl Default for AppConfig {
             has_scanned_once: false,
             auto_repair_git: true,
             setup_checkpoint: None,
+            use_system_node: true,
+            use_system_git: true,
+            launch_mode: "normal".to_string(),
         }
     }
 }
@@ -586,6 +598,103 @@ pub struct WorldInfoFile {
     pub file_name: String,
     pub size: u64,
     pub modified_ms: Option<i64>,
+}
+
+// ─────────────────────────────────────────────
+// 对话历史
+// ─────────────────────────────────────────────
+
+/// 单条对话消息（解析自 .jsonl 每行）
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    pub name: String,
+    pub mes: String,
+    pub is_user: bool,
+    pub is_system: bool,
+    pub send_date: Option<String>,
+}
+
+/// 单个 .jsonl 文件信息
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatFile {
+    pub file_name: String,
+    /// 所属角色文件夹名（如 default_Seraphina）
+    pub char_folder: String,
+    pub size: u64,
+    pub modified_ms: Option<i64>,
+}
+
+/// 按角色分组的对话历史
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatGroup {
+    /// 文件夹名（如 default_Seraphina）
+    pub char_folder: String,
+    /// 显示用角色名（如 Seraphina）
+    pub char_name: String,
+    pub files: Vec<ChatFile>,
+}
+
+/// 批量删除时传入的 {charFolder, fileName} 对
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatDeleteItem {
+    pub char_folder: String,
+    pub file_name: String,
+}
+
+// ─────────────────────────────────────────────
+// 资源迁移
+// ─────────────────────────────────────────────
+
+/// 可迁移的来源实例
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceMigrationSource {
+    /// 酒馆根目录路径
+    pub tavern_path: String,
+    /// 酒馆 data 目录路径（{tavernPath}/data）
+    pub data_path: String,
+    /// 版本号
+    pub version: String,
+    /// 显示名称
+    pub display: String,
+}
+
+/// 冲突文件条目
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictFile {
+    /// 相对于 data 目录的路径，如 "default-user/characters/foo.png"
+    pub rel_path: String,
+    /// 来源实例路径（完整绝对路径）
+    pub source_full_path: String,
+    /// 目标完整路径
+    pub dest_full_path: String,
+    /// 来源实例显示名
+    pub source_display: String,
+    /// 文件大小（字节）
+    pub size: u64,
+    /// 友好的分类名称（角色卡 / 世界书 / 历史聊天记录 / ...）
+    pub category: String,
+}
+
+/// 迁移进度事件 payload
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MigrationProgressEvent {
+    /// 已完成文件数
+    pub done: usize,
+    /// 总文件数
+    pub total: usize,
+    /// 当前正在处理的文件相对路径
+    pub current: String,
+    /// 是否全部完成
+    pub finished: bool,
+    /// 错误信息（若有）
+    pub error: Option<String>,
 }
 
 // ─────────────────────────────────────────────
@@ -1638,7 +1747,7 @@ pub const DEFAULT_SETTINGS_JSON: &str = r####"{
         "deepseek_model": "deepseek-chat",
         "aimlapi_model": "chatgpt-4o-latest",
         "xai_model": "grok-3-beta",
-        "pollinations_model": "openai",
+        "pollinations_model": "gemini",
         "cometapi_model": "gpt-4o",
         "moonshot_model": "kimi-latest",
         "fireworks_model": "accounts/fireworks/models/kimi-k2-instruct",
@@ -1648,8 +1757,8 @@ pub const DEFAULT_SETTINGS_JSON: &str = r####"{
         "azure_deployment_name": "",
         "azure_api_version": "2024-02-15-preview",
         "azure_openai_model": "",
-        "custom_model": "",
-        "custom_url": "",
+        "custom_model": "gemini-3-pro-preview",
+        "custom_url": "http://localhost:8000",
         "custom_include_body": "",
         "custom_exclude_body": "",
         "custom_include_headers": "",
@@ -1662,6 +1771,7 @@ pub const DEFAULT_SETTINGS_JSON: &str = r####"{
         "openrouter_allow_fallbacks": true,
         "openrouter_middleout": "on",
         "reverse_proxy": "",
+        "chat_completion_source": "pollinations",
         "chat_completion_source": "openai",
         "max_context_unlocked": true,
         "show_external_models": false,

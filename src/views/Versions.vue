@@ -684,6 +684,45 @@ const handleInstallDependencies = async (version: string) => {
 };
 
 const handleInstall = async (release: Release) => {
+    // 检查版本是否需要 Node v20+（ST >= 1.17.0）
+    const tagName = release.tag_name; // e.g. "v1.17.0"
+    const vMatch = tagName.replace(/^v/, '').match(/^(\d+)\.(\d+)\./);
+    if (vMatch) {
+        const major = parseInt(vMatch[1], 10);
+        const minor = parseInt(vMatch[2], 10);
+        const needs20 = major > 1 || (major === 1 && minor >= 17);
+        if (needs20) {
+            // 检查当前 Node 版本
+            const nodeCache = localStorage.getItem('app_settings_node_cache');
+            const nodeInfo = nodeCache ? JSON.parse(nodeCache) : null;
+            const nodeVersion: string | null = nodeInfo?.version || null;
+            const currentMajor = nodeVersion ? parseInt((nodeVersion.match(/v?(\d+)\./) || [])[1] || '0', 10) : 0;
+            if (currentMajor < 20) {
+                // 弹提示
+                const shouldProceed = await new Promise<boolean>((resolve) => {
+                    Dialog.warning({
+                        title: t('versions.nodeVersionWarningTitle'),
+                        msg: t('versions.nodeVersionWarningDesc', {
+                            version: tagName,
+                            required: '20',
+                            current: nodeVersion || t('home.notInstalled'),
+                        }),
+                        confirmText: t('versions.nodeVersionWarningConfirm'),
+                        cancelText: t('versions.nodeVersionWarningSkip'),
+                        onConfirm: () => {
+                            // 跳转到设置页 node 区域触发安装
+                            router.push('/settings?action=install_node');
+                            resolve(false);
+                        },
+                        onCancel: () => resolve(true),
+                        onClose: () => resolve(true),
+                    });
+                });
+                if (!shouldProceed) return;
+            }
+        }
+    }
+
     installState.show = true;
     installState.version = release.tag_name;
     installState.status = 'downloading';

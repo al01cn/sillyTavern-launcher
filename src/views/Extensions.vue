@@ -277,7 +277,8 @@ import {
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Dialog } from '../lib/useDialog';
-import { openInstallExtensionDialog, openRepairLogDialog, closeInstallExtensionDialog } from '../lib/useExtensionInstall';
+import { openInstallExtensionDialog } from '../lib/useExtensionInstall';
+import { openRepairGitDialog, closeRepairGitDialog, repairGitDialogState } from '../lib/useRepairGitDialog';
 import { useExtensions, ExtensionInfo } from '../lib/useExtensions';
 
 const { t } = useI18n();
@@ -554,16 +555,34 @@ const isRepoUrl = (url?: string) => {
 const repairGit = async (ext: ExtensionInfo) => {
     if (repairingId.value) return;
     repairingId.value = ext.id;
-    openRepairLogDialog();
+    const displayName = ext.manifest?.display_name || ext.id;
+    openRepairGitDialog(displayName);
     try {
-        await invoke('repair_extension_git', { 
+        // Rust 返回 bool: true=完整修复, false=离线保底
+        const isFullRepair = await invoke<boolean>('repair_extension_git', { 
             id: ext.id, 
-            scope: ext.scope 
+            scope: ext.scope,
+            dirPath: ext.dir_path,
         });
-        toast.success(t('extensions.repairGitSuccess'));
-        setTimeout(() => closeInstallExtensionDialog(), 3000);
+        repairGitDialogState.result = isFullRepair ? 'success' : 'offline';
+        repairGitDialogState.isRepairing = false;
+        if (isFullRepair) {
+            toast.success(t('extensions.repairGitSuccess'));
+        } else {
+            toast.warning(t('extensions.repairGitOffline'));
+        }
+        // 成功后 3 秒自动关闭弹窗；离线保底不自动关（用户需要看到提示）
+        if (isFullRepair) {
+            setTimeout(() => {
+                if (repairGitDialogState.show) {
+                    closeRepairGitDialog();
+                }
+            }, 3000);
+        }
         refresh(true);
     } catch (e) {
+        repairGitDialogState.result = 'error';
+        repairGitDialogState.isRepairing = false;
         toast.error(t('extensions.repairGitFailed') + ': ' + String(e));
     } finally {
         repairingId.value = null;

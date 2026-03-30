@@ -5,12 +5,15 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { installExtensionState, closeInstallExtensionDialog } from '../lib/useExtensionInstall';
-import { X, UploadCloud, FileArchive, CheckCircle2, AlertTriangle, Loader2, Terminal, Copy, Trash2 } from 'lucide-vue-next';
+import { openRepairGitDialog, repairGitDialogState } from '../lib/useRepairGitDialog';
+import { X, UploadCloud, FileArchive, CheckCircle2, AlertTriangle, Loader2, Terminal, Copy, Trash2, GitBranchPlus, Settings } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import * as fflate from 'fflate';
 
 const { t } = useI18n();
+const router = useRouter();
 
 const scope = ref<'user' | 'global'>('user');
 const installMode = ref<'offline' | 'online'>('online');
@@ -21,6 +24,23 @@ const showLogModal = ref(false);
 const logContainer = ref<HTMLElement | null>(null);
 const isDragging = ref(false);
 const isInstalling = ref(false);
+const installResult = ref<'success' | 'error' | null>(null);
+
+// Git 安装检测
+const gitInstalled = ref(true); // 默认 true，检测后更新
+const gitChecking = ref(false);
+
+const updateGitStatus = async () => {
+    gitChecking.value = true;
+    try {
+        const gitInfo: any = await invoke('check_git');
+        gitInstalled.value = gitInfo?.source !== 'none';
+    } catch (e) {
+        gitInstalled.value = false;
+    } finally {
+        gitChecking.value = false;
+    }
+};
 
 let unlisten: UnlistenFn | null = null;
 onMounted(async () => {
@@ -32,6 +52,9 @@ onMounted(async () => {
             }
         });
     });
+
+    // 检测 Git 是否已安装（复用 get_git_exe 逻辑，system/local 均视为可用）
+    await updateGitStatus();
 });
 
 onUnmounted(() => {
@@ -43,6 +66,8 @@ interface ExtensionManifest {
     author?: string;
     version?: string;
     description?: string;
+    homePage?: string;
+    auto_update?: boolean;
 }
 
 interface ExtensionFile {
@@ -57,12 +82,11 @@ interface ExtensionFile {
 
 const selectedFiles = ref<ExtensionFile[]>([]);
 
-watch(() => installExtensionState.show, (newVal) => {
+watch(() => installExtensionState.show, async (newVal) => {
     if (newVal) {
         resetState();
-        if (installExtensionState.logOnly) {
-            showLogModal.value = true;
-        }
+        // 每次打开弹窗时重新检测 Git，确保安装 MinGit 后状态及时更新
+        await updateGitStatus();
     }
 });
 
@@ -76,6 +100,7 @@ const resetState = () => {
     selectedFiles.value = [];
     isInstalling.value = false;
     isDragging.value = false;
+    installResult.value = null;
 };
 
 // ✅ 和角色卡一致的拖拽
@@ -195,6 +220,8 @@ const hasValidFiles = computed(() => {
     if (installMode.value === 'offline') {
         return selectedFiles.value.some(f => f.status === 'valid');
     } else {
+        // 在线安装需要 Git，检测阶段和未安装时将按钮禁用
+        if (gitChecking.value || !gitInstalled.value) return false;
         return gitUrl.value.trim().length > 0;
     }
 });
@@ -252,12 +279,37 @@ const install = async () => {
 
     isInstalling.value = true;
     let successCount = 0;
-    
-    // 如果启用了自动修复，自动开启日志展示
+
+    // 读取 Rust 端 config 的 auto_repair_git（通过 localStorage 同步的 camelCase key）
     const autoRepair = localStorage.getItem('autoRepairGit') === 'true';
-    if (autoRepair) {
-        gitLogs.value = [];
-        showLogModal.value = true;
+
+    // 判断扩展是否满足 Git 修复条件（与 Rust 端 repair_extension_git 的 can_repair 逻辑一致）
+    // 条件：auto_update === true 或 homePage 是标准 git 仓库地址
+    const canRepairExtension = (manifest?: ExtensionManifest): boolean => {
+        if (!manifest) return false;
+        if (manifest.auto_update === true) return true;
+        const hp = (manifest.homePage ?? '').toLowerCase();
+        if (hp && (
+            hp.includes('github.com') ||
+            hp.includes('gitee.com') ||
+            hp.includes('gitcode.com') ||
+            hp.includes('gitlab.com') ||
+            hp.endsWith('.git')
+        )) {
+            return true;
+        }
+        return false;
+    };
+
+    // 是否含有至少一个满足修复条件的扩展
+    const hasThirdParty = validFiles.some(f => canRepairExtension(f.manifestInfo));
+
+    // 如果开启自动修复，且含有满足修复条件的扩展，先打开 RepairGitDialog
+    if (autoRepair && hasThirdParty) {
+        // 取第一个满足修复条件的文件名称用于弹窗标题
+        const firstRepairable = validFiles.find(f => canRepairExtension(f.manifestInfo));
+        const firstName = firstRepairable?.manifestInfo?.display_name || firstRepairable?.name || '';
+        openRepairGitDialog(firstName);
     }
 
     for (const file of validFiles) {
@@ -295,13 +347,24 @@ const install = async () => {
         toast.success(t('resources.installSuccessCount', { count: successCount }));
         installExtensionState.onSuccess?.();
 
-        if (successCount === validFiles.length) {
+        if (autoRepair && hasThirdParty) {
+            // invoke 已串行等待修复完毕，更新 RepairGitDialog 状态
+            repairGitDialogState.isRepairing = false;
+            repairGitDialogState.result = successCount === validFiles.length ? 'success' : 'error';
+            // 关闭安装弹窗，修复弹窗留给用户手动关闭
+            closeInstallExtensionDialog();
+        } else {
             setTimeout(() => {
-                showLogModal.value = false;
                 closeInstallExtensionDialog();
-            }, autoRepair ? 3000 : 1000);
+            }, 1000);
         }
     } else {
+        if (autoRepair && hasThirdParty) {
+            // 安装全部失败，修复弹窗标记失败
+            repairGitDialogState.isRepairing = false;
+            repairGitDialogState.result = 'error';
+            closeInstallExtensionDialog();
+        }
         toast.error(t('resources.importFailedMsg', { type: t('extensions.title') }));
     }
 };
@@ -317,7 +380,6 @@ const install = async () => {
 
         <!-- Modal Content -->
         <div 
-            v-if="!installExtensionState.logOnly"
             class="modal-content relative bg-white w-full max-w-lg max-h-[620px] rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col pointer-events-auto animate-in zoom-in-95 duration-200"
             @click.stop
         >
@@ -393,6 +455,38 @@ const install = async () => {
                     </div>
 
                     <div v-if="installMode === 'online'" class="space-y-4 pt-2">
+                        <!-- Git 检测中 -->
+                        <div v-if="gitChecking" class="flex flex-col items-center justify-center py-8 px-4 gap-4 bg-blue-50 border border-blue-100 rounded-2xl">
+                            <div class="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-500">
+                                <Loader2 class="w-7 h-7 animate-spin" />
+                            </div>
+                            <div class="text-center space-y-1">
+                                <p class="text-sm font-bold text-blue-900">{{ t('resources.gitChecking') }}</p>
+                                <p class="text-xs text-blue-600/90 leading-relaxed max-w-[300px]">{{ t('resources.gitRequiredDesc') }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Git 未安装警告 -->
+                        <div v-else-if="!gitInstalled" class="flex flex-col items-center justify-center py-8 px-4 gap-4 bg-amber-50 border border-amber-200 rounded-2xl">
+
+                            <div class="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-amber-500">
+                                <GitBranchPlus class="w-7 h-7" />
+                            </div>
+                            <div class="text-center space-y-1">
+                                <p class="text-sm font-bold text-amber-800">{{ t('resources.gitRequiredTitle') }}</p>
+                                <p class="text-xs text-amber-600/90 leading-relaxed max-w-[300px]">{{ t('resources.gitRequiredDesc') }}</p>
+                            </div>
+                            <button
+                                @click="closeInstallExtensionDialog(); router.push('/settings')"
+                                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-sm shadow-amber-500/20 active:scale-95"
+                            >
+                                <Settings class="w-3.5 h-3.5" />
+                                {{ t('resources.goToSettings') }}
+                            </button>
+                        </div>
+
+                        <!-- 正常在线安装表单 -->
+                        <template v-else>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-2">{{ t('resources.gitUrl') }}</label>
                             <input 
@@ -413,6 +507,7 @@ const install = async () => {
                                 :disabled="isInstalling"
                             />
                         </div>
+                        </template>
                     </div>
 
                     <!-- Empty / Dragging State -->
@@ -632,14 +727,19 @@ const install = async () => {
                         <span>{{ log }}</span>
                     </div>
                 </div>
-                <div class="px-5 py-3 bg-slate-800 border-t border-slate-700 flex justify-end">
+                <div class="px-5 py-3 bg-slate-800 border-t border-slate-700 flex items-center justify-between gap-3">
                     <div v-if="isInstalling" class="flex items-center gap-2 text-blue-400 text-xs font-medium">
                         <Loader2 class="w-3.5 h-3.5 animate-spin" />
                         <span>{{ t('resources.gitCloning') }}</span>
                     </div>
+                    <div v-else-if="installResult === 'success'" class="flex items-center gap-2 text-emerald-400 text-xs font-medium">
+                        <CheckCircle2 class="w-3.5 h-3.5" />
+                        <span>{{ t('resources.installAutoRepairDone') }}</span>
+                    </div>
+                    <div v-else class="flex-1"></div>
                     <button 
-                        v-else
-                        @click="showLogModal = false"
+                        v-if="!isInstalling"
+                        @click="showLogModal = false; closeInstallExtensionDialog()"
                         class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all"
                     >
                         {{ t('common.close') }}

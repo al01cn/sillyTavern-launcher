@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use sys_locale::get_locale;
 use tauri::{AppHandle, Manager, PhysicalPosition, Position, WindowEvent};
 
-use crate::types::{AppConfig, Lang};
+use crate::types::{AppConfig, GithubProxyConfig, Lang};
 use crate::utils::get_config_path;
 
 // ─────────────────────────────────────────────
@@ -89,6 +89,18 @@ pub fn read_app_config_from_disk(app: &AppHandle) -> AppConfig {
         
         serde_json::from_value::<AppConfig>(json_val).unwrap_or_default()
     };
+
+    // 兜底：github_proxy.url 若被清空或不是合法 http/https URL，自动恢复默认值
+    {
+        let url = config.github_proxy.url.trim().to_string();
+        let is_valid = !url.is_empty()
+            && (url.starts_with("http://") || url.starts_with("https://"))
+            && url.len() > 10
+            && url.contains('.');
+        if !is_valid {
+            config.github_proxy.url = GithubProxyConfig::default().url;
+        }
+    }
     
     if !config.region_auto_configured {
         let locale = sys_locale::get_locale().unwrap_or_else(|| "".to_string()).to_lowercase();

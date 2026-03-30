@@ -4,7 +4,6 @@ export const installExtensionState = reactive({
     show: false,
     version: null as {version: string, path: string} | null,
     onSuccess: undefined as (() => void) | undefined,
-    logOnly: false,
 });
 
 export const openInstallExtensionDialog = (version: {version: string, path: string}, onSuccess?: () => void) => {
@@ -18,11 +17,5 @@ export const closeInstallExtensionDialog = () => {
     setTimeout(() => {
         installExtensionState.version = null;
         installExtensionState.onSuccess = undefined;
-        installExtensionState.logOnly = false;
     }, 300);
-};
-
-export const openRepairLogDialog = () => {
-    installExtensionState.logOnly = true;
-    installExtensionState.show = true;
 };

@@ -1,119 +1,189 @@
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
+use crate::config::{get_current_lang, read_app_config_from_disk};
+use crate::types::{Lang, GitInfo, DownloadProgress};
+use crate::utils::get_config_path;
 
-pub fn get_git_exe(app: &AppHandle) -> PathBuf {
+/// 内置 MinGit 的可执行文件路径
+fn local_git_path(app: &AppHandle) -> PathBuf {
     let data_dir = get_config_path(app)
         .parent()
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
     let git_dir = data_dir.join("git");
-
     if cfg!(target_os = "windows") {
-        let local = git_dir.join("cmd/git.exe");
-        if local.exists() {
-            local
-        } else {
-            PathBuf::from("git")
-        }
-    } else {
-        let local = git_dir.join("bin/git");
-        if local.exists() {
-            local
-        } else {
-            PathBuf::from("git")
-        }
-    }
-}
-use crate::config::get_current_lang;
-use crate::types::{Lang, GitInfo, DownloadProgress};
-use crate::utils::get_config_path;
-
-#[tauri::command]
-pub async fn check_git(app: AppHandle) -> Result<GitInfo, String> {
-    let _lang = get_current_lang(&app);
-    let data_dir = get_config_path(&app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
-    let git_dir = data_dir.join("git");
-
-    let local_git_path = if cfg!(target_os = "windows") {
         git_dir.join("cmd/git.exe")
     } else {
         git_dir.join("bin/git")
-    };
+    }
+}
 
-    if local_git_path.exists() {
-        let mut command = std::process::Command::new(&local_git_path);
-        command.arg("--version");
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
+/// 检测系统 Git 是否存在，返回 PathBuf（"git"）或 None
+fn has_system_git() -> bool {
+    let mut cmd = std::process::Command::new("git");
+    cmd.arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(target_os = "windows")]
+    { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+    cmd.status().map(|s| s.success()).unwrap_or(false)
+}
+
+/// 获取可用的 git 可执行文件路径。
+/// 按 use_system_git 配置决定优先级（系统优先 or 内置优先），均不可用时回退到 "git"。
+pub fn get_git_exe(app: &AppHandle) -> PathBuf {
+    let use_system = read_app_config_from_disk(app).use_system_git;
+
+    let local = local_git_path(app);
+    let local_exists = local.exists();
+
+    if use_system {
+        // 系统优先
+        if has_system_git() {
+            return PathBuf::from("git");
         }
-
-        if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
-            if output.status.success() {
-                let version_output = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let version = version_output.replace("git version ", "").trim().to_string();
-                return Ok(GitInfo {
-                    version: Some(version),
-                    path: Some(local_git_path.to_string_lossy().replace('\\', "/")),
-                    source: "local".to_string(),
-                });
-            }
+        if local_exists { return local; }
+    } else {
+        // 内置优先
+        if local_exists { return local; }
+        if has_system_git() {
+            return PathBuf::from("git");
         }
     }
+    PathBuf::from("git") // 都没有，让调用方报错
+}
 
-    let cmd = "git";
-    let mut command = std::process::Command::new(cmd);
-    command.arg("--version");
+/// 同时检测系统 Git 和内置 Git，用于前端展示切换按钮
+#[tauri::command]
+pub async fn check_git_both(app: AppHandle) -> Result<serde_json::Value, String> {
+    let local_path = local_git_path(&app);
+
+    // ── 系统 Git ──
+    let system_git: Option<GitInfo> = {
+        let mut cmd = std::process::Command::new("git");
+        cmd.arg("--version").stdin(std::process::Stdio::null());
+        #[cfg(target_os = "windows")]
+        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+        if let Ok(out) = cmd.output() {
+            if out.status.success() {
+                let ver_raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let ver = ver_raw.replace("git version ", "").trim().to_string();
+
+                // 取路径
+                let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+                let mut pc = std::process::Command::new(path_cmd);
+                pc.arg("git").stdin(std::process::Stdio::null());
+                #[cfg(target_os = "windows")]
+                { use std::os::windows::process::CommandExt; pc.creation_flags(0x08000000); }
+                let mut git_path = "system".to_string();
+                if let Ok(po) = pc.output() {
+                    if po.status.success() {
+                        let ps = String::from_utf8_lossy(&po.stdout);
+                        if let Some(l) = ps.lines().next() {
+                            let t = l.trim();
+                            if !t.is_empty() { git_path = t.replace('\\', "/"); }
+                        }
+                    }
+                }
+                // 排除内置路径被误识别为系统 Git
+                let local_norm = local_path.to_string_lossy().replace('\\', "/").to_lowercase();
+                let found_norm = git_path.to_lowercase();
+                if found_norm != local_norm {
+                    Some(GitInfo { version: Some(ver), path: Some(git_path), source: "system".to_string() })
+                } else {
+                    None
+                }
+            } else { None }
+        } else { None }
+    };
+
+    // ── 内置 MinGit ──
+    let local_git: Option<GitInfo> = if local_path.exists() {
+        let mut cmd = std::process::Command::new(&local_path);
+        cmd.arg("--version").stdin(std::process::Stdio::null());
+        #[cfg(target_os = "windows")]
+        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+        if let Ok(out) = cmd.output() {
+            if out.status.success() {
+                let ver_raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let ver = ver_raw.replace("git version ", "").trim().to_string();
+                Some(GitInfo {
+                    version: Some(ver),
+                    path: Some(local_path.to_string_lossy().replace('\\', "/")),
+                    source: "local".to_string(),
+                })
+            } else { None }
+        } else { None }
+    } else { None };
+
+    Ok(serde_json::json!({ "system": system_git, "local": local_git }))
+}
+
+
+
+#[tauri::command]
+pub async fn check_git(app: AppHandle) -> Result<GitInfo, String> {
+    // 直接复用 get_git_exe 获取实际可用的 git 可执行文件路径，
+    // 保证检测结果与实际使用（clone/install 等操作）完全一致。
+    let git_exe = get_git_exe(&app);
+    let git_exe_str = git_exe.to_string_lossy().to_string();
+
+    // 判断来源：是系统 Git（"git"）还是内置 MinGit（绝对路径）
+    let is_system = git_exe_str == "git";
+
+    let mut command = std::process::Command::new(&git_exe);
+    command.arg("--version")
+        .stdin(std::process::Stdio::null());
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
 
-    if let Ok(output) = command.stdin(std::process::Stdio::null()).output() {
+    if let Ok(output) = command.output() {
         if output.status.success() {
             let version_output = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let version = version_output.replace("git version ", "").trim().to_string();
 
-            let path_cmd = if cfg!(target_os = "windows") {
-                "where"
-            } else {
-                "which"
-            };
-            let mut git_path = "system".to_string();
-
-            let mut path_command = std::process::Command::new(path_cmd);
-            path_command.arg("git");
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                path_command.creation_flags(0x08000000);
-            }
-
-            if let Ok(path_output) = path_command.stdin(std::process::Stdio::null()).output() {
-                if path_output.status.success() {
-                    let path_str = String::from_utf8_lossy(&path_output.stdout);
-                    if let Some(first_line) = path_str.lines().next() {
-                        let trimmed = first_line.trim();
-                        if !trimmed.is_empty() {
-                            git_path = trimmed.replace('\\', "/");
-                        }
-                    }
+            let (path, source) = if is_system {
+                // 系统 Git：通过 where/which 获取实际路径
+                let path_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+                let mut path_command = std::process::Command::new(path_cmd);
+                path_command.arg("git").stdin(std::process::Stdio::null());
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    path_command.creation_flags(0x08000000);
                 }
-            }
+                let git_path = if let Ok(path_output) = path_command.output() {
+                    if path_output.status.success() {
+                        let path_str = String::from_utf8_lossy(&path_output.stdout);
+                        path_str.lines().next()
+                            .map(|l| l.trim().replace('\\', "/"))
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or_else(|| "system".to_string())
+                    } else {
+                        "system".to_string()
+                    }
+                } else {
+                    "system".to_string()
+                };
+                (git_path, "system".to_string())
+            } else {
+                // 内置 MinGit：直接用绝对路径
+                (git_exe_str.replace('\\', "/"), "local".to_string())
+            };
 
             return Ok(GitInfo {
                 version: Some(version),
-                path: Some(git_path),
-                source: "system".to_string(),
+                path: Some(path),
+                source,
             });
         }
     }
 
+    // get_git_exe 找不到可用 git（系统无 git 且内置 MinGit 不存在）
     Ok(GitInfo {
         version: None,
         path: None,

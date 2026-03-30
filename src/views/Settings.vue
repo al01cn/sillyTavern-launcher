@@ -11,7 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl as open } from '@tauri-apps/plugin-opener';
 import { toast } from 'vue-sonner';
-import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple, PhShield, PhShieldCheck, PhGitBranch, PhSliders, PhTerminalWindow, PhX } from '@phosphor-icons/vue';
+import { PhCheck, PhArrowsClockwise, PhGlobe, PhPalette, PhGithubLogo, PhInfo, PhPackage, PhDownloadSimple, PhShield, PhShieldCheck, PhGitBranch, PhSliders, PhTerminalWindow, PhX, PhWarning, PhDesktop } from '@phosphor-icons/vue';
 import globalConfig from '../lib/config'
 import { checkUpdate } from '../lib/updater'
 import { setTheme } from '../lib/theme'
@@ -25,7 +25,7 @@ const route = useRoute();
 
 interface GithubProxyConfig {
   enable: boolean;
-  url: String;
+  url: string;
 }
 
 interface GitInfo {
@@ -63,6 +63,9 @@ interface AppConfig {
   initialSetupCompleted: boolean;
   enableAnimations: boolean;
   setupCheckpoint: string | null;
+  useSystemNode: boolean;
+  useSystemGit: boolean;
+  launchMode: 'normal' | 'desktop' | 'lan' | 'public' | 'debug';
 }
 
 interface ProxyItem {
@@ -119,7 +122,10 @@ const config = ref<AppConfig>({
   regionAutoConfigured: false,
   initialSetupCompleted: false,
   enableAnimations: true,
-  setupCheckpoint: null
+  setupCheckpoint: null,
+  useSystemNode: true,
+  useSystemGit: true,
+  launchMode: 'normal',
 });
 
 const proxies = ref<ProxyItem[]>([]);
@@ -130,6 +136,56 @@ const nodeInfo = ref<NodeInfo>({ version: null, path: null, source: 'none' });
 const npmInfo = ref<NpmInfo>({ version: null, path: null, source: 'none' });
 const installingNode = ref(false);
 const nodeProgress = ref<DownloadProgress>({ status: '', progress: 0, log: '' });
+
+// 同时检测系统/内置 Node（用于切换 Toggle）
+interface BothNodeInfo {
+  system: NodeInfo | null;
+  local: NodeInfo | null;
+}
+const bothNodeInfo = ref<BothNodeInfo>({ system: null, local: null });
+
+// 同时检测系统/内置 Git（用于切换 Toggle）
+interface BothGitInfo {
+  system: GitInfo | null;
+  local: GitInfo | null;
+}
+const bothGitInfo = ref<BothGitInfo>({ system: null, local: null });
+
+const checkNodeBoth = async () => {
+  try {
+    const res = await invoke<BothNodeInfo>('check_nodejs_both');
+    bothNodeInfo.value = res;
+  } catch (e) {
+    console.error('check_nodejs_both failed:', e);
+  }
+};
+
+// 切换 Node 来源（系统/内置），保存配置并重新检测
+const switchNodeSource = async (useSystem: boolean) => {
+  config.value.useSystemNode = useSystem;
+  await saveConfig();
+  await checkNode();
+  await checkNpm();
+  await checkNodeBoth(); // 切换后刷新，确保按钮文案正确反映内置 Node 是否存在
+};
+
+const checkGitBoth = async () => {
+  try {
+    const res = await invoke<BothGitInfo>('check_git_both');
+    bothGitInfo.value = res;
+  } catch (e) {
+    console.error('check_git_both failed:', e);
+  }
+};
+
+// 切换 Git 来源（系统/内置），保存配置并重新检测
+const switchGitSource = async (useSystem: boolean) => {
+  config.value.useSystemGit = useSystem;
+  await saveConfig();
+  await checkGit();
+  await checkGitBoth();
+};
+
 const isElevated = ref(false);
 const elevating = ref(false);
 const systemCpuCores = ref<number>(parseInt(localStorage.getItem('app_system_cpu_cores') || '0', 10));
@@ -174,9 +230,30 @@ const isNodeVersionValid = computed(() => {
   const match = nodeInfo.value.version.match(/v?(\d+)\./);
   if (match && match[1]) {
     const majorVersion = parseInt(match[1], 10);
-    return majorVersion >= 18;
+    return majorVersion >= requiredNodeMajor.value;
   }
   return false;
+});
+
+// 根据当前选择的酒馆版本动态计算所需的最低 Node 主版本
+// ST >= 1.17.0 需要 v20+，否则需要 v18+
+const requiredNodeMajor = computed(() => {
+  try {
+    const configCache = localStorage.getItem('app_settings_config_cache');
+    if (configCache) {
+      const cached = JSON.parse(configCache);
+      const tavernVer: string | null = cached?.sillytavern?.version?.version || null;
+      if (tavernVer) {
+        const m = tavernVer.replace(/^v/, '').match(/^(\d+)\.(\d+)\./);
+        if (m) {
+          const major = parseInt(m[1], 10);
+          const minor = parseInt(m[2], 10);
+          if (major > 1 || (major === 1 && minor >= 17)) return 20;
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return 18;
 });
 
 const loadConfig = async () => {
@@ -262,8 +339,28 @@ const loadConfig = async () => {
   return globalLoadConfigPromise;
 };
 
+// 验证 URL 格式：必须是 http:// 或 https:// 开头
+const isValidProxyUrl = (url: string): boolean => {
+  if (!url || !url.trim()) return false;
+  try {
+    const trimmed = url.trim();
+    // 必须以 http:// 或 https:// 开头
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return false;
+    // 再做一次 URL 构造验证
+    new URL(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const saveConfig = async () => {
   try {
+    // 兜底：github_proxy.url 必须是合法 URL，否则恢复默认值
+    if (!isValidProxyUrl(config.value.githubProxy.url)) {
+      config.value.githubProxy.url = 'https://ghfast.top/';
+    }
+
     await invoke('save_app_config', { config: config.value });
 
     // 保存成功后同时更新本地缓存，合并现有数据以免覆盖其他模块追加的数据(如 sillytavern.version)
@@ -456,6 +553,9 @@ const installGit = async () => {
       toast.success(t('settings.gitInstall') + ' ' + t('common.success'));
     }
     await checkGit();
+    await checkGitBoth();
+    // 安装完内置 Git 后自动切换到内置 Git 来源
+    await switchGitSource(false);
   } catch (error) {
     console.error('Failed to install git:', error);
     if (route.query.action === 'one_click_setup') {
@@ -481,8 +581,8 @@ const installNode = async () => {
 
   try {
     await invoke('install_nodejs');
-    await checkNode();
-    await checkNpm();
+    // 安装完内置 Node 后自动切换到内置 Node 来源
+    await switchNodeSource(false);
     if (route.query.action === 'one_click_setup') {
       updateOneClickMessage(t('oneClick.nodeSuccess'));
       await invoke('save_app_config', { config: { ...config.value, setupCheckpoint: 'NODE_DONE' } });
@@ -599,7 +699,8 @@ onMounted(() => {
     });
   });
   checkNpm();
-
+  checkNodeBoth();
+  checkGitBoth();
   checkElevation();
   checkSystemCpuCores();
   listen<DownloadProgress>('download-progress', (event) => {
@@ -618,6 +719,38 @@ const openLink = (url: string) => {
     console.error('Failed to open URL:', err);
     toast.error(t('settings.loadFailed'));
   });
+};
+
+// ─── 公网模式二次确认弹窗 ──────────────────────────────────────────────────
+const SKIP_PUBLIC_CONFIRM_KEY = 'launch_public_skip_confirm';
+const showPublicConfirm = ref(false);
+
+const handleLaunchModeChange = (mode: AppConfig['launchMode']) => {
+  if (mode === 'public') {
+    const skip = localStorage.getItem(SKIP_PUBLIC_CONFIRM_KEY);
+    if (skip === 'true') {
+      config.value.launchMode = 'public';
+    } else {
+      showPublicConfirm.value = true;
+    }
+  } else {
+    config.value.launchMode = mode;
+  }
+};
+
+const confirmPublicMode = () => {
+  config.value.launchMode = 'public';
+  showPublicConfirm.value = false;
+};
+
+const neverAskPublicMode = () => {
+  localStorage.setItem(SKIP_PUBLIC_CONFIRM_KEY, 'true');
+  config.value.launchMode = 'public';
+  showPublicConfirm.value = false;
+};
+
+const cancelPublicMode = () => {
+  showPublicConfirm.value = false;
 };
 </script>
 
@@ -689,6 +822,82 @@ const openLink = (url: string) => {
                   <option v-for="n in systemCpuCores" :key="n" :value="n">{{ n }}</option>
                 </template>
               </select>
+            </div>
+
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+
+            <!-- Launch Mode -->
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-center gap-3 shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center text-violet-500">
+                  <PhTerminalWindow :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.launchMode') }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.launchModeDesc') }}</div>
+                </div>
+              </div>
+              <!-- Tag 单选选择器 -->
+              <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shrink-0 flex-wrap justify-end">
+                <button
+                  @click="handleLaunchModeChange('normal')"
+                  :class="[
+                    'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                    config.launchMode === 'normal'
+                      ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ]"
+                  :title="t('settings.launchModeNormalDesc')"
+                >{{ t('settings.launchModeNormal') }}</button>
+                <button
+                  @click="handleLaunchModeChange('desktop')"
+                  :class="[
+                    'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                    config.launchMode === 'desktop'
+                      ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ]"
+                  :title="t('settings.launchModeDesktopDesc')"
+                >{{ t('settings.launchModeDesktop') }}</button>
+                <button
+                  @click="handleLaunchModeChange('lan')"
+                  :class="[
+                    'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                    config.launchMode === 'lan'
+                      ? 'bg-white dark:bg-slate-600 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ]"
+                  :title="t('settings.launchModeLanDesc')"
+                >{{ t('settings.launchModeLan') }}</button>
+                <button
+                  @click="handleLaunchModeChange('public')"
+                  :class="[
+                    'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                    config.launchMode === 'public'
+                      ? 'bg-white dark:bg-slate-600 text-red-600 dark:text-red-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ]"
+                  :title="t('settings.launchModePublicDesc')"
+                >{{ t('settings.launchModePublic') }}</button>
+                <button
+                  @click="handleLaunchModeChange('debug')"
+                  :class="[
+                    'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                    config.launchMode === 'debug'
+                      ? 'bg-white dark:bg-slate-600 text-violet-600 dark:text-violet-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ]"
+                  :title="t('settings.launchModeDebugDesc')"
+                >{{ t('settings.launchModeDebug') }}</button>
+              </div>
+            </div>
+            <!-- 当前选中模式的说明文字 -->
+            <div class="pl-11 text-xs -mt-2">
+              <span v-if="config.launchMode === 'normal'" class="text-slate-400 dark:text-slate-500">{{ t('settings.launchModeNormalDesc') }}</span>
+              <span v-else-if="config.launchMode === 'desktop'" class="text-violet-500">{{ t('settings.launchModeDesktopDesc') }}</span>
+              <span v-else-if="config.launchMode === 'lan'" class="text-emerald-600 dark:text-emerald-400">{{ t('settings.launchModeLanDesc') }}</span>
+              <span v-else-if="config.launchMode === 'public'" class="text-red-500 font-medium flex items-center gap-1"><PhWarning :size="12" weight="fill" />{{ t('settings.launchModePublicDesc') }}</span>
+              <span v-else-if="config.launchMode === 'debug'" class="text-amber-500">{{ t('settings.launchModeDebugDesc') }}</span>
             </div>
           </div>
         </section>
@@ -815,7 +1024,8 @@ const openLink = (url: string) => {
                 </div>
               </div>
 
-              <div v-if="!gitInfo.version || gitInfo.source === 'local'" class="flex items-center gap-2">
+              <!-- Git 按钮：始终显示，有系统 Git 时改为"安装内置"文案 -->
+              <div class="flex items-center gap-2">
                 <button v-if="installingGit" @click="showLogs('git')"
                   class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700 rounded-md transition-colors"
                   :title="t('common.logs', '日志')">
@@ -825,7 +1035,7 @@ const openLink = (url: string) => {
                   class="px-3 py-1.5 text-xs font-medium bg-orange-50 dark:bg-orange-900/30 text-orange-600 rounded-md hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
                   <PhArrowsClockwise v-if="installingGit" :size="14" class="animate-spin" />
                   <PhDownloadSimple v-else :size="14" />
-                  {{ installingGit ? t('settings.gitInstalling') : (gitInfo.version ? t('settings.gitReinstall') : t('settings.gitInstall')) }}
+                  {{ installingGit ? t('settings.gitInstalling') : (gitInfo.source === 'local' ? t('settings.gitReinstall') : gitInfo.source === 'system' ? t('settings.gitInstallLocal') : t('settings.gitInstall')) }}
                 </button>
               </div>
             </div>
@@ -840,6 +1050,52 @@ const openLink = (url: string) => {
                   :style="{ width: `${gitProgress.progress * 100}%` }"></div>
               </div>
             </div>
+
+            <!-- 系统/内置 Git 切换（系统和内置 Git 同时存在时才显示） -->
+            <template v-if="bothGitInfo.local && bothGitInfo.system">
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                    <PhSliders :size="18" weight="duotone" />
+                  </div>
+                  <div>
+                    <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.gitSourceToggle') }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.gitSourceToggleDesc') }}</div>
+                    <div class="mt-1 text-[10px] text-slate-400 dark:text-slate-500 space-y-0.5">
+                      <div v-if="bothGitInfo.system" class="flex items-center gap-1">
+                        <PhDesktop :size="11" class="shrink-0" />
+                        <span>{{ t('settings.gitSystem') }}: {{ bothGitInfo.system.version }} — {{ bothGitInfo.system.path }}</span>
+                      </div>
+                      <div v-if="bothGitInfo.local" class="flex items-center gap-1">
+                        <PhPackage :size="11" class="shrink-0" />
+                        <span>{{ t('settings.gitLocal') }}: {{ bothGitInfo.local.version }} — {{ bothGitInfo.local.path }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shrink-0">
+                  <button
+                    @click="switchGitSource(true)"
+                    :class="[
+                      'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                      config.useSystemGit
+                        ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ]"
+                  >{{ t('settings.gitUseSystem') }}</button>
+                  <button
+                    @click="switchGitSource(false)"
+                    :class="[
+                      'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                      !config.useSystemGit
+                        ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ]"
+                  >{{ t('settings.gitUseLocal') }}</button>
+                </div>
+              </div>
+            </template>
           </div>
         </section>
 
@@ -865,7 +1121,7 @@ const openLink = (url: string) => {
                         {{ t('settings.nodejsPath') }}: {{ nodeInfo.path }}
                       </div>
                       <div v-if="!isNodeVersionValid" class="mt-1 text-red-500">
-                        {{ t('settings.nodejsLowVersion') }}
+                        {{ t('settings.nodejsLowVersion', { required: `v${requiredNodeMajor}` }) }}
                       </div>
                     </span>
                     <span v-else>{{ t('settings.nodejsNotFound') }}</span>
@@ -873,7 +1129,13 @@ const openLink = (url: string) => {
                 </div>
               </div>
 
-              <div v-if="!isNodeVersionValid || nodeInfo.source === 'local'" class="flex items-center gap-2">
+              <!-- Node 按钮：
+                   - 当前用系统 Node 且已有内置 Node → 隐藏（用户主动选了系统Node，不需要再装）
+                   - 当前用内置 Node → 显示「重新安装」
+                   - 无内置 Node，当前系统 Node → 显示「安装内置 Node」
+                   - 完全没有 Node → 显示「立即安装」
+              -->
+              <div v-if="!(nodeInfo.source === 'system' && bothNodeInfo.local)" class="flex items-center gap-2">
                 <button v-if="installingNode" @click="showLogs('node')"
                   class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700 rounded-md transition-colors"
                   :title="t('common.logs', '日志')">
@@ -883,7 +1145,7 @@ const openLink = (url: string) => {
                   class="px-3 py-1.5 text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-600 rounded-md hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
                   <PhArrowsClockwise v-if="installingNode" :size="14" class="animate-spin" />
                   <PhDownloadSimple v-else :size="14" />
-                  {{ installingNode ? t('settings.nodejsInstalling') : (nodeInfo.version ? t('settings.nodejsReinstall') : t('settings.nodejsInstall')) }}
+                  {{ installingNode ? t('settings.nodejsInstalling') : (nodeInfo.source === 'local' ? t('settings.nodejsReinstall') : nodeInfo.source === 'system' ? t('settings.nodejsInstallLocal') : nodeInfo.version ? t('settings.nodejsReinstall') : t('settings.nodejsInstall')) }}
                 </button>
               </div>
             </div>
@@ -898,6 +1160,52 @@ const openLink = (url: string) => {
                   :style="{ width: `${nodeProgress.progress * 100}%` }"></div>
               </div>
             </div>
+
+            <!-- 系统/内置 Node 切换（系统和内置 Node 同时存在时才显示） -->
+            <template v-if="bothNodeInfo.local && bothNodeInfo.system">
+              <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                    <PhSliders :size="18" weight="duotone" />
+                  </div>
+                  <div>
+                    <div class="font-medium text-slate-700 dark:text-slate-300">{{ t('settings.nodejsSourceToggle') }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('settings.nodejsSourceToggleDesc2') }}</div>
+                    <div class="mt-1 text-[10px] text-slate-400 dark:text-slate-500 space-y-0.5">
+                      <div v-if="bothNodeInfo.system" class="flex items-center gap-1">
+                        <PhDesktop :size="11" class="shrink-0" />
+                        <span>{{ t('settings.nodejsSystem') }}: {{ bothNodeInfo.system.version }} — {{ bothNodeInfo.system.path }}</span>
+                      </div>
+                      <div v-if="bothNodeInfo.local" class="flex items-center gap-1">
+                        <PhPackage :size="11" class="shrink-0" />
+                        <span>{{ t('settings.nodejsLocal') }}: {{ bothNodeInfo.local.version }} — {{ bothNodeInfo.local.path }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shrink-0">
+                  <button
+                    @click="switchNodeSource(true)"
+                    :class="[
+                      'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                      config.useSystemNode
+                        ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ]"
+                  >{{ t('settings.nodejsUseSystem') }}</button>
+                  <button
+                    @click="switchNodeSource(false)"
+                    :class="[
+                      'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                      !config.useSystemNode
+                        ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ]"
+                  >{{ t('settings.nodejsUseLocal') }}</button>
+                </div>
+              </div>
+            </template>
 
             <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
 
@@ -1013,7 +1321,11 @@ const openLink = (url: string) => {
             <!-- Current URL Display -->
             <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700">
               <div class="text-sm font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ t('settings.currentAddress') }}:</div>
-              <div class="text-sm text-slate-800 dark:text-slate-300 font-mono truncate select-all">{{ config.githubProxy.url }}</div>
+              <div v-if="isValidProxyUrl(config.githubProxy.url)"
+                class="text-sm text-slate-800 dark:text-slate-300 font-mono truncate select-all">{{ config.githubProxy.url }}</div>
+              <div v-else class="text-sm text-slate-400 dark:text-slate-500 font-mono italic">
+                https://ghfast.top/ ({{ t('settings.defaultAddress') }})
+              </div>
             </div>
 
             <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
@@ -1154,6 +1466,52 @@ const openLink = (url: string) => {
     </div>
 
   </div>
+
+  <!-- 公网服务二次确认弹窗 -->
+  <Teleport to="body">
+    <div v-if="showPublicConfirm" class="fixed inset-0 z-[999] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="cancelPublicMode"></div>
+      <div class="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200 border border-red-200 dark:border-red-900/50">
+        <!-- 标题 -->
+        <div class="flex items-start gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+            <PhWarning :size="22" weight="duotone" />
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-slate-100 text-base">{{ t('settings.publicModeWarningTitle') }}</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ t('settings.publicModeWarningDesc') }}</p>
+          </div>
+        </div>
+        <!-- 风险列表 -->
+        <ul class="space-y-2 mb-4">
+          <li v-for="riskKey in ['publicModeRisk1','publicModeRisk2','publicModeRisk3','publicModeRisk4']" :key="riskKey"
+            class="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <span class="text-red-500 mt-0.5 shrink-0">•</span>
+            <span>{{ t(`settings.${riskKey}`) }}</span>
+          </li>
+        </ul>
+        <!-- 建议 -->
+        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-5 text-xs text-amber-700 dark:text-amber-400">
+          {{ t('settings.publicModeAdvice') }}
+        </div>
+        <!-- 三个按钮 -->
+        <div class="flex items-center gap-2">
+          <button @click="cancelPublicMode"
+            class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95">
+            {{ t('settings.publicModeCancel') }}
+          </button>
+          <button @click="neverAskPublicMode"
+            class="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95">
+            {{ t('settings.publicModeNeverAsk') }}
+          </button>
+          <button @click="confirmPublicMode"
+            class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-red-500/20">
+            {{ t('settings.publicModeConfirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

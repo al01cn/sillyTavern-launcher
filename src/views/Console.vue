@@ -11,13 +11,15 @@ import {
   XCircle,
   Trash2
 } from 'lucide-vue-next'
-import { consoleStatus as status, consoleLogs as logs, serverUrl, processPid, startProcess, stopProcess, clearLogs } from '../lib/consoleState'
+import { consoleStatus as status, consoleLogs as logs, serverUrl, processPid, startProcess, stopProcess, clearLogs, networkMode, networkPort, launchMode } from '../lib/consoleState'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { updateOneClickMessage, startOneClickSetup, finishOneClickSetup, simulateClickEffect } from '../lib/useOneClick'
+import NetworkLinkDialog from '../components/NetworkLinkDialog.vue'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const logsContainer = ref<HTMLElement | null>(null)
+const showNetworkDialog = ref(false)
 
 // 自动滚动到底部
 const scrollToBottom = () => {
@@ -155,7 +157,8 @@ const handleOpenUrl = async (url: string) => {
           <span class="text-xs font-mono text-slate-400">PID: {{ processPid }}</span>
         </div>
         
-        <div v-if="status === 2 && serverUrl" class="flex items-center gap-2 ml-2">
+        <!-- 普通模式：直接显示访问链接 -->
+        <div v-if="status === 2 && serverUrl && networkMode === null && launchMode !== 'desktop'" class="flex items-center gap-2 ml-2">
           <div class="h-4 w-px bg-[#2a2d3d]"></div>
           <button 
             @click="handleOpenUrl(serverUrl)"
@@ -164,6 +167,23 @@ const handleOpenUrl = async (url: string) => {
           >
             <span>{{ t('console.visitTavern') }}: {{ serverUrl }}</span>
             <svg class="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </button>
+        </div>
+
+        <!-- 局域网/公网模式：打开连接弹窗 -->
+        <div v-else-if="status === 2 && networkMode !== null" class="flex items-center gap-2 ml-2">
+          <div class="h-4 w-px bg-[#2a2d3d]"></div>
+          <button
+            @click="showNetworkDialog = true"
+            :class="[
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors group',
+              networkMode === 'lan'
+                ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20'
+                : 'text-red-400 bg-red-500/10 hover:bg-red-500/20 border-red-500/20'
+            ]"
+          >
+            <span>{{ networkMode === 'lan' ? t('home.lanLink') : t('home.publicLink') }}</span>
+            <svg class="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </button>
         </div>
       </div>
@@ -246,6 +266,15 @@ const handleOpenUrl = async (url: string) => {
       </div>
     </div>
   </div>
+
+  <!-- 局域网/公网连接弹窗 -->
+  <NetworkLinkDialog
+    v-if="networkMode !== null"
+    :open="showNetworkDialog"
+    :mode="networkMode"
+    :port="networkPort"
+    @close="showNetworkDialog = false"
+  />
 </template>
 
 <style scoped>

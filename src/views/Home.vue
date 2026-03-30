@@ -1,7 +1,7 @@
 <template>
   <div class="h-full flex flex-col gap-6 text-slate-800 dark:text-slate-200">
-    <!-- 断点续传提示 -->
-    <div v-if="setupCheckpoint && setupCheckpoint !== 'DONE' && !initialSetupCompleted" 
+    <!-- 断点续传提示：只在一键安装中途中断（没有安装好酒馆）时才显示，且必须等数据加载完才渲染（避免中间态闪烁） -->
+    <div v-if="isDataReady && setupCheckpoint && setupCheckpoint !== 'DONE' && !initialSetupCompleted && !hasAnyTavern" 
          class="mx-1 px-5 py-4 bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500 shadow-sm"
     >
       <div class="flex items-center gap-4">
@@ -71,12 +71,26 @@
               {{ t('home.systemInfo') }}
             </h2>
             <button 
-              v-if="status === 2 && serverUrl"
+              v-if="status === 2 && serverUrl && networkMode === null && launchMode !== 'desktop'"
               @click="handleOpenServer"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 transition-colors group"
             >
               <span>{{ t('home.visitTavern') }}</span>
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </button>
+            <!-- 局域网/公网服务模式：显示网络链接按钮 -->
+            <button
+              v-else-if="status === 2 && networkMode !== null"
+              @click="showNetworkDialog = true"
+              :class="[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                networkMode === 'lan'
+                  ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-700'
+                  : 'text-red-600 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 border-red-300 dark:border-red-700'
+              ]"
+            >
+              <span>{{ networkMode === 'lan' ? t('home.lanLink') : t('home.publicLink') }}</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             </button>
           </div>
           <div class="flex flex-col gap-4 text-sm">
@@ -103,7 +117,7 @@
         
         <!-- 一键启动按钮 / 安装NodeJs按钮 -->
         <button
-          v-if="!initialSetupCompleted && (nodeVersion === t('home.notInstalled') || !nodeVersion) && (tavernVersion === t('home.notInstalled') || !tavernVersion)"
+          v-if="!initialSetupCompleted && !hasAnyTavern && (nodeVersion === t('home.notInstalled') || !nodeVersion)"
           :disabled="checkingEnv"
           class="btn shrink-0 min-h-[6rem] py-3 h-auto rounded-2xl shadow-md hover:shadow-lg border-none text-white flex flex-col items-center justify-center gap-1 group relative overflow-hidden bg-primary hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed"
           @click="router.push('/settings?action=one_click_setup')"
@@ -154,10 +168,19 @@
       </div>
     </div>
   </div>
+
+  <!-- 局域网/公网连接弹窗 -->
+  <NetworkLinkDialog
+    v-if="networkMode !== null"
+    :open="showNetworkDialog"
+    :mode="networkMode"
+    :port="networkPort"
+    @close="showNetworkDialog = false"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
@@ -178,13 +201,16 @@ import {
   History as HistoryIcon,
 } from 'lucide-vue-next'
 
-import { consoleStatus as status, serverUrl, startProcess, stopProcess } from '../lib/consoleState'
+import { consoleStatus as status, serverUrl, networkMode, networkPort, startProcess, stopProcess, launchMode } from '../lib/consoleState'
+import { scanManager } from '../lib/useScan'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Dialog } from '../lib/useDialog'
 import { toast } from 'vue-sonner'
+import NetworkLinkDialog from '../components/NetworkLinkDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const showNetworkDialog = ref(false)
 const appVersion = ref('')
 const nodeVersion = ref('')
 const tavernVersion = ref('')
@@ -193,6 +219,21 @@ const gitPath = ref('')
 const initialSetupCompleted = ref(false)
 const checkingEnv = ref(true)
 const setupCheckpoint = ref<string | null>(null)
+// 标记关键数据（在线已安装列表、本地列表）是否已全部加载完，防止断点续传提示在中间态一闪而过
+const isDataReady = ref(false)
+
+// 在线下载安装的版本列表（用于判断是否有任何已安装的酒馆）
+const installedOnlineVersions = ref<string[]>([])
+
+/**
+ * 是否已有任何酒馆实例：
+ * - 本地列表（手动添加 / 扫描到）有项目，或
+ * - 在线下载页已安装了任意版本
+ * 满足任意一条 → 视为"已有酒馆"，隐藏一键安装按钮和断点续传提示
+ */
+const hasAnyTavern = computed(() =>
+  scanManager.state.localList.length > 0 || installedOnlineVersions.value.length > 0
+)
 
 const getCheckpointName = (cp: string) => {
     if (cp === 'START') return t('oneClick.gitDetecting');
@@ -357,6 +398,11 @@ const fetchVersions = async () => {
       initialSetupCompleted.value = false;
     }
     setupCheckpoint.value = config.setupCheckpoint || null;
+
+    // 从 config 读取本地列表（和 Versions.vue 使用相同数据源）
+    if (config.localSillytavernList && Array.isArray(config.localSillytavernList)) {
+      scanManager.state.localList = config.localSillytavernList;
+    }
   } catch (e) {}
 
   // 后台静默获取最新数据并更新缓存
@@ -414,6 +460,28 @@ const fetchVersions = async () => {
     }
   }
 
+  // 查询在线下载页面已安装的版本列表
+  try {
+    const installed: any[] = await invoke('get_installed_versions_info');
+    installedOnlineVersions.value = installed.map(v => v.version);
+  } catch (e) {
+    installedOnlineVersions.value = [];
+  }
+
+  // 如果确认已有酒馆但 setupCheckpoint 仍是中间状态（残留/误判），自动清掉
+  if (hasAnyTavern.value && setupCheckpoint.value && setupCheckpoint.value !== 'DONE') {
+    setupCheckpoint.value = null;
+    try {
+      const cfg: any = await invoke('get_app_config');
+      cfg.setupCheckpoint = null;
+      cfg.initialSetupCompleted = true;
+      await invoke('save_app_config', { config: cfg });
+      initialSetupCompleted.value = true;
+    } catch(e) {}
+  }
+
+  // 所有关键数据已就绪，现在才允许渲染断点续传提示（避免中间态一闪而过）
+  isDataReady.value = true;
   checkingEnv.value = false;
 }
 

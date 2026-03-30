@@ -1,14 +1,14 @@
 {
   "lang": "zh-CN",
-  "theme": "auto",
+  "theme": "light",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 641,
-    "y": 214
+    "x": 345,
+    "y": 181
   },
   "githubProxy": {
     "enable": true,
-    "url": "https://ghfast.top/"
+    "url": "https://gh.sixyin.com"
   },
   "sillytavern": {
     "version": {
@@ -36,5 +36,8 @@
   "enableAnimations": true,
   "hasScannedOnce": false,
   "autoRepairGit": true,
-  "setupCheckpoint": null
+  "setupCheckpoint": null,
+  "useSystemNode": true,
+  "useSystemGit": true,
+  "launchMode": "desktop"
 }

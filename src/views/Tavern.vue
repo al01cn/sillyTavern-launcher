@@ -10,9 +10,10 @@ import {
   PhCircleNotch, PhCheckCircle,
   PhFolderOpen, PhGear,
   PhCpu, PhPlugsConnected, PhLightning,
-  PhX, PhPlus, PhFile
+  PhX, PhPlus, PhFile, PhArrowsDownUp
 } from '@phosphor-icons/vue';
 import { useI18n } from 'vue-i18n';
+import ConfigMigrateDialog from '../components/ConfigMigrateDialog.vue';
 
 const { t } = useI18n();
 
@@ -21,6 +22,8 @@ const configError = ref<string | null>(null);
 const saveInProgress = ref(false);
 const saveQueued = ref(false);
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const showMigrateDialog = ref(false);
 
 // 折叠状态管理
 const collapsedSections = ref({
@@ -372,6 +375,11 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
           class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all text-xs font-bold active:scale-95 shadow-sm">
           <PhFolderOpen :size="16" />
           {{ t('tavern.openConfigFile') }}
+        </button>
+        <button @click="showMigrateDialog = true"
+          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-indigo-500 hover:text-indigo-500 transition-all text-xs font-bold active:scale-95 shadow-sm">
+          <PhArrowsDownUp :size="16" />
+          {{ t('tavern.migrate.button') }}
         </button>
       </div>
     </header>
@@ -1195,6 +1203,13 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
       </div>
     </main>
   </div>
+
+  <!-- 配置迁移弹窗 -->
+  <ConfigMigrateDialog
+    :open="showMigrateDialog"
+    @close="showMigrateDialog = false"
+    @migrated="loadConfig"
+  />
 </template>
 
 <style>
