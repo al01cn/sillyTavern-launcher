@@ -105,7 +105,7 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-slate-900">
     <!-- 1. Header & Navigation -->
-    <header class="app-titlebar h-14 shrink-0 flex items-center justify-between px-6 z-60">
+    <header data-tauri-drag-region class="app-titlebar h-14 shrink-0 flex items-center justify-between px-6 z-60">
       <div class="flex items-center gap-2.5 w-40">
         <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white">
           <img :src="config.appIcon" alt="logo" />
