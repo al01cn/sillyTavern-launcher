@@ -1,8 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { PhUserSquare, PhArrowsClockwise, PhTrash, PhPlus, PhGlobe, PhChatCircleText, PhArrowsDownUp } from '@phosphor-icons/vue'
-import { ChevronLeft, ChevronRight, CheckSquare, Square, BookOpen, ChevronDown, ChevronUp, MessageCircle } from 'lucide-vue-next'
+import {
+  PhUserSquare,
+  PhArrowsClockwise,
+  PhTrash,
+  PhPlus,
+  PhGlobe,
+  PhChatCircleText,
+  PhArrowsDownUp,
+} from '@phosphor-icons/vue'
+import {
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
+  Square,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
+} from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { openCharacterCardDialog } from '../lib/useCharacterCardDialog'
 import { openUploadCharacterCardDialog } from '../lib/useUploadCharacterCard'
@@ -189,7 +206,7 @@ const deleteSelected = async () => {
         errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
-    }
+    },
   })
 }
 
@@ -197,7 +214,10 @@ const deleteSelectedChats = async () => {
   if (selectedChatItems.value.size === 0) return
   Dialog.warning({
     title: t('resources.confirmDelete'),
-    msg: t('resources.confirmDeleteMultiple', { count: selectedChatItems.value.size, type: t('resources.chat.chatRecord') }),
+    msg: t('resources.confirmDeleteMultiple', {
+      count: selectedChatItems.value.size,
+      type: t('resources.chat.chatRecord'),
+    }),
     confirmText: t('common.delete'),
     cancelText: t('common.cancel'),
     onConfirm: async () => {
@@ -215,7 +235,7 @@ const deleteSelectedChats = async () => {
         errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
-    }
+    },
   })
 }
 
@@ -243,7 +263,7 @@ const deleteSingle = async (fileName: string, event: Event) => {
         errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
-    }
+    },
   })
 }
 
@@ -251,19 +271,24 @@ const deleteSingleChat = async (group: ChatGroup, file: ChatFile, event: Event) 
   event.stopPropagation()
   Dialog.warning({
     title: t('resources.confirmDelete'),
-    msg: t('resources.confirmDeleteSingle', { type: t('resources.chat.chatRecord'), name: file.fileName }),
+    msg: t('resources.confirmDeleteSingle', {
+      type: t('resources.chat.chatRecord'),
+      name: file.fileName,
+    }),
     confirmText: t('common.delete'),
     cancelText: t('common.cancel'),
     onConfirm: async () => {
       loading.value = true
       try {
-        await invoke('delete_chats', { items: [{ charFolder: group.charFolder, fileName: file.fileName }] })
+        await invoke('delete_chats', {
+          items: [{ charFolder: group.charFolder, fileName: file.fileName }],
+        })
         await loadChats()
       } catch (e: any) {
         errorMsg.value = t('resources.deleteFailed') + ': ' + (e?.message || String(e))
         loading.value = false
       }
-    }
+    },
   })
 }
 
@@ -286,14 +311,14 @@ window.addEventListener('character-card-imported', () => {
 
 // ── 分页 ─────────────────────────────────────────────
 const currentPage = ref(1)
-const pageSize = computed(() => activeTab.value === 'characters' ? 10 : 20)
+const pageSize = computed(() => (activeTab.value === 'characters' ? 10 : 20))
 
 const totalCount = computed(() =>
   activeTab.value === 'characters'
     ? characterCards.value.length
     : activeTab.value === 'worlds'
       ? worldInfos.value.length
-      : chatGroups.value.reduce((s, g) => s + g.files.length, 0)
+      : chatGroups.value.reduce((s, g) => s + g.files.length, 0),
 )
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)))
 
@@ -462,34 +487,34 @@ onUnmounted(() => {
       <div class="flex items-center gap-2">
         <button
           v-if="activeTab === 'characters'"
-          @click="importCard()"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
           type="button"
+          @click="importCard()"
         >
           <PhPlus :size="16" weight="bold" />
           {{ t('resources.addCharacterCard') }}
         </button>
         <button
           v-if="activeTab === 'worlds'"
-          @click="importWorld()"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
           type="button"
+          @click="importWorld()"
         >
           <PhPlus :size="16" weight="bold" />
           {{ t('resources.addWorldInfo') }}
         </button>
         <button
-          @click="refreshCurrent"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
           type="button"
+          @click="refreshCurrent"
         >
           <PhArrowsClockwise :size="16" weight="duotone" :class="loading ? 'animate-spin' : ''" />
           {{ t('common.refresh') }}
         </button>
         <button
-          @click="showMigrateDialog = true"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-400 dark:hover:border-violet-600 flex items-center gap-2"
           type="button"
+          @click="showMigrateDialog = true"
         >
           <PhArrowsDownUp :size="16" weight="duotone" />
           {{ t('resources.migrate.button') }}
@@ -500,40 +525,40 @@ onUnmounted(() => {
     <!-- Tab 切换 -->
     <div class="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit mb-6 shrink-0">
       <button
-        @click="activeTab = 'characters'"
         :class="[
           'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
           activeTab === 'characters'
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50',
         ]"
         type="button"
+        @click="activeTab = 'characters'"
       >
         <PhUserSquare :size="16" weight="duotone" />
         {{ t('resources.characterCards') }}
       </button>
       <button
-        @click="activeTab = 'worlds'"
         :class="[
           'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
           activeTab === 'worlds'
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50',
         ]"
         type="button"
+        @click="activeTab = 'worlds'"
       >
         <PhGlobe :size="16" weight="duotone" />
         {{ t('resources.worldInfos') }}
       </button>
       <button
-        @click="activeTab = 'chats'"
         :class="[
           'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2',
           activeTab === 'chats'
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50',
         ]"
         type="button"
+        @click="activeTab = 'chats'"
       >
         <PhChatCircleText :size="16" weight="duotone" />
         {{ t('resources.chat.title') }}
@@ -541,33 +566,40 @@ onUnmounted(() => {
     </div>
 
     <div class="flex-1 overflow-y-auto px-1 pb-10 min-h-0 relative">
-
       <!-- ─── 角色卡 ─── -->
       <div v-if="activeTab === 'characters'" class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('resources.characterCards') }}</div>
+              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {{ t('resources.characterCards') }}
+              </div>
               <div class="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
               <button
-                @click="toggleSelectMode"
                 class="text-xs font-medium px-2 py-1 rounded transition-colors"
-                :class="isSelectMode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'"
+                :class="
+                  isSelectMode
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'
+                "
+                @click="toggleSelectMode"
               >
                 {{ isSelectMode ? t('resources.exitSelection') : t('resources.batchOperations') }}
               </button>
               <template v-if="isSelectMode">
                 <button
-                  @click="selectAllOnPage"
                   class="text-xs font-medium px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                  @click="selectAllOnPage"
                 >
                   {{ t('resources.selectAllOnPage') }}
                 </button>
                 <div v-if="selectedFiles.size > 0" class="flex items-center gap-2">
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.selectedItems', { count: selectedFiles.size }) }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                    t('resources.selectedItems', { count: selectedFiles.size })
+                  }}</span>
                   <button
-                    @click="deleteSelected"
                     class="text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
+                    @click="deleteSelected"
                   >
                     <PhTrash :size="14" />
                     {{ t('resources.deleteSelected') }}
@@ -575,16 +607,26 @@ onUnmounted(() => {
                 </div>
               </template>
             </div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">{{ t('resources.totalCards', { count: characterCards.length }) }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">
+              {{ t('resources.totalCards', { count: characterCards.length }) }}
+            </div>
           </div>
         </div>
 
-        <div v-if="errorMsg" class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
+        <div
+          v-if="errorMsg"
+          class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400"
+        >
           {{ errorMsg }}
         </div>
 
-        <div v-else-if="!loading && characterCards.length === 0" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400">
-          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('resources.noCharacterCards') }}</div>
+        <div
+          v-else-if="!loading && characterCards.length === 0"
+          class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400"
+        >
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {{ t('resources.noCharacterCards') }}
+          </div>
           <div class="text-xs text-slate-400 mt-1">{{ t('resources.noCharacterCardsHint') }}</div>
         </div>
 
@@ -599,7 +641,11 @@ onUnmounted(() => {
             <div
               v-if="isSelectMode"
               class="absolute inset-0 z-10 rounded-2xl border-2 transition-all pointer-events-none"
-              :class="selectedFiles.has(card.fileName) ? 'border-blue-500 bg-blue-500/10' : 'border-transparent group-hover:border-slate-300'"
+              :class="
+                selectedFiles.has(card.fileName)
+                  ? 'border-blue-500 bg-blue-500/10'
+                  : 'border-transparent group-hover:border-slate-300'
+              "
             >
               <div class="absolute top-3 left-3 bg-white rounded shadow-sm">
                 <CheckSquare v-if="selectedFiles.has(card.fileName)" class="w-5 h-5 text-blue-500" />
@@ -608,13 +654,15 @@ onUnmounted(() => {
             </div>
             <button
               v-if="!isSelectMode"
-              @click="deleteSingle(card.fileName, $event)"
               class="absolute top-3 right-3 z-10 p-1.5 bg-white/90 backdrop-blur text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
               :title="t('common.delete')"
+              @click="deleteSingle(card.fileName, $event)"
             >
               <PhTrash :size="16" weight="bold" />
             </button>
-            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-soft transition-shadow overflow-hidden flex-1 flex flex-col">
+            <div
+              class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-soft transition-shadow overflow-hidden flex-1 flex flex-col"
+            >
               <div class="bg-slate-100 dark:bg-slate-700 aspect-2/3 shrink-0">
                 <img
                   v-if="thumbUrlByFileName[card.fileName]"
@@ -623,26 +671,48 @@ onUnmounted(() => {
                   :alt="card.fileName"
                   loading="lazy"
                 />
-                <div v-else class="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-medium">
+                <div
+                  v-else
+                  class="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-medium"
+                >
                   {{ t('common.loading') }}
                 </div>
               </div>
               <div class="p-3 flex-1 flex flex-col justify-between">
-                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight">{{ card.fileName }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400 mt-2 shrink-0">{{ formatSize(card.size) }}</div>
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight">
+                  {{ card.fileName }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 mt-2 shrink-0">
+                  {{ formatSize(card.size) }}
+                </div>
               </div>
             </div>
           </button>
         </div>
 
-        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6">
-          <span class="text-sm text-slate-500 dark:text-slate-400">{{ t('resources.totalCards', { count: characterCards.length }) }}</span>
+        <div
+          v-if="totalPages > 1"
+          class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6"
+        >
+          <span class="text-sm text-slate-500 dark:text-slate-400">{{
+            t('resources.totalCards', { count: characterCards.length })
+          }}</span>
           <div class="flex items-center gap-2">
-            <button @click="prevPage" :disabled="currentPage === 1" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800">
+            <button
+              :disabled="currentPage === 1"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
+              @click="prevPage"
+            >
               <ChevronLeft class="w-4 h-4" />
             </button>
-            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center">{{ currentPage }} / {{ totalPages }}</span>
-            <button @click="nextPage" :disabled="currentPage === totalPages" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800">
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center"
+              >{{ currentPage }} / {{ totalPages }}</span
+            >
+            <button
+              :disabled="currentPage === totalPages"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
+              @click="nextPage"
+            >
               <ChevronRight class="w-4 h-4" />
             </button>
           </div>
@@ -654,27 +724,35 @@ onUnmounted(() => {
         <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('resources.worldInfos') }}</div>
+              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {{ t('resources.worldInfos') }}
+              </div>
               <div class="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
               <button
-                @click="toggleSelectMode"
                 class="text-xs font-medium px-2 py-1 rounded transition-colors"
-                :class="isSelectMode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'"
+                :class="
+                  isSelectMode
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'
+                "
+                @click="toggleSelectMode"
               >
                 {{ isSelectMode ? t('resources.exitSelection') : t('resources.batchOperations') }}
               </button>
               <template v-if="isSelectMode">
                 <button
-                  @click="selectAllOnPage"
                   class="text-xs font-medium px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                  @click="selectAllOnPage"
                 >
                   {{ t('resources.selectAllOnPage') }}
                 </button>
                 <div v-if="selectedFiles.size > 0" class="flex items-center gap-2">
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.selectedItems', { count: selectedFiles.size }) }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                    t('resources.selectedItems', { count: selectedFiles.size })
+                  }}</span>
                   <button
-                    @click="deleteSelected"
                     class="text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
+                    @click="deleteSelected"
                   >
                     <PhTrash :size="14" />
                     {{ t('resources.deleteSelected') }}
@@ -682,16 +760,26 @@ onUnmounted(() => {
                 </div>
               </template>
             </div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">{{ t('resources.totalInfos', { count: worldInfos.length }) }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">
+              {{ t('resources.totalInfos', { count: worldInfos.length }) }}
+            </div>
           </div>
         </div>
 
-        <div v-if="errorMsg" class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
+        <div
+          v-if="errorMsg"
+          class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400"
+        >
           {{ errorMsg }}
         </div>
 
-        <div v-else-if="!loading && worldInfos.length === 0" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400">
-          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('resources.noWorldInfos') }}</div>
+        <div
+          v-else-if="!loading && worldInfos.length === 0"
+          class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-slate-400"
+        >
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {{ t('resources.noWorldInfos') }}
+          </div>
           <div class="text-xs text-slate-400 mt-1">{{ t('resources.noWorldInfosHint') }}</div>
         </div>
 
@@ -712,37 +800,61 @@ onUnmounted(() => {
             </div>
             <button
               v-if="!isSelectMode"
-              @click="deleteSingle(world.fileName, $event)"
               class="absolute top-1/2 -translate-y-1/2 right-3 z-10 p-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
               :title="t('common.delete')"
+              @click="deleteSingle(world.fileName, $event)"
             >
               <PhTrash :size="16" weight="bold" />
             </button>
-            <div class="bg-white dark:bg-slate-800 rounded-xl border transition-all p-4 flex items-center gap-4"
+            <div
+              class="bg-white dark:bg-slate-800 rounded-xl border transition-all p-4 flex items-center gap-4"
               :class="[
-                isSelectMode && selectedFiles.has(world.fileName) ? 'border-blue-500 dark:border-blue-400 bg-blue-50/30 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:shadow-soft',
-                isSelectMode ? 'pr-12' : ''
+                isSelectMode && selectedFiles.has(world.fileName)
+                  ? 'border-blue-500 dark:border-blue-400 bg-blue-50/30 dark:bg-blue-900/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:shadow-soft',
+                isSelectMode ? 'pr-12' : '',
               ]"
             >
-              <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+              <div
+                class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0"
+              >
                 <BookOpen class="w-5 h-5 text-blue-500 dark:text-blue-400" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{{ world.fileName }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ formatSize(world.size) }}</div>
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                  {{ world.fileName }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {{ formatSize(world.size) }}
+                </div>
               </div>
             </div>
           </button>
         </div>
 
-        <div v-if="totalPages > 1" class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6">
-          <span class="text-sm text-slate-500 dark:text-slate-400">{{ t('resources.totalInfos', { count: worldInfos.length }) }}</span>
+        <div
+          v-if="totalPages > 1"
+          class="p-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mt-6"
+        >
+          <span class="text-sm text-slate-500 dark:text-slate-400">{{
+            t('resources.totalInfos', { count: worldInfos.length })
+          }}</span>
           <div class="flex items-center gap-2">
-            <button @click="prevPage" :disabled="currentPage === 1" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800">
+            <button
+              :disabled="currentPage === 1"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
+              @click="prevPage"
+            >
               <ChevronLeft class="w-4 h-4" />
             </button>
-            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center">{{ currentPage }} / {{ totalPages }}</span>
-            <button @click="nextPage" :disabled="currentPage === totalPages" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800">
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-12 text-center"
+              >{{ currentPage }} / {{ totalPages }}</span
+            >
+            <button
+              :disabled="currentPage === totalPages"
+              class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-slate-50 dark:bg-slate-800"
+              @click="nextPage"
+            >
               <ChevronRight class="w-4 h-4" />
             </button>
           </div>
@@ -755,20 +867,28 @@ onUnmounted(() => {
         <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('resources.chat.title') }}</div>
+              <div class="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {{ t('resources.chat.title') }}
+              </div>
               <div class="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
               <button
-                @click="toggleSelectMode"
                 class="text-xs font-medium px-2 py-1 rounded transition-colors"
-                :class="isSelectMode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'"
+                :class="
+                  isSelectMode
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'
+                "
+                @click="toggleSelectMode"
               >
                 {{ isSelectMode ? t('resources.exitSelection') : t('resources.batchOperations') }}
               </button>
               <template v-if="isSelectMode && selectedChatItems.size > 0">
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.selectedItems', { count: selectedChatItems.size }) }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                  t('resources.selectedItems', { count: selectedChatItems.size })
+                }}</span>
                 <button
-                  @click="deleteSelectedChats"
                   class="text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
+                  @click="deleteSelectedChats"
                 >
                   <PhTrash :size="14" />
                   {{ t('resources.deleteSelected') }}
@@ -782,13 +902,21 @@ onUnmounted(() => {
         </div>
 
         <!-- 错误 -->
-        <div v-if="errorMsg" class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
+        <div
+          v-if="errorMsg"
+          class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400"
+        >
           {{ errorMsg }}
         </div>
 
         <!-- 空 -->
-        <div v-else-if="!loading && chatGroups.length === 0" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center">
-          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('resources.chat.noChats') }}</div>
+        <div
+          v-else-if="!loading && chatGroups.length === 0"
+          class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center"
+        >
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {{ t('resources.chat.noChats') }}
+          </div>
           <div class="text-xs text-slate-400 mt-1">{{ t('resources.chat.noChatsHint') }}</div>
         </div>
 
@@ -805,20 +933,24 @@ onUnmounted(() => {
               class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
               @click="toggleFolder(group.charFolder)"
             >
-              <div class="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0 text-sm font-bold text-purple-600 dark:text-purple-400">
+              <div
+                class="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0 text-sm font-bold text-purple-600 dark:text-purple-400"
+              >
                 {{ group.charName[0]?.toUpperCase() || '?' }}
               </div>
               <div class="flex-1 text-left min-w-0">
-                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{{ group.charName }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.chat.fileCount', { count: group.files.length }) }}</div>
+                <div class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                  {{ group.charName }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('resources.chat.fileCount', { count: group.files.length }) }}
+                </div>
               </div>
               <!-- 选中数量 -->
-              <div
-                v-if="isSelectMode"
-                class="text-xs text-slate-400"
-                @click.stop="selectAllChatsInFolder(group)"
-              >
-                <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer transition-colors">
+              <div v-if="isSelectMode" class="text-xs text-slate-400" @click.stop="selectAllChatsInFolder(group)">
+                <span
+                  class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer transition-colors"
+                >
                   {{ t('resources.selectAllOnPage') }}
                 </span>
               </div>
@@ -839,36 +971,45 @@ onUnmounted(() => {
                 :class="[
                   isSelectMode && selectedChatItems.has(chatItemKey(group.charFolder, file.fileName))
                     ? 'bg-blue-50 dark:bg-blue-900/20'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-700/50',
                 ]"
                 @click="handleChatClick(group, file, $event)"
               >
                 <!-- 选择框 -->
                 <div v-if="isSelectMode" class="shrink-0">
-                  <CheckSquare v-if="selectedChatItems.has(chatItemKey(group.charFolder, file.fileName))" class="w-4 h-4 text-blue-500" />
+                  <CheckSquare
+                    v-if="selectedChatItems.has(chatItemKey(group.charFolder, file.fileName))"
+                    class="w-4 h-4 text-blue-500"
+                  />
                   <Square v-else class="w-4 h-4 text-slate-300" />
                 </div>
 
                 <!-- 图标 -->
-                <div class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                <div
+                  class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center shrink-0"
+                >
                   <MessageCircle class="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                 </div>
 
                 <!-- 文件名 -->
                 <div class="flex-1 min-w-0">
-                  <div class="text-sm text-slate-700 dark:text-slate-200 truncate">{{ file.fileName }}</div>
+                  <div class="text-sm text-slate-700 dark:text-slate-200 truncate">
+                    {{ file.fileName }}
+                  </div>
                   <div class="text-xs text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-2">
                     <span>{{ formatSize(file.size) }}</span>
-                    <span v-if="parseChatDate(file.fileName)" class="text-slate-400">{{ parseChatDate(file.fileName) }}</span>
+                    <span v-if="parseChatDate(file.fileName)" class="text-slate-400">{{
+                      parseChatDate(file.fileName)
+                    }}</span>
                   </div>
                 </div>
 
                 <!-- 删除按钮（非选择模式 hover 显示） -->
                 <button
                   v-if="!isSelectMode"
-                  @click="deleteSingleChat(group, file, $event)"
                   class="p-1.5 bg-white/90 dark:bg-slate-800/90 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm shrink-0"
                   :title="t('common.delete')"
+                  @click="deleteSingleChat(group, file, $event)"
                 >
                   <PhTrash :size="14" weight="bold" />
                 </button>
@@ -877,14 +1018,9 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
   <!-- 资源迁移弹窗 -->
-  <ResourceMigrateDialog
-    :open="showMigrateDialog"
-    @close="showMigrateDialog = false"
-    @migrated="refreshCurrent"
-  />
+  <ResourceMigrateDialog :open="showMigrateDialog" @close="showMigrateDialog = false" @migrated="refreshCurrent" />
 </template>

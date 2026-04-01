@@ -12,7 +12,7 @@ export interface AnimationState {
 const animationState = ref<AnimationState>({
   enabled: true,
   isLowPerformance: false,
-  hasShownPerformanceTip: false
+  hasShownPerformanceTip: false,
 })
 
 // 是否已经初始化
@@ -49,7 +49,7 @@ async function initAnimationState(): Promise<void> {
     if (config.enableAnimations !== undefined) {
       animationState.value.enabled = config.enableAnimations
     }
-  } catch (e) {
+  } catch (_e) {
     console.log('Failed to load animation config from backend, using default')
   }
 
@@ -84,8 +84,8 @@ export function useAnimations() {
   return {
     animationsEnabled: computed(() => animationState.value.enabled),
     isLowPerformanceDevice: computed(() => animationState.value.isLowPerformance),
-    shouldShowPerformanceTip: computed(() =>
-      animationState.value.isLowPerformance && !animationState.value.hasShownPerformanceTip
+    shouldShowPerformanceTip: computed(
+      () => animationState.value.isLowPerformance && !animationState.value.hasShownPerformanceTip,
     ),
     animationState: computed(() => animationState.value),
     initAnimationState,

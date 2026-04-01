@@ -1,10 +1,10 @@
+use futures_util::future::select_ok;
+use reqwest::Client;
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
-use tracing_subscriber::{filter::EnvFilter, layer::SubscriberExt, Registry};
-use futures_util::future::select_ok;
-use reqwest::Client;
 use std::time::Duration;
+use tracing_subscriber::{filter::EnvFilter, layer::SubscriberExt, Registry};
 
 use crate::types::AppConfig;
 
@@ -22,7 +22,11 @@ impl GithubProxy {
         let config = crate::config::read_app_config_from_disk(app);
         let mut mirrors = vec!["".to_string()]; // 原始链接
 
-        if config.github_proxy.enable {
+        // GitHub 加速开关开启时，或设置了网络代理（代理和加速不冲突）时启用加速
+        let use_accelerate = config.github_proxy.enable
+            || config.network_proxy.mode != crate::types::ProxyMode::None;
+
+        if use_accelerate {
             // 用户设置的默认代理节点
             if !config.github_proxy.url.is_empty() {
                 mirrors.push(config.github_proxy.url.clone());
@@ -34,7 +38,7 @@ impl GithubProxy {
                 .timeout(Duration::from_secs(3))
                 .build()
                 .unwrap_or_default();
-            
+
             if let Ok(response) = client.get("https://api.akams.cn/github").send().await {
                 if let Ok(proxy_resp) = response.json::<crate::types::ProxyResponse>().await {
                     if proxy_resp.code == 200 {

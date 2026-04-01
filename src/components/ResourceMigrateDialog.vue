@@ -4,10 +4,24 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import {
-  PhX, PhArrowsDownUp, PhWarning, PhCheckCircle,
-  PhCircleNotch, PhArrowRight, PhFolder, PhFile, PhCheck,
-  PhUserSquare, PhPuzzlePiece, PhChatCircleText, PhBookOpen,
-  PhPalette, PhArchiveBox, PhCaretDown, PhCaretUp, PhCrown
+  PhX,
+  PhArrowsDownUp,
+  PhWarning,
+  PhCheckCircle,
+  PhCircleNotch,
+  PhArrowRight,
+  PhFolder,
+  PhFile,
+  PhCheck,
+  PhUserSquare,
+  PhPuzzlePiece,
+  PhChatCircleText,
+  PhBookOpen,
+  PhPalette,
+  PhArchiveBox,
+  PhCaretDown,
+  PhCaretUp,
+  PhCrown,
 } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
@@ -56,17 +70,17 @@ const sourcesError = ref('')
 
 // 可排除的内容分类（与 Rust infer_category 返回值保持一致）
 interface ExcludeOption {
-  key: string        // 对应 infer_category 返回值
-  labelKey: string   // i18n key
-  icon: Component  // Phosphor 图标组件
+  key: string // 对应 infer_category 返回值
+  labelKey: string // i18n key
+  icon: Component // Phosphor 图标组件
 }
 const EXCLUDE_OPTIONS: ExcludeOption[] = [
-  { key: '角色卡',       labelKey: 'resources.migrate.catCharacters', icon: PhUserSquare },
-  { key: '扩展',         labelKey: 'resources.migrate.catExtensions', icon: PhPuzzlePiece },
-  { key: '历史聊天记录', labelKey: 'resources.migrate.catChats',      icon: PhChatCircleText },
-  { key: '世界书',       labelKey: 'resources.migrate.catWorlds',     icon: PhBookOpen },
-  { key: '主题',         labelKey: 'resources.migrate.catThemes',     icon: PhPalette },
-  { key: '备份',         labelKey: 'resources.migrate.catBackups',    icon: PhArchiveBox },
+  { key: '角色卡', labelKey: 'resources.migrate.catCharacters', icon: PhUserSquare },
+  { key: '扩展', labelKey: 'resources.migrate.catExtensions', icon: PhPuzzlePiece },
+  { key: '历史聊天记录', labelKey: 'resources.migrate.catChats', icon: PhChatCircleText },
+  { key: '世界书', labelKey: 'resources.migrate.catWorlds', icon: PhBookOpen },
+  { key: '主题', labelKey: 'resources.migrate.catThemes', icon: PhPalette },
+  { key: '备份', labelKey: 'resources.migrate.catBackups', icon: PhArchiveBox },
 ]
 
 // 每个来源独立的排除集合：dataPath → Set<categoryKey>
@@ -99,8 +113,7 @@ const toggleExpandExclude = (dataPath: string) => {
   expandedExclude.value = s
 }
 
-const excludedCountForSource = (dataPath: string): number =>
-  getExcludedSet(dataPath).size
+const excludedCountForSource = (dataPath: string): number => getExcludedSet(dataPath).size
 
 const loadSources = async () => {
   loadingSources.value = true
@@ -136,9 +149,7 @@ const scanConflicts = async () => {
     const sourcePaths = selSources.map(s => s.dataPath)
     const sourceDisplays = selSources.map(s => s.display)
     // 按来源顺序构建各自的排除列表
-    const excludeCategoriesPerSource = selSources.map(s =>
-      [...getExcludedSet(s.dataPath)]
-    )
+    const excludeCategoriesPerSource = selSources.map(s => [...getExcludedSet(s.dataPath)])
     const list = await invoke<ConflictFile[]>('scan_migration_conflicts', {
       sourcePaths,
       sourceDisplays,
@@ -159,12 +170,8 @@ const scanConflicts = async () => {
   }
 }
 
-const overwriteCount = computed(() =>
-  Object.values(conflictDecisions.value).filter(v => v === 'overwrite').length
-)
-const skipCount = computed(() =>
-  Object.values(conflictDecisions.value).filter(v => v === 'skip').length
-)
+const overwriteCount = computed(() => Object.values(conflictDecisions.value).filter(v => v === 'overwrite').length)
+const skipCount = computed(() => Object.values(conflictDecisions.value).filter(v => v === 'skip').length)
 
 const setAllDecisions = (dec: 'overwrite' | 'skip') => {
   const d: Record<string, 'overwrite' | 'skip'> = {}
@@ -190,7 +197,7 @@ const startMigration = async () => {
   step.value = 3
 
   // 监听进度事件
-  unlistenFn = await listen<ProgressEvent>('resource-migration-progress', (event) => {
+  unlistenFn = await listen<ProgressEvent>('resource-migration-progress', event => {
     progress.value = event.payload
     if (event.payload.error) {
       migrationErrors.value.push(event.payload.error)
@@ -216,9 +223,7 @@ const startMigration = async () => {
     const skipPaths = Object.entries(conflictDecisions.value)
       .filter(([, v]) => v === 'skip')
       .map(([k]) => k)
-    const excludeCategoriesPerSource = selSources.map(s =>
-      [...getExcludedSet(s.dataPath)]
-    )
+    const excludeCategoriesPerSource = selSources.map(s => [...getExcludedSet(s.dataPath)])
 
     await invoke('execute_resource_migration', {
       sourcePaths,
@@ -247,7 +252,10 @@ const goBack = () => {
 
 const handleClose = () => {
   if (migrating.value) return
-  if (unlistenFn) { unlistenFn(); unlistenFn = null }
+  if (unlistenFn) {
+    unlistenFn()
+    unlistenFn = null
+  }
   if (step.value === 3 && progress.value.finished) {
     emit('migrated')
   }
@@ -255,29 +263,39 @@ const handleClose = () => {
 }
 
 // ── 打开时初始化 ──────────────────────────────────────────────────────────────
-watch(() => props.open, async (val) => {
-  if (val) {
-    step.value = 1
-    selectedSources.value = new Set()
-    excludedPerSource.value = new Map()
-    expandedExclude.value = new Set()
-    prioritySourcePath.value = null
-    conflicts.value = []
-    conflictDecisions.value = {}
-    migrationErrors.value = []
-    progress.value = { done: 0, total: 0, current: '', finished: false }
-    await loadSources()
-  } else {
-    if (unlistenFn) { unlistenFn(); unlistenFn = null }
-  }
-})
+watch(
+  () => props.open,
+  async val => {
+    if (val) {
+      step.value = 1
+      selectedSources.value = new Set()
+      excludedPerSource.value = new Map()
+      expandedExclude.value = new Set()
+      prioritySourcePath.value = null
+      conflicts.value = []
+      conflictDecisions.value = {}
+      migrationErrors.value = []
+      progress.value = { done: 0, total: 0, current: '', finished: false }
+      await loadSources()
+    } else {
+      if (unlistenFn) {
+        unlistenFn()
+        unlistenFn = null
+      }
+    }
+  },
+)
 
 // ── 工具 ─────────────────────────────────────────────────────────────────────
 const formatSize = (bytes: number) => {
   if (!bytes) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
-  let v = bytes, i = 0
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+  let v = bytes,
+    i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 </script>
@@ -285,19 +303,18 @@ const formatSize = (bytes: number) => {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div
-        v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="handleClose"
-      >
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="handleClose">
         <!-- 背景遮罩 -->
         <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="handleClose" />
 
         <!-- 弹窗主体 -->
-        <div class="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-
+        <div
+          class="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        >
           <!-- 头部 -->
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0"
+          >
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
                 <PhArrowsDownUp :size="18" class="text-violet-600 dark:text-violet-400" />
@@ -319,11 +336,13 @@ const formatSize = (bytes: number) => {
               <div v-for="n in 3" :key="n" class="flex items-center gap-1">
                 <div
                   class="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center transition-colors"
-                  :class="step === n
-                    ? 'bg-violet-600 text-white'
-                    : step > n
-                      ? 'bg-green-500 text-white'
-                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'"
+                  :class="
+                    step === n
+                      ? 'bg-violet-600 text-white'
+                      : step > n
+                        ? 'bg-green-500 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                  "
                 >
                   <PhCheck v-if="step > n" :size="12" />
                   <span v-else>{{ n }}</span>
@@ -334,8 +353,8 @@ const formatSize = (bytes: number) => {
 
             <button
               v-if="!migrating"
-              @click="handleClose"
               class="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              @click="handleClose"
             >
               <PhX :size="18" />
             </button>
@@ -355,12 +374,18 @@ const formatSize = (bytes: number) => {
               </div>
 
               <!-- 错误 -->
-              <div v-else-if="sourcesError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400">
+              <div
+                v-else-if="sourcesError"
+                class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-600 dark:text-red-400"
+              >
                 {{ sourcesError }}
               </div>
 
               <!-- 空 -->
-              <div v-else-if="sources.length === 0" class="bg-slate-50 dark:bg-slate-800 rounded-xl p-8 text-center text-slate-400">
+              <div
+                v-else-if="sources.length === 0"
+                class="bg-slate-50 dark:bg-slate-800 rounded-xl p-8 text-center text-slate-400"
+              >
                 <PhFolder :size="32" class="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                 <div class="text-sm font-medium">{{ t('resources.migrate.noSources') }}</div>
                 <div class="text-xs mt-1">{{ t('resources.migrate.noSourcesDesc') }}</div>
@@ -372,21 +397,22 @@ const formatSize = (bytes: number) => {
                   v-for="src in sources"
                   :key="src.dataPath"
                   class="rounded-xl border transition-all select-none overflow-hidden"
-                  :class="selectedSources.has(src.dataPath)
-                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'"
+                  :class="
+                    selectedSources.has(src.dataPath)
+                      ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                  "
                 >
                   <!-- 主行：勾选 + 信息 + 优先级角标 + 展开排除按钮 -->
-                  <div
-                    class="flex items-center gap-3 p-4 cursor-pointer"
-                    @click="toggleSource(src.dataPath)"
-                  >
+                  <div class="flex items-center gap-3 p-4 cursor-pointer" @click="toggleSource(src.dataPath)">
                     <!-- 复选框 -->
                     <div
                       class="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors"
-                      :class="selectedSources.has(src.dataPath)
-                        ? 'border-violet-500 bg-violet-500'
-                        : 'border-slate-300 dark:border-slate-600'"
+                      :class="
+                        selectedSources.has(src.dataPath)
+                          ? 'border-violet-500 bg-violet-500'
+                          : 'border-slate-300 dark:border-slate-600'
+                      "
                     >
                       <PhCheck v-if="selectedSources.has(src.dataPath)" :size="12" class="text-white" />
                     </div>
@@ -413,13 +439,19 @@ const formatSize = (bytes: number) => {
                     <!-- 排除设置按钮 -->
                     <button
                       class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0"
-                      :class="excludedCountForSource(src.dataPath) > 0
-                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'"
+                      :class="
+                        excludedCountForSource(src.dataPath) > 0
+                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      "
                       @click.stop="toggleExpandExclude(src.dataPath)"
                     >
                       <span v-if="excludedCountForSource(src.dataPath) > 0">
-                        {{ t('resources.migrate.excludeCount', { count: excludedCountForSource(src.dataPath) }) }}
+                        {{
+                          t('resources.migrate.excludeCount', {
+                            count: excludedCountForSource(src.dataPath),
+                          })
+                        }}
                       </span>
                       <span v-else>{{ t('resources.migrate.excludeBtn') }}</span>
                       <PhCaretDown v-if="!expandedExclude.has(src.dataPath)" :size="12" />
@@ -440,14 +472,20 @@ const formatSize = (bytes: number) => {
                       </p>
                       <div class="flex gap-2">
                         <button
-                          @click.stop="prioritySourcePath = prioritySourcePath === src.dataPath ? null : src.dataPath"
                           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all"
-                          :class="prioritySourcePath === src.dataPath
-                            ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-300'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-300 dark:hover:border-amber-600'"
+                          :class="
+                            prioritySourcePath === src.dataPath
+                              ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-300'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-300 dark:hover:border-amber-600'
+                          "
+                          @click.stop="prioritySourcePath = prioritySourcePath === src.dataPath ? null : src.dataPath"
                         >
                           <PhCrown :size="13" :weight="prioritySourcePath === src.dataPath ? 'fill' : 'regular'" />
-                          <span>{{ prioritySourcePath === src.dataPath ? t('resources.migrate.priorityOn') : t('resources.migrate.prioritySet') }}</span>
+                          <span>{{
+                            prioritySourcePath === src.dataPath
+                              ? t('resources.migrate.priorityOn')
+                              : t('resources.migrate.prioritySet')
+                          }}</span>
                         </button>
                       </div>
                       <p class="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
@@ -464,13 +502,19 @@ const formatSize = (bytes: number) => {
                         <button
                           v-for="opt in EXCLUDE_OPTIONS"
                           :key="opt.key"
-                          @click.stop="toggleExclude(src.dataPath, opt.key)"
                           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all"
-                          :class="getExcludedSet(src.dataPath).has(opt.key)
-                            ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-300'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-300 dark:hover:border-amber-600'"
+                          :class="
+                            getExcludedSet(src.dataPath).has(opt.key)
+                              ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-300'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-300 dark:hover:border-amber-600'
+                          "
+                          @click.stop="toggleExclude(src.dataPath, opt.key)"
                         >
-                          <component :is="opt.icon" :size="13" :weight="getExcludedSet(src.dataPath).has(opt.key) ? 'fill' : 'regular'" />
+                          <component
+                            :is="opt.icon"
+                            :size="13"
+                            :weight="getExcludedSet(src.dataPath).has(opt.key) ? 'fill' : 'regular'"
+                          />
                           <span>{{ t(opt.labelKey) }}</span>
                         </button>
                       </div>
@@ -483,15 +527,15 @@ const formatSize = (bytes: number) => {
             <!-- 底部按钮 -->
             <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0 flex justify-end gap-3">
               <button
-                @click="handleClose"
                 class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                @click="handleClose"
               >
                 {{ t('common.cancel') }}
               </button>
               <button
-                @click="goToStep2"
                 :disabled="selectedSources.size === 0 || scanningConflicts"
                 class="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800"
+                @click="goToStep2"
               >
                 <PhCircleNotch v-if="scanningConflicts" :size="16" class="animate-spin" />
                 {{ scanningConflicts ? t('resources.migrate.scanning') : t('resources.migrate.nextStep') }}
@@ -503,9 +547,11 @@ const formatSize = (bytes: number) => {
           <!-- ─── Step 2：冲突确认 ───────────────────────────────────────────── -->
           <div v-else-if="step === 2" class="flex flex-col flex-1 overflow-hidden">
             <div class="px-6 py-4 flex-1 overflow-y-auto space-y-4">
-
               <!-- 无冲突 -->
-              <div v-if="conflicts.length === 0" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-start gap-3">
+              <div
+                v-if="conflicts.length === 0"
+                class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-start gap-3"
+              >
                 <PhCheckCircle :size="20" class="text-green-500 shrink-0 mt-0.5" />
                 <div class="text-sm text-green-700 dark:text-green-400">
                   {{ t('resources.migrate.noConflicts') }}
@@ -514,7 +560,9 @@ const formatSize = (bytes: number) => {
 
               <!-- 有冲突 -->
               <template v-else>
-                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
+                <div
+                  class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3"
+                >
                   <PhWarning :size="20" class="text-amber-500 shrink-0 mt-0.5" />
                   <div class="text-sm text-amber-700 dark:text-amber-400">
                     {{ t('resources.migrate.conflictWarning', { count: conflicts.length }) }}
@@ -523,21 +571,28 @@ const formatSize = (bytes: number) => {
 
                 <!-- 全选操作 -->
                 <div class="flex items-center gap-3">
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ t('resources.migrate.batchDecide') }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                    t('resources.migrate.batchDecide')
+                  }}</span>
                   <button
-                    @click="setAllDecisions('overwrite')"
                     class="text-xs px-2 py-1 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors font-medium"
+                    @click="setAllDecisions('overwrite')"
                   >
                     {{ t('resources.migrate.overwriteAll') }}
                   </button>
                   <button
-                    @click="setAllDecisions('skip')"
                     class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium"
+                    @click="setAllDecisions('skip')"
                   >
                     {{ t('resources.migrate.skipAll') }}
                   </button>
                   <span class="text-xs text-slate-400">
-                    {{ t('resources.migrate.decisionSummary', { overwrite: overwriteCount, skip: skipCount }) }}
+                    {{
+                      t('resources.migrate.decisionSummary', {
+                        overwrite: overwriteCount,
+                        skip: skipCount,
+                      })
+                    }}
                   </span>
                 </div>
 
@@ -547,17 +602,23 @@ const formatSize = (bytes: number) => {
                     v-for="c in conflicts"
                     :key="c.relPath"
                     class="flex items-start gap-3 p-3 rounded-xl border transition-all"
-                    :class="conflictDecisions[c.relPath] === 'overwrite'
-                      ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
-                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'"
+                    :class="
+                      conflictDecisions[c.relPath] === 'overwrite'
+                        ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                    "
                   >
-                    <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <div
+                      class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-0.5"
+                    >
                       <PhFile :size="16" class="text-slate-500" />
                     </div>
                     <div class="flex-1 min-w-0">
                       <!-- 分类 + 文件名 -->
                       <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
+                        <span
+                          class="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium"
+                        >
                           {{ c.category }}
                         </span>
                         <span class="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
@@ -574,20 +635,24 @@ const formatSize = (bytes: number) => {
                     <!-- 决策切换 -->
                     <div class="flex items-center gap-1 shrink-0">
                       <button
-                        @click="conflictDecisions[c.relPath] = 'overwrite'"
                         class="text-xs px-2 py-1 rounded font-medium transition-colors"
-                        :class="conflictDecisions[c.relPath] === 'overwrite'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'"
+                        :class="
+                          conflictDecisions[c.relPath] === 'overwrite'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400'
+                        "
+                        @click="conflictDecisions[c.relPath] = 'overwrite'"
                       >
                         {{ t('resources.migrate.overwrite') }}
                       </button>
                       <button
-                        @click="conflictDecisions[c.relPath] = 'skip'"
                         class="text-xs px-2 py-1 rounded font-medium transition-colors"
-                        :class="conflictDecisions[c.relPath] === 'skip'
-                          ? 'bg-slate-500 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
+                        :class="
+                          conflictDecisions[c.relPath] === 'skip'
+                            ? 'bg-slate-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                        "
+                        @click="conflictDecisions[c.relPath] = 'skip'"
                       >
                         {{ t('resources.migrate.skip') }}
                       </button>
@@ -597,7 +662,9 @@ const formatSize = (bytes: number) => {
               </template>
 
               <!-- settings.json 合并提示 -->
-              <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
+              <div
+                class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2"
+              >
                 <PhCheckCircle :size="14" class="shrink-0 mt-0.5" />
                 {{ t('resources.migrate.settingsJsonNote') }}
               </div>
@@ -606,14 +673,14 @@ const formatSize = (bytes: number) => {
             <!-- 底部按钮 -->
             <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-3 shrink-0">
               <button
-                @click="goBack"
                 class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                @click="goBack"
               >
                 {{ t('common.back') }}
               </button>
               <button
-                @click="startMigration"
                 class="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800"
+                @click="startMigration"
               >
                 <PhArrowsDownUp :size="16" />
                 {{ t('resources.migrate.confirmMerge') }}
@@ -624,10 +691,11 @@ const formatSize = (bytes: number) => {
           <!-- ─── Step 3：迁移进度 ───────────────────────────────────────────── -->
           <div v-else-if="step === 3" class="flex flex-col flex-1 overflow-hidden">
             <div class="px-6 py-6 flex-1 overflow-y-auto space-y-5">
-
               <!-- 完成状态 -->
               <div v-if="progress.finished" class="text-center space-y-3">
-                <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center mx-auto">
+                <div
+                  class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center mx-auto"
+                >
                   <PhCheckCircle :size="36" class="text-green-500" />
                 </div>
                 <p class="text-base font-bold text-slate-800 dark:text-slate-100">
@@ -680,15 +748,14 @@ const formatSize = (bytes: number) => {
             <!-- 底部按钮 -->
             <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0">
               <button
-                @click="handleClose"
                 :disabled="migrating"
                 class="px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800"
+                @click="handleClose"
               >
                 {{ progress.finished ? t('resources.migrate.close') : t('common.cancel') }}
               </button>
             </div>
           </div>
-
         </div>
       </div>
     </Transition>
@@ -696,10 +763,12 @@ const formatSize = (bytes: number) => {
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.2s;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

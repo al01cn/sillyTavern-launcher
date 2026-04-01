@@ -33,7 +33,11 @@ function getRequiredNodeMajor(tavernVersion: string | null): number {
  * 检查当前 Node.js 版本是否满足酒馆版本要求
  * 返回 { ok, requiredMajor, currentMajor }
  */
-function checkNodeCompatibility(): { ok: boolean; requiredMajor: number; currentMajor: number | null } {
+function checkNodeCompatibility(): {
+  ok: boolean
+  requiredMajor: number
+  currentMajor: number | null
+} {
   try {
     // 读取 Node 信息
     const nodeCache = localStorage.getItem('app_settings_node_cache')
@@ -96,12 +100,12 @@ let isIntentionalStop = false
 
 export function addLog(type: LogType, text: string) {
   // 移除可能存在的 ANSI 转义字符
-  const cleanText = text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')
+  const cleanText = text.replace(/\u001B\[[0-9;]*[a-zA-Z]/g, '') // eslint-disable-line no-control-regex
   consoleLogs.push({
     id: nextId++,
     type,
     text: cleanText,
-    time: Date.now()
+    time: Date.now(),
   })
 
   // 限制日志条数，防止内存泄漏（最多保留2000条日志）
@@ -183,20 +187,20 @@ export async function stopProcess() {
 // 预加载 GitHub 加速列表
 const preloadGithubProxies = async () => {
   try {
-    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-    const lastFetchTime = localStorage.getItem('app_settings_proxies_last_fetch');
-    const now = Date.now();
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
+    const lastFetchTime = localStorage.getItem('app_settings_proxies_last_fetch')
+    const now = Date.now()
 
     // 如果没有缓存或者缓存已过期，则预加载
-    if (!lastFetchTime || (now - Number(lastFetchTime) >= THREE_DAYS_MS)) {
-      await invoke('fetch_github_proxies');
-      localStorage.setItem('app_settings_proxies_last_fetch', now.toString());
+    if (!lastFetchTime || now - Number(lastFetchTime) >= THREE_DAYS_MS) {
+      await invoke('fetch_github_proxies')
+      localStorage.setItem('app_settings_proxies_last_fetch', now.toString())
     }
   } catch (error) {
     // 静默失败，不影响启动
-    console.error('预加载 GitHub 加速列表失败:', error);
+    console.error('预加载 GitHub 加速列表失败:', error)
   }
-};
+}
 
 let isInitialized = false
 export async function initConsoleState() {
@@ -204,11 +208,11 @@ export async function initConsoleState() {
   isInitialized = true
 
   setTimeout(() => {
-    initReleases();
-    preloadGithubProxies();
-  }, 2000);
+    initReleases()
+    preloadGithubProxies()
+  }, 2000)
 
-  await listen<string>('process-log', (event) => {
+  await listen<string>('process-log', event => {
     const text = event.payload
     let type: LogType = 'output'
     if (text.startsWith('ERROR:')) type = 'error'
@@ -239,7 +243,7 @@ export async function initConsoleState() {
   })
 
   // 局域网/公网服务模式：酒馆启动成功后，接收端口信息
-  await listen<{ mode: string; port: number }>('tavern-network-ready', (event) => {
+  await listen<{ mode: string; port: number }>('tavern-network-ready', event => {
     const { mode, port } = event.payload
     networkMode.value = mode as 'lan' | 'public'
     networkPort.value = port
@@ -261,4 +265,36 @@ export async function initConsoleState() {
     networkPort.value = 8000
     launchMode.value = 'normal'
   })
+
+  // ─── 运行时缺失依赖自动修复 ──────────────────────────────────────────────
+  // 当酒馆 stderr 检测到 MODULE_NOT_FOUND 时，Rust 端发此事件
+  await listen<{ packages: string[]; st_dir: string }>('tavern-missing-dep', async event => {
+    const { packages, st_dir } = event.payload
+    if (!packages || packages.length === 0) return
+
+    addLog('error', i18n.global.t('console.missingDepDetected', { packages: packages.join(', ') }))
+
+    // 先标记当前是主动停止，等进程自然退出后不触发「异常退出」提示
+    isIntentionalStop = true
+
+    try {
+      await invoke('repair_missing_deps', { packages, stDir: st_dir })
+      // repair_missing_deps 成功后会 emit tavern-dep-repaired，由下面的监听触发重启
+    } catch (err: any) {
+      addLog('error', i18n.global.t('console.missingDepRepairFailed', { error: err }))
+      toast.error(i18n.global.t('console.missingDepRepairFailed', { error: err }))
+      // 修复失败时把状态置为异常，让用户手动处理
+      consoleStatus.value = 4
+      isIntentionalStop = false
+    }
+  })
+
+  // 修复成功后自动重启
+  await listen('tavern-dep-repaired', async () => {
+    addLog('system', i18n.global.t('console.missingDepRepaired'))
+    // 短暂延迟，确保进程已完全退出
+    await new Promise(r => setTimeout(r, 1500))
+    await startProcess()
+  })
+  // ─────────────────────────────────────────────────────────────────────────
 }

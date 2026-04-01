@@ -106,7 +106,8 @@ export default {
     noTavernInstalled: 'No installed Tavern version detected, cannot open global directory',
     cannotOpenBrowser: 'Cannot open browser, please try again',
     confirmClose: 'Confirm Exit',
-    tavernIsRunningCloseApp: 'SillyTavern is currently running. Closing the launcher will also terminate its process. Are you sure you want to exit?',
+    tavernIsRunningCloseApp:
+      'SillyTavern is currently running. Closing the launcher will also terminate its process. Are you sure you want to exit?',
   },
   tavern: {
     title: 'Tavern Configuration',
@@ -122,8 +123,10 @@ export default {
       loadFailed: 'Failed to load migration sources',
       selectFirst: 'Please select a config file first',
       noSources: 'No migratable configs found',
-      noSourcesDesc: 'No default/config.yaml found in any local instance. Please make sure you have added a local Tavern instance.',
-      overwriteWarning: 'Migration will overwrite st_data/config.yaml directly. The original config cannot be recovered. Proceed with caution.',
+      noSourcesDesc:
+        'No default/config.yaml found in any local instance. Please make sure you have added a local Tavern instance.',
+      overwriteWarning:
+        'Migration will overwrite st_data/config.yaml directly. The original config cannot be recovered. Proceed with caution.',
       confirm: 'Confirm Migration',
       migrating: 'Migrating...',
       success: 'Config migrated successfully. Configuration reloaded.',
@@ -139,7 +142,8 @@ export default {
     saveFailed: 'Failed to save configuration',
     cannotOpenFile: 'Cannot open configuration file',
     noVersionSelected: 'No Tavern version selected. Please select or install a version in the "Versions" page first.',
-    loadConfigFailed: 'Failed to load configuration file. The version may not be installed or the configuration is missing.',
+    loadConfigFailed:
+      'Failed to load configuration file. The version may not be installed or the configuration is missing.',
     networkAndAccess: 'Network & Access',
     networkAndAccessDesc: 'Port, Listen Address & Protocol',
     serverPort: 'Server Port',
@@ -222,17 +226,17 @@ export default {
     browserSelection: 'Browser Selection',
     browserSelectionDesc: 'Select the browser to use',
     browserDefault: 'System Default',
-    
+
     securityWhitelistDesc: 'Account System & Basic Auth',
     globalUsername: 'Global Username',
     globalPassword: 'Global Password',
-    
+
     // 分组标题
     basicSettings: 'Basic Settings',
     basicSettingsDesc: 'Commonly used configuration options',
     advancedSettings: 'Advanced Settings',
     advancedSettingsDesc: 'Advanced configuration for power users',
-    
+
     // SSL/TLS 配置
     sslConfig: 'HTTPS / SSL',
     sslConfigDesc: 'Configure certificates to support encrypted access',
@@ -246,7 +250,7 @@ export default {
     certificateFileDesc: 'Certificate file (.pem, .crt, .cer)',
     privateKeyFileDesc: 'Private key file (.pem, .key)',
     keyPassphraseDesc: 'Enter if private key is password protected',
-    
+
     // DNS 和 network 高级选项
     dnsNetworkAdvanced: 'DNS & Network Advanced',
     dnsPreferIPv6: 'DNS Prefer IPv6',
@@ -257,7 +261,7 @@ export default {
     hostWhitelistEnabled: 'Enable Host Whitelist',
     hostWhitelistScan: 'Scan Hosts',
     addHost: 'Add Host',
-    
+
     // 会话和安全
     sessionSecurity: 'Session & Security',
     sessionTimeout: 'Session Timeout (seconds)',
@@ -270,7 +274,7 @@ export default {
     allowKeysExposureDesc: 'Not recommended to enable',
     skipContentCheck: 'Skip Content Check',
     skipContentCheckDesc: 'Skip content security check',
-    
+
     // 日志和性能
     loggingPerformance: 'Performance Optimization',
     loggingPerformanceDesc: 'Cache management and loading strategies',
@@ -292,18 +296,18 @@ export default {
     minLogLevelDesc: '0=All, 1=Warning, 2=Error',
     useDiskCache: 'Use Disk Cache',
     useDiskCacheDesc: 'Reduce memory usage',
-    
+
     // 缓存清除
     cacheBuster: 'Cache Buster',
     cacheBusterEnabled: 'Enable Cache Buster',
     cacheBusterPattern: 'User-Agent Pattern',
     cacheBusterPatternDesc: 'Pattern to match browsers that need cache clearing',
-    
+
     // SSO 单点登录
     ssoConfig: 'SSO Single Sign-On',
     autheliaAuth: 'Authelia Authentication',
     authentikAuth: 'Authentik Authentication',
-    
+
     // 扩展和插件
     extensionsPlugins: 'Extensions & Plugins',
     extensionsEnabled: 'Enable Extensions',
@@ -311,7 +315,7 @@ export default {
     enableServerPlugins: 'Enable Server Plugins',
     enableServerPluginsDesc: 'Enable server-side plugin functionality',
     enableServerPluginsAutoUpdate: 'Server Plugins Auto Update',
-    
+
     // 其他
     otherSettings: 'Other Settings',
     enableCorsProxy: 'Enable CORS Proxy',
@@ -343,13 +347,15 @@ export default {
     unknownVersion: 'Unknown version',
     scanComplete: 'Scan Complete',
     scanCancelled: 'Scan Cancelled',
+    cancelScan: 'Cancel Scan',
     scanLog: 'Scan Log',
     scanLogEmpty: 'No scan log available',
     scanLogLoading: 'Loading...',
     localVersionList: 'Local Instance List',
     importLocal: 'Import Local Instance',
     importLocalTooltip: 'Manually select an existing SillyTavern directory (must contain package.json)',
-    scanTimeWarning: 'Scanning the entire disk will take some time, depending on device performance and disk speed. You can still use the launcher during the scan. Do you want to continue?',
+    scanTimeWarning:
+      'Scanning the entire disk will take some time, depending on device performance and disk speed. You can still use the launcher during the scan. Do you want to continue?',
     usingFallbackData: 'Using local fallback data',
     addedToLocal: 'Added to local list',
     alreadyInLocal: 'This instance is already in the list',
@@ -365,7 +371,8 @@ export default {
     installed: 'Installed',
     current: 'Current',
     installDeps: 'Install Dependencies',
-    installDepsLocalWarning: 'Warning: Installing dependencies for a local tavern will automatically generate or overwrite the optimized settings.json file. Do you want to continue?',
+    installDepsLocalWarning:
+      'Warning: Installing dependencies for a local tavern will automatically generate or overwrite the optimized settings.json file. Do you want to continue?',
     switchVersion: 'Switch Version',
     currentlyUsed: 'Currently Used',
     switching: 'Switching...',
@@ -377,7 +384,8 @@ export default {
     confirmDelete: 'Confirm Delete',
     confirmDeleteMsg: 'Are you sure you want to delete version {version}? This action cannot be undone.',
     confirmUnbind: 'Confirm Unbind',
-    confirmUnbindMsg: 'Are you sure you want to unbind version {version}? This will only remove the record from the version list and will not delete your original files.',
+    confirmUnbindMsg:
+      'Are you sure you want to unbind version {version}? This will only remove the record from the version list and will not delete your original files.',
     startDeleting: 'Starting to delete version {version}...',
     deleteSuccess: 'Version {version} deleted successfully',
     unbindSuccess: 'Version {version} unbound successfully',
@@ -389,7 +397,8 @@ export default {
     usingProxy: 'Using acceleration proxy',
     fetchFailed: 'Failed to fetch data',
     nodeVersionWarningTitle: 'Node.js Version Insufficient',
-    nodeVersionWarningDesc: 'SillyTavern {version} requires Node.js v{required}+, but current version is {current}. It is recommended to upgrade the built-in Node.js first.',
+    nodeVersionWarningDesc:
+      'SillyTavern {version} requires Node.js v{required}+, but current version is {current}. It is recommended to upgrade the built-in Node.js first.',
     nodeVersionWarningConfirm: 'Upgrade Node.js',
     nodeVersionWarningSkip: 'Skip, continue install',
     installTitle: 'Install Tavern Version {version}',
@@ -446,7 +455,8 @@ export default {
     system: 'System',
     maybeIncompatible: 'May be incompatible',
     minClientVersion: 'Minimum client version',
-    confirmDeleteExt: 'Are you sure you want to delete extension "{name}"? This will permanently delete the extension folder.',
+    confirmDeleteExt:
+      'Are you sure you want to delete extension "{name}"? This will permanently delete the extension folder.',
     extensionDeleted: 'Extension "{name}" has been deleted',
     deleteFailed: 'Failed to delete extension',
     toggleEnableFailed: 'Failed to toggle status',
@@ -486,7 +496,11 @@ export default {
     stopError: 'Stop failed: {error}',
     processExited: 'Process exited',
     processAbnormalExit: 'Process exited abnormally',
-    nodeVersionInsufficient: 'Node.js version ({current}) does not meet requirements (needs {required}+). Auto-switching to built-in Node and downloading...',
+    nodeVersionInsufficient:
+      'Node.js version ({current}) does not meet requirements (needs {required}+). Auto-switching to built-in Node and downloading...',
+    missingDepDetected: 'Runtime missing packages detected: {packages}. Auto-repairing...',
+    missingDepRepaired: 'Missing packages repaired. Auto-restarting SillyTavern...',
+    missingDepRepairFailed: 'Failed to repair missing packages: {error}',
   },
   tools: {
     title: 'Small Tools',
@@ -515,7 +529,8 @@ export default {
     offlineInstallDesc: 'Upload extension zip packages for installation, supports multiple files.',
     gitChecking: 'Detecting Git environment...',
     gitRequiredTitle: 'Git Required',
-    gitRequiredDesc: 'Online extension installation requires Git, but Git was not detected on your system. Please go to Settings to install Git first.',
+    gitRequiredDesc:
+      'Online extension installation requires Git, but Git was not detected on your system. Please go to Settings to install Git first.',
     goToSettings: 'Install Git',
     copyLog: 'Copy Log',
     clearLog: 'Clear Log',
@@ -647,7 +662,8 @@ export default {
       step1Subtitle: 'Select source instances (multi-select)',
       step2Subtitle: 'Handle conflicting files',
       step3Subtitle: 'Migration progress',
-      step1Desc: 'Select local Tavern instances (data directories) to migrate from. You can select multiple. Their data will be merged into the unified data directory.',
+      step1Desc:
+        'Select local Tavern instances (data directories) to migrate from. You can select multiple. Their data will be merged into the unified data directory.',
       noSources: 'No migratable sources found',
       noSourcesDesc: 'No data directory found in any local instance. Please add a local Tavern instance first.',
       unknownVersion: 'Unknown version',
@@ -662,7 +678,8 @@ export default {
       conflictFrom: 'From: ',
       overwrite: 'Overwrite',
       skip: 'Skip',
-      settingsJsonNote: 'settings.json (UI/extension config) will be deep-merged automatically — it will not be directly overwritten.',
+      settingsJsonNote:
+        'settings.json (UI/extension config) will be deep-merged automatically — it will not be directly overwritten.',
       confirmMerge: 'Confirm Merge',
       merging: 'Migrating...',
       mergeSuccess: 'Migration complete!',
@@ -675,7 +692,8 @@ export default {
       priorityLabel: 'Migration priority (runs last — its data wins)',
       prioritySet: 'Set as Priority',
       priorityOn: 'Priority Active',
-      priorityDesc: 'When enabled, this source runs last during merge/overwrite, so its files take precedence over all others.',
+      priorityDesc:
+        'When enabled, this source runs last during merge/overwrite, so its files take precedence over all others.',
       priorityBadge: 'Priority',
       catCharacters: 'Characters',
       catExtensions: 'Extensions',
@@ -687,11 +705,48 @@ export default {
   },
   settings: {
     importantNotice: 'Important Notice',
-    freeSoftwareNotice: 'This software is completely free and open-source. If you purchased it or paid for it on any platform, please request a refund and report the seller.',
+    freeSoftwareNotice:
+      'This software is completely free and open-source. If you purchased it or paid for it on any platform, please request a refund and report the seller.',
     localSillytavern: 'Local Installed',
     onlineDownload: 'Online Downloaded',
     title: 'Settings',
     general: 'General',
+    credits: 'Credits',
+    creditsDesc: 'Open source technologies and third-party libraries used in this project. Thanks to all contributors!',
+    creditsLink: 'Visit',
+    creditsItems: {
+      // Frameworks
+      tauri: 'Build lightweight, secure desktop applications',
+      vue: 'Progressive JavaScript framework',
+      rust: 'Safe, concurrent, practical programming language',
+      // Frontend
+      tailwind: 'Utility-first CSS framework',
+      vueI18n: 'Internationalization plugin for Vue 3',
+      vueRouter: 'Official routing library for Vue.js',
+      phosphorIcons: 'Flexible icon library',
+      lucide: 'Modern, clean open source icons',
+      qrcode: 'JavaScript library for generating QR codes',
+      vueSonner: 'Toast notification component',
+      daisyui: 'Component library for Tailwind CSS',
+      // Backend
+      tokio: 'Asynchronous runtime for Rust',
+      reqwest: 'HTTP client for Rust',
+      serde: 'Serialization/deserialization framework for Rust',
+      zip: 'ZIP file handling library for Rust',
+      walkdir: 'Directory traversal library for Rust',
+      jwalk: 'Parallel directory traversal library',
+      sevenz: '7z compressed file handling',
+      headlessChrome: 'Headless browser support',
+      winreg: 'Windows registry access',
+      // DevTools
+      vite: 'Next generation frontend build tool',
+      typescript: 'JavaScript superset',
+      eslint: 'JavaScript/TypeScript linting',
+      prettier: 'Code formatting tool',
+      // Special Thanks
+      sillytavern: 'The primary service target of this project',
+      sillytavernCommunity: 'Technical support and feedback',
+    },
     about: 'About',
     basic: 'Basic Settings',
     interface: 'Interface Settings',
@@ -723,14 +778,16 @@ export default {
     launchModeDebug: 'DEBUG',
     launchModeDebugDesc: 'Start with node --inspect for DevTools debugging',
     publicModeWarningTitle: 'Open Public Access — High Risk',
-    publicModeWarningDesc: 'Enabling public service means anyone on the internet may access your SillyTavern. Please review the following risks:',
+    publicModeWarningDesc:
+      'Enabling public service means anyone on the internet may access your SillyTavern. Please review the following risks:',
     publicModeRisk1: 'Port scanning & attacks: Your server will be discovered and brute-forced by automated scanners',
     publicModeRisk2: 'Credential attacks: Without Basic Auth, anyone can access your data directly',
     publicModeRisk3: 'API Key leakage: Your configured API keys may be stolen by malicious visitors',
     publicModeRisk4: 'Data exposure: Chat logs, character cards, world info and other private data may be exposed',
-    publicModeAdvice: 'Strongly recommend enabling Basic Auth or user accounts in Tavern Config before using public mode.',
+    publicModeAdvice:
+      'Strongly recommend enabling Basic Auth or user accounts in Tavern Config before using public mode.',
     publicModeCancel: 'Cancel',
-    publicModeNeverAsk: 'Don\'t ask again',
+    publicModeNeverAsk: "Don't ask again",
     publicModeConfirm: 'Confirm & Open',
     nodejs: 'NodeJs Settings',
     nodejsEnv: 'NodeJs Environment',
@@ -744,6 +801,8 @@ export default {
     nodejsInstallLocal: 'Install Built-in Node',
     nodejsReinstall: 'Reinstall',
     nodejsInstalling: 'Installing...',
+    nodejsInstallCancel: 'Cancel Install',
+    nodejsInstallCancelled: 'Installation cancelled',
     nodejsSourceToggle: 'Node.js Source',
     nodejsSourceToggleDesc: 'Both system and built-in Node.js detected. Switch which one to use.',
     nodejsSourceToggleDesc2: 'Switch between system Node or built-in Node.',
@@ -765,15 +824,19 @@ export default {
     gitLocal: 'Built-in',
     gitSystem: 'System',
     gitNotFound: 'Git not detected, Tavern and its extensions will not auto-update',
+    gitNotFoundForTest: 'Git not detected, please install MinGit before testing',
     gitInstall: 'Install Now',
     gitInstallLocal: 'Install Built-in Git',
     gitInstalling: 'Installing...',
+    gitInstallCancel: 'Cancel Install',
+    gitInstallCancelled: 'Installation cancelled',
     gitReinstall: 'Reinstall Built-in',
     gitSourceToggle: 'Git Source',
     gitSourceToggleDesc: 'Switch between system Git and built-in Git',
     gitUseSystem: 'System Git',
     gitUseLocal: 'Built-in Git',
-    gitTooltip: 'Tavern and its extensions rely on Git for version management and updates. You must install Git unless you no longer need auto-updates.',
+    gitTooltip:
+      'Tavern and its extensions rely on Git for version management and updates. You must install Git unless you no longer need auto-updates.',
     currentAddress: 'Current Address',
     defaultAddress: 'default',
     github: 'Github Acceleration',
@@ -783,8 +846,11 @@ export default {
     githubLastSync: 'Last Sync',
     githubRefresh: 'Refresh List',
     githubRefreshing: 'Testing...',
+    githubProxyConflictWarning:
+      'Proxy enabled - recommend disabling GitHub acceleration to use direct connection, otherwise connection errors may occur',
     githubEmpty: 'Click refresh to get the latest Github proxy nodes',
     loadingConfig: 'Loading configuration...',
+    refreshEnv: 'Refresh Environment Detection',
     saveSuccess: 'Settings saved',
     saveFailed: 'Failed to save configuration',
     loadFailed: 'Failed to load configuration, using defaults',
@@ -796,16 +862,71 @@ export default {
     isElevated: 'Administrator Mode',
     nonElevated: 'Normal Mode',
     elevateBtn: 'Elevate to Administrator',
-    elevateDesc: 'Certain operations (such as installing Node.js to system directories or modifying system configurations) may require administrator privileges.',
+    elevateDesc:
+      'Certain operations (such as installing Node.js to system directories or modifying system configurations) may require administrator privileges.',
     elevating: 'Elevating...',
     animations: 'Interface Animations',
     animationsDesc: 'Enable or disable page transition animations',
     animationsOn: 'Enabled',
     animationsOff: 'Disabled',
     performanceTip: 'Performance Tip',
-    performanceTipDesc: 'Low device configuration detected. Disabling animations is recommended for smoother experience.',
+    performanceTipDesc:
+      'Low device configuration detected. Disabling animations is recommended for smoother experience.',
     closeAnimations: 'Disable Animations',
     keepAnimations: 'Keep Enabled',
+    network: 'Network',
+    networkDesc: 'Configure proxy and other network options',
+    networkProxy: 'Proxy Settings',
+    networkProxyDesc: 'Configure HTTP/HTTPS proxy for this launcher',
+    networkProxyOpen: 'Open Proxy Settings',
+    githubConnectionTest: 'Test GitHub Connection',
+    githubTesting: 'Testing...',
+    githubTestSuccess: 'Connected',
+    githubTestFailed: 'Connection Failed',
+    testDirectConnection: 'Test Direct',
+    testDirectConnectionDesc: 'Test GitHub connection without proxy',
+    testFailed: 'Test Failed',
+    testResultCount: '{success}/{total}',
+    testItemFileAccess: 'File Access',
+    testItemHomepage: 'Homepage',
+    testItemRepo: 'Repo Access',
+    testItemApi: 'API Access',
+    testItemSpeed: 'Download Speed',
+    speedTooSlow: 'Too Slow',
+    speedSlow: 'Slow',
+    speedNormal: 'Normal',
+    speedFast: 'Fast',
+    speedVeryFast: 'Very Fast',
+    downloadSpeedTest: 'Download Speed Test',
+    directSpeedTest: 'Direct Speed Test',
+    proxySpeedTest: 'Proxy Speed Test',
+    testing: 'Testing...',
+    latency: 'Latency',
+    githubConnection: 'GitHub Connection',
+    proxyDialogTitle: 'Proxy Settings',
+    proxyMode: 'Proxy Mode',
+    proxyModeNone: 'No Proxy',
+    proxyModeSystem: 'System Proxy',
+    proxyModeCustom: 'Custom',
+    proxyModeNoneDesc: 'Connect directly without any proxy',
+    proxyModeSystemDesc: 'Use the operating system proxy configuration',
+    proxyModeCustomDesc: 'Manually enter proxy host and port',
+    proxyHost: 'Proxy Host',
+    proxyHostPlaceholder: 'e.g. 127.0.0.1',
+    proxyPort: 'Port',
+    proxyPortPlaceholder: 'e.g. 7890',
+    proxyTest: 'Test Connection',
+    proxyTesting: 'Testing...',
+    proxyTestSuccess: 'Connection Successful',
+    proxyTestFailed: 'Connection Failed',
+    proxyTestLatency: 'Latency',
+    systemProxyEnabled: 'Enabled',
+    systemProxyDisabled: 'Disabled',
+    proxyCurrentStatus: 'Status',
+    proxyStatusNone: 'Direct',
+    proxyStatusSystem: 'System Proxy',
+    proxyStatusCustom: 'Custom Proxy',
+    proxySave: 'Save',
   },
   networkLink: {
     lanTitle: 'LAN Connect',
@@ -826,4 +947,3 @@ export default {
     nodes: 'nodes',
   },
 }
-

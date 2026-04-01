@@ -7,7 +7,7 @@ interface WorldInfoDialogState {
 
 export const worldInfoDialogState = reactive<WorldInfoDialogState>({
   visible: false,
-  fileName: ''
+  fileName: '',
 })
 
 export const openWorldInfoDialog = (fileName: string) => {

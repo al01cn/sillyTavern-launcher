@@ -17,10 +17,7 @@ fn get_chats_dir(app: &AppHandle) -> PathBuf {
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
 
-    data_dir
-        .join("st_data")
-        .join("default-user")
-        .join("chats")
+    data_dir.join("st_data").join("default-user").join("chats")
 }
 
 // ─────────────────────────────────────────────
@@ -113,11 +110,7 @@ pub async fn list_chats(app: AppHandle) -> Result<Vec<ChatGroup>, String> {
             }
 
             // 按修改时间倒序
-            files.sort_by(|a, b| {
-                b.modified_ms
-                    .unwrap_or(0)
-                    .cmp(&a.modified_ms.unwrap_or(0))
-            });
+            files.sort_by(|a, b| b.modified_ms.unwrap_or(0).cmp(&a.modified_ms.unwrap_or(0)));
 
             groups.push(ChatGroup {
                 char_folder,

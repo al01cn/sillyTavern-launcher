@@ -37,9 +37,7 @@ fn get_character_cards_dir(app: &AppHandle) -> PathBuf {
 // ─────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn list_character_card_pngs(
-    app: AppHandle,
-) -> Result<Vec<CharacterCardFile>, String> {
+pub async fn list_character_card_pngs(app: AppHandle) -> Result<Vec<CharacterCardFile>, String> {
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
         let dir = get_character_cards_dir(&app_clone);
@@ -100,10 +98,7 @@ pub async fn list_character_card_pngs(
 }
 
 #[tauri::command]
-pub async fn read_character_card_png(
-    app: AppHandle,
-    file_name: String,
-) -> Result<Vec<u8>, String> {
+pub async fn read_character_card_png(app: AppHandle, file_name: String) -> Result<Vec<u8>, String> {
     if file_name.trim().is_empty() {
         return Err("文件名不能为空".to_string());
     }
@@ -128,10 +123,7 @@ pub async fn read_character_card_png(
 }
 
 #[tauri::command]
-pub async fn delete_character_cards(
-    app: AppHandle,
-    file_names: Vec<String>,
-) -> Result<(), String> {
+pub async fn delete_character_cards(app: AppHandle, file_names: Vec<String>) -> Result<(), String> {
     if file_names.is_empty() {
         return Ok(());
     }
@@ -170,10 +162,7 @@ pub async fn delete_character_cards(
 }
 
 #[tauri::command]
-pub async fn import_character_card(
-    app: AppHandle,
-    source_path: String,
-) -> Result<(), String> {
+pub async fn import_character_card(app: AppHandle, source_path: String) -> Result<(), String> {
     if source_path.trim().is_empty() {
         return Err("源路径不能为空".to_string());
     }
@@ -248,7 +237,7 @@ pub async fn import_character_card_from_bytes(
     }
 
     let app_clone = app.clone();
-    
+
     // 2. 放入 blocking 线程池执行文件 I/O 操作
     tokio::task::spawn_blocking(move || {
         // 获取目标目录
@@ -259,7 +248,7 @@ pub async fn import_character_card_from_bytes(
 
         // 拼接目标文件路径
         let target_path = dir.join(&filename);
-        
+
         // 查重：防止覆盖现有角色卡
         if target_path.exists() {
             return Err("同名角色卡已存在，请重命名后再导入".to_string());

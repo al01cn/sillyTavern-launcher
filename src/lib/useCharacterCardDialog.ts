@@ -24,4 +24,3 @@ export const openImportCharacterCardDialog = (sourcePath: string, fileName: stri
 export const closeCharacterCardDialog = () => {
   characterCardDialogState.show = false
 }
-

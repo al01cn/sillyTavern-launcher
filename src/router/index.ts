@@ -12,48 +12,48 @@ const routes = [
   {
     path: '/',
     name: 'Home',
-    component: Home
+    component: Home,
   },
   {
     path: '/tavern',
     name: 'Tavern',
-    component: Tavern
+    component: Tavern,
   },
   {
     path: '/versions',
     name: 'Versions',
-    component: Versions
+    component: Versions,
   },
   {
     path: '/extensions',
     name: 'Extensions',
-    component: Extensions
+    component: Extensions,
   },
   {
     path: '/tools',
     name: 'Tools',
-    component: Tools
+    component: Tools,
   },
   {
     path: '/resources',
     name: 'Resources',
-    component: Resources
+    component: Resources,
   },
   {
     path: '/console',
     name: 'Console',
-    component: Console
+    component: Console,
   },
   {
     path: '/settings',
     name: 'Settings',
-    component: Settings
-  }
+    component: Settings,
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
 export default router

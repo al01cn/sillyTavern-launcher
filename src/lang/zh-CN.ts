@@ -223,7 +223,7 @@ export default {
     browserSelection: '浏览器选择',
     browserSelectionDesc: '选择要使用的浏览器',
     browserDefault: '系统默认',
-    
+
     // 安全与账户
     securityWhitelistDesc: '账户系统与 Basic Auth 验证',
     globalUsername: '全局用户名',
@@ -233,7 +233,7 @@ export default {
     basicSettingsDesc: '日常使用的常用配置项',
     advancedSettings: '高级选项',
     advancedSettingsDesc: '专业用户才需要的高级配置项',
-    
+
     // SSL/TLS 配置
     sslConfig: 'SSL/TLS 配置',
     enableSsl: '启用 HTTPS (SSL/TLS)',
@@ -247,7 +247,7 @@ export default {
     certificateFileDesc: '证书文件 (.pem, .crt, .cer)',
     privateKeyFileDesc: '私钥文件 (.pem, .key)',
     keyPassphraseDesc: '如果私钥有密码保护，请输入',
-    
+
     // DNS 和网络高级选项
     dnsNetworkAdvanced: 'DNS 和网络高级选项',
     dnsPreferIPv6: 'DNS IPv6 优先',
@@ -271,7 +271,7 @@ export default {
     default: '默认',
     recommended: '推荐',
     compressionQuality: '压缩质量 (1-100)',
-    
+
     // 会话和安全
     sessionSecurity: '会话和安全',
     sessionTimeout: '会话超时时间 (秒)',
@@ -284,7 +284,7 @@ export default {
     allowKeysExposureDesc: '不推荐开启',
     skipContentCheck: '跳过内容检查',
     skipContentCheckDesc: '跳过内容安全检查',
-    
+
     // 日志和性能
     loggingPerformance: '性能优化',
     loggingPerformanceDesc: '缓存管理与加载策略',
@@ -307,18 +307,18 @@ export default {
     selectKeyFile: '选择私钥文件',
     useDiskCache: '使用磁盘缓存',
     useDiskCacheDesc: '减少内存使用',
-    
+
     // 缓存清除
     cacheBuster: '缓存清除',
     cacheBusterEnabled: '启用缓存清除',
     cacheBusterPattern: 'User-Agent 匹配模式',
     cacheBusterPatternDesc: '用于匹配需要清除缓存的浏览器',
-    
+
     // SSO 单点登录
     ssoConfig: 'SSO 单点登录',
     autheliaAuth: 'Authelia 认证',
     authentikAuth: 'Authentik 认证',
-    
+
     // 扩展和插件
     extensionsPlugins: '扩展和插件',
     extensionsEnabled: '启用扩展',
@@ -326,7 +326,7 @@ export default {
     enableServerPlugins: '启用服务器插件',
     enableServerPluginsDesc: '启用服务端插件功能',
     enableServerPluginsAutoUpdate: '服务器插件自动更新',
-    
+
     // 其他
     otherSettings: '其他设置',
     enableCorsProxy: '启用 CORS 代理',
@@ -358,6 +358,7 @@ export default {
     unknownVersion: '未知版本',
     scanComplete: '扫描完成',
     scanCancelled: '扫描已取消',
+    cancelScan: '取消扫描',
     scanLog: '扫描日志',
     scanLogEmpty: '暂无扫描日志',
     scanLogLoading: '加载中...',
@@ -380,7 +381,8 @@ export default {
     installed: 'Installed',
     current: 'Current',
     installDeps: '安装依赖',
-    installDepsLocalWarning: '提示：为本地酒馆安装依赖时，会自动生成或覆盖优化后的 settings.json 配置文件。是否继续安装？',
+    installDepsLocalWarning:
+      '提示：为本地酒馆安装依赖时，会自动生成或覆盖优化后的 settings.json 配置文件。是否继续安装？',
     switchVersion: '切换版本',
     currentlyUsed: '当前使用',
     switching: '切换中...',
@@ -404,7 +406,8 @@ export default {
     usingProxy: '使用加速代理',
     fetchFailed: '获取数据失败',
     nodeVersionWarningTitle: 'Node.js 版本不足',
-    nodeVersionWarningDesc: '酒馆 {version} 需要 Node.js v{required}+，当前版本为 {current}。建议先升级内置 Node.js，否则可能无法正常运行。',
+    nodeVersionWarningDesc:
+      '酒馆 {version} 需要 Node.js v{required}+，当前版本为 {current}。建议先升级内置 Node.js，否则可能无法正常运行。',
     nodeVersionWarningConfirm: '去升级 Node.js',
     nodeVersionWarningSkip: '忽略，继续安装',
     installTitle: '安装酒馆版本 {version}',
@@ -578,7 +581,11 @@ export default {
     stopError: '停止失败: {error}',
     processExited: '进程已退出',
     processAbnormalExit: '进程异常退出',
-    nodeVersionInsufficient: '当前系统 Node.js 版本 ({current}) 不满足要求（需要 {required}+），正在自动切换内置 Node 并下载安装...',
+    nodeVersionInsufficient:
+      '当前系统 Node.js 版本 ({current}) 不满足要求（需要 {required}+），正在自动切换内置 Node 并下载安装...',
+    missingDepDetected: '检测到运行时缺失包：{packages}，正在自动修复...',
+    missingDepRepaired: '缺失包已修复，正在自动重启酒馆...',
+    missingDepRepairFailed: '缺失包修复失败：{error}',
   },
   tools: {
     title: '小工具',
@@ -779,11 +786,48 @@ export default {
   },
   settings: {
     importantNotice: '重要提醒',
-    freeSoftwareNotice: '本软件完全免费且开源。如果您是通过付费、打赏或在各平台（如某宝、某鱼等）购买到的，请立即申请退款并举报相应商家。',
+    freeSoftwareNotice:
+      '本软件完全免费且开源。如果您是通过付费、打赏或在各平台（如某宝、某鱼等）购买到的，请立即申请退款并举报相应商家。',
     localSillytavern: '本地导入',
     onlineDownload: '在线下载',
     title: '设置',
     general: '一般设置',
+    credits: '鸣谢',
+    creditsDesc: '本项目使用到的开源技术与第三方库，感谢所有贡献者的付出',
+    creditsLink: '访问',
+    creditsItems: {
+      // 框架
+      tauri: '构建轻量级、安全的桌面应用',
+      vue: '渐进式 JavaScript 框架',
+      rust: '安全、并发、实用的编程语言',
+      // 前端
+      tailwind: '实用优先的 CSS 框架',
+      vueI18n: 'Vue 3 的国际化插件',
+      vueRouter: 'Vue.js 的官方路由',
+      phosphorIcons: '灵活的图标库',
+      lucide: '现代、简洁的开源图标',
+      qrcode: '生成二维码的 JavaScript 库',
+      vueSonner: 'Toast 通知组件',
+      daisyui: 'Tailwind CSS 的组件库',
+      // 后端
+      tokio: 'Rust 的异步运行时',
+      reqwest: 'Rust 的 HTTP 客户端',
+      serde: 'Rust 的序列化/反序列化框架',
+      zip: 'Rust 的 ZIP 文件处理库',
+      walkdir: 'Rust 的目录遍历库',
+      jwalk: '并行的目录遍历库',
+      sevenz: '7z 压缩文件处理',
+      headlessChrome: '无头浏览器支持',
+      winreg: 'Windows 注册表访问',
+      // 开发工具
+      vite: '下一代前端构建工具',
+      typescript: 'JavaScript 的超集',
+      eslint: 'JavaScript/TypeScript 代码检查',
+      prettier: '代码格式化工具',
+      // 特别感谢
+      sillytavern: '本项目的主要服务对象',
+      sillytavernCommunity: '提供技术支持与反馈',
+    },
     about: '关于',
     basic: '基础设置',
     interface: '界面设置',
@@ -836,6 +880,8 @@ export default {
     nodejsInstallLocal: '安装内置 Node',
     nodejsReinstall: '重新安装',
     nodejsInstalling: '安装中...',
+    nodejsInstallCancel: '取消安装',
+    nodejsInstallCancelled: '安装已取消',
     nodejsSourceToggle: 'Node.js 环境来源',
     nodejsSourceToggleDesc: '系统环境与内置环境均已检测到，可在此切换使用哪个',
     nodejsSourceToggleDesc2: '可切换使用系统 Node 或内置 Node',
@@ -857,9 +903,12 @@ export default {
     gitLocal: '内置',
     gitSystem: '系统',
     gitNotFound: '未检测到 Git 环境，酒馆及其扩展将无法自动更新',
+    gitNotFoundForTest: '未检测到 Git 环境，请先安装 MinGit 后再测试',
     gitInstall: '立即安装',
     gitInstallLocal: '安装内置 Git',
     gitInstalling: '安装中...',
+    gitInstallCancel: '取消安装',
+    gitInstallCancelled: '安装已取消',
     gitReinstall: '重新安装内置',
     gitSourceToggle: 'Git 环境来源',
     gitSourceToggleDesc: '可切换使用系统 Git 或内置 Git',
@@ -875,8 +924,11 @@ export default {
     githubLastSync: '上次同步',
     githubRefresh: '刷新列表',
     githubRefreshing: '测速中...',
+    githubProxyConflictWarning:
+      '检测到您已开启系统代理/自定义代理，建议关闭 GitHub 加速以使用直连，否则可能出现连接错误',
     githubEmpty: '点击刷新列表获取最新的 Github 加速节点',
     loadingConfig: '正在加载配置...',
+    refreshEnv: '刷新环境检测',
     saveSuccess: '设置已保存',
     saveFailed: '保存配置失败',
     loadFailed: '加载配置失败，将使用默认配置',
@@ -898,6 +950,59 @@ export default {
     performanceTipDesc: '检测到您的设备配置较低，建议关闭界面动效以获得更流畅的使用体验',
     closeAnimations: '关闭动效',
     keepAnimations: '保持开启',
+    network: '网络设置',
+    networkDesc: '配置代理等网络选项',
+    networkProxy: '代理设置',
+    networkProxyDesc: '为本启动器配置 HTTP/HTTPS 代理',
+    networkProxyOpen: '打开代理设置',
+    githubConnectionTest: '测试 GitHub 连接',
+    githubTesting: '测试连接中...',
+    githubTestSuccess: '连接成功',
+    githubTestFailed: '连接失败',
+    testDirectConnection: '测试直连',
+    testDirectConnectionDesc: '不通过代理测试 GitHub 连接',
+    testFailed: '测试失败',
+    testResultCount: '{success}/{total}',
+    testItemFileAccess: '文件访问',
+    testItemHomepage: '首页访问',
+    testItemRepo: '仓库访问',
+    testItemApi: 'API 访问',
+    testItemSpeed: '下载速度',
+    speedTooSlow: '太慢',
+    speedSlow: '速度慢',
+    speedNormal: '速度正常',
+    speedFast: '速度很快',
+    speedVeryFast: '速度极快',
+    downloadSpeedTest: '下载速度测试',
+    directSpeedTest: '直连测速',
+    proxySpeedTest: '加速测速',
+    testing: '测试中...',
+    latency: '延迟',
+    githubConnection: 'GitHub 连接',
+    proxyDialogTitle: '代理设置',
+    proxyMode: '代理模式',
+    proxyModeNone: '不代理',
+    proxyModeSystem: '使用系统设置',
+    proxyModeCustom: '自定义',
+    proxyModeNoneDesc: '不使用任何代理，直接连接',
+    proxyModeSystemDesc: '使用操作系统的代理配置',
+    proxyModeCustomDesc: '手动输入代理地址和端口',
+    proxyHost: '代理地址',
+    proxyHostPlaceholder: '例如：127.0.0.1',
+    proxyPort: '端口',
+    proxyPortPlaceholder: '例如：7890',
+    proxyTest: '测试连接',
+    proxyTesting: '测试中...',
+    proxyTestSuccess: '连接成功',
+    proxyTestFailed: '连接失败',
+    proxyTestLatency: '延迟',
+    systemProxyEnabled: '已启用',
+    systemProxyDisabled: '未启用',
+    proxyCurrentStatus: '当前状态',
+    proxyStatusNone: '直连',
+    proxyStatusSystem: '系统代理',
+    proxyStatusCustom: '自定义代理',
+    proxySave: '保存',
   },
   networkLink: {
     lanTitle: '局域网连接',

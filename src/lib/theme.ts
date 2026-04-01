@@ -60,7 +60,7 @@ export function initTheme() {
   // 监听系统主题变化
   if (window.matchMedia) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    mediaQuery.addEventListener('change', (e) => {
+    mediaQuery.addEventListener('change', e => {
       if (themeMode.value === 'auto') {
         currentTheme.value = e.matches ? 'dark' : 'light'
         applyTheme(currentTheme.value)
@@ -69,7 +69,7 @@ export function initTheme() {
   }
 
   // 监听主题模式变化
-  watch(themeMode, (newMode) => {
+  watch(themeMode, newMode => {
     currentTheme.value = getActualTheme(newMode)
     applyTheme(currentTheme.value)
   })

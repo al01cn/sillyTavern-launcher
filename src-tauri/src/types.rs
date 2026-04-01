@@ -53,6 +53,24 @@ pub struct SillyTavernConfig {
     pub version: LocalTavernItem,
 }
 
+/// 代理模式：none=不代理, system=系统代理, custom=自定义
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum ProxyMode {
+    #[default]
+    None,
+    System,
+    Custom,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct NetworkProxyConfig {
+    pub mode: ProxyMode,
+    pub host: String,
+    pub port: u16,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct LocalTavernItem {
@@ -85,6 +103,8 @@ pub struct AppConfig {
     pub use_system_git: bool,
     /// 酒馆启动模式：normal / desktop / debug
     pub launch_mode: String,
+    /// 启动器网络代理配置
+    pub network_proxy: NetworkProxyConfig,
 }
 
 impl Default for WindowPosition {
@@ -98,6 +118,16 @@ impl Default for GithubProxyConfig {
         Self {
             enable: false,
             url: "https://ghfast.top/".to_string(),
+        }
+    }
+}
+
+impl Default for NetworkProxyConfig {
+    fn default() -> Self {
+        Self {
+            mode: ProxyMode::None,
+            host: "127.0.0.1".to_string(),
+            port: 7890,
         }
     }
 }
@@ -131,6 +161,7 @@ impl Default for AppConfig {
             use_system_node: true,
             use_system_git: true,
             launch_mode: "normal".to_string(),
+            network_proxy: NetworkProxyConfig::default(),
         }
     }
 }

@@ -7,7 +7,7 @@ const originalHttpsGet = https.get;
 const originalHttpRequest = http.request;
 const originalHttpGet = http.get;
 
-const PROXY_URL = 'https://gh.sixyin.com';
+const PROXY_URL = 'https://ghfast.top';
 
 function rewriteGitHubUrl(url) {
     if (!url || typeof url !== 'string') return url;

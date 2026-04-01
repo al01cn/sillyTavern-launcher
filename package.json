@@ -3,7 +3,7 @@
   "description": "SillyTavern Launcher GUI 是一个专为 SillyTavern 设计的跨平台桌面客户端，基于 Tauri v2 + Vue 3 + Rust 构建。它提供了直观、现代的图形界面，让用户无需命令行即可完整管理 SillyTavern 的安装、启动、配置和扩展。",
   "descriptionEn": "SillyTavern Launcher GUI is a cross-platform desktop client built with Tauri v2 + Vue 3 + Rust, designed specifically for SillyTavern. It provides a modern graphical interface to fully manage SillyTavern without using the command line.",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "homepage": "https://st.al01.cn/",
   "scripts": {
@@ -11,6 +11,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "sync-version": "node scripts/sync-version.js",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -18,7 +20,8 @@
     "cargo:clean": "cd src-tauri && cargo clean",
     "cargo:check": "cd src-tauri && cargo check",
     "cargo:build": "cd src-tauri && cargo build",
-    "allcheck": "bun run typecheck && bun run cargo:check"
+    "cargo:fmt": "cd src-tauri && cargo fmt",
+    "allcheck": "bun run typecheck && bun run lint:fix && bun run cargo:fmt && bun run cargo:check"
   },
   "dependencies": {
     "@phosphor-icons/vue": "^2.2.1",
@@ -44,17 +47,28 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@iconify-json/material-icon-theme": "^1.2.56",
     "@iconify-json/mdi": "^1.2.3",
     "@iconify-json/simple-icons": "^1.2.74",
     "@iconify/vue": "^5.0.0",
     "@tauri-apps/cli": "^2.10.1",
     "@types/qrcode": "^1.5.6",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "cross-env": "^10.1.0",
     "daisyui": "^5.5.19",
-    "typescript": "~5.6.2",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0",
     "vite": "^6.0.3",
-    "vue-tsc": "^2.1.10"
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.6"
   }
 }

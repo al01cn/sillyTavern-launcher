@@ -1,8 +1,8 @@
 [package]
 name = "sillytavern-launcher-gui"
-version = "0.1.5"
+version = "0.1.6"
 description = "SillyTavern Launcher GUI 是一个专为 SillyTavern 设计的跨平台桌面客户端，基于 Tauri v2 + Vue 3 + Rust 构建。它提供了直观、现代的图形界面，让用户无需命令行即可完整管理 SillyTavern 的安装、启动、配置和扩展。"
-authors = ["you"]
+authors = ["AL01.CN"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,7 +27,7 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = "0.9"
-reqwest = { version = "0.11", features = ["stream", "json"] }
+reqwest = { version = "0.12", features = ["stream", "json", "rustls-tls", "gzip"] }
 zip = "0.6.3"
 futures-util = "0.3.32"
 tokio = { version = "1", features = ["full"] }
@@ -50,6 +50,10 @@ jwalk = "0.8.1"
 sevenz-rust = "0.6.1"
 catch-unwind = "0.3.0"
 headless_chrome = { version = "1", features = [] }
+regex = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

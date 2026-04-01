@@ -1,9 +1,9 @@
 <div align="center">
-<img src="./src/assets/images/banner.png">
+<img src="https://ghfast.top/https://raw.githubusercontent.com/al01cn/sillyTavern-launcher/GUI/src/assets/images/banner.png" style="width: 100%; height: 100>
 
 ---
 
-<img src="./public/logo.png" style="width: 100px; height: 100px;">
+<img src="https://ghfast.top/https://raw.githubusercontent.com/al01cn/sillyTavern-launcher/GUI/public/logo.png" style="width: 100px; height: 100px;">
 
 # SillyTavern Launcher GUI
 
@@ -14,7 +14,7 @@
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&logo=vue.js)](https://vuejs.org/)
 [![Rust](https://img.shields.io/badge/Rust-latest-CE422B?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/al01cn/sillytavern-launcher)](https://github.com/al01cn/sillytavern-launcher/releases)
+[![Releases](https://img.shields.io/github/v/release/al01cn/sillytavern-launcher)](https://github.com/al01cn/sillytavern-launcher/releases)
 
 [中文文档](#-中文文档) · [English Docs](#-english-documentation)
 

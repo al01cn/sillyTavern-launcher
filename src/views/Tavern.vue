@@ -1,29 +1,41 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
-import { toast } from 'vue-sonner';
+import { ref, onMounted, watch } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
+import { toast } from 'vue-sonner'
 import {
-  PhList, PhGlobe, PhLockKey, PhListNumbers,
-  PhShieldCheck, PhImage, PhActivity,
+  PhList,
+  PhGlobe,
+  PhLockKey,
+  PhListNumbers,
+  PhShieldCheck,
+  PhImage,
+  PhActivity,
   PhCaretDown,
-  PhCircleNotch, PhCheckCircle,
-  PhFolderOpen, PhGear,
-  PhCpu, PhPlugsConnected, PhLightning,
-  PhX, PhPlus, PhFile, PhArrowsDownUp
-} from '@phosphor-icons/vue';
-import { useI18n } from 'vue-i18n';
-import ConfigMigrateDialog from '../components/ConfigMigrateDialog.vue';
+  PhCircleNotch,
+  PhCheckCircle,
+  PhFolderOpen,
+  PhGear,
+  PhCpu,
+  PhPlugsConnected,
+  PhLightning,
+  PhX,
+  PhPlus,
+  PhFile,
+  PhArrowsDownUp,
+} from '@phosphor-icons/vue'
+import { useI18n } from 'vue-i18n'
+import ConfigMigrateDialog from '../components/ConfigMigrateDialog.vue'
 
-const { t } = useI18n();
+const { t } = useI18n()
 
-const loading = ref(true);
-const configError = ref<string | null>(null);
-const saveInProgress = ref(false);
-const saveQueued = ref(false);
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const loading = ref(true)
+const configError = ref<string | null>(null)
+const saveInProgress = ref(false)
+const saveQueued = ref(false)
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-const showMigrateDialog = ref(false);
+const showMigrateDialog = ref(false)
 
 // 折叠状态管理
 const collapsedSections = ref({
@@ -36,86 +48,86 @@ const collapsedSections = ref({
   thumbnail: true,
   performance: true,
   logging: true,
-  other: true
-});
+  other: true,
+})
 
 const toggleSection = (section: keyof typeof collapsedSections.value) => {
-  collapsedSections.value[section] = !collapsedSections.value[section];
-};
+  collapsedSections.value[section] = !collapsedSections.value[section]
+}
 
 type TavernConfigPayload = {
-  port: number;
-  listen: boolean;
-  listenAddress: { ipv4: string; ipv6: string; };
-  protocol: { ipv4: boolean; ipv6: boolean; };
-  basicAuthMode: boolean;
-  enableUserAccounts: boolean;
-  enableDiscreetLogin: boolean;
-  perUserBasicAuth: boolean;
-  basicAuthUser: { username: string; password: string; };
-  whitelistMode: boolean;
-  whitelist: string[];
+  port: number
+  listen: boolean
+  listenAddress: { ipv4: string; ipv6: string }
+  protocol: { ipv4: boolean; ipv6: boolean }
+  basicAuthMode: boolean
+  enableUserAccounts: boolean
+  enableDiscreetLogin: boolean
+  perUserBasicAuth: boolean
+  basicAuthUser: { username: string; password: string }
+  whitelistMode: boolean
+  whitelist: string[]
   cors: {
-    enabled: boolean;
-    origin: string[];
-    methods: string[];
-    allowedHeaders: string[];
-    exposedHeaders: string[];
-    credentials: boolean;
-    maxAge: number | null;
-  };
+    enabled: boolean
+    origin: string[]
+    methods: string[]
+    allowedHeaders: string[]
+    exposedHeaders: string[]
+    credentials: boolean
+    maxAge: number | null
+  }
   requestProxy: {
-    enabled: boolean;
-    url: string;
-    bypass: string[];
-  };
+    enabled: boolean
+    url: string
+    bypass: string[]
+  }
   backups: {
-    common: { numberOfBackups: number; };
+    common: { numberOfBackups: number }
     chat: {
-      enabled: boolean;
-      checkIntegrity: boolean;
-      maxTotalBackups: number;
-      throttleInterval: number;
-    };
-  };
+      enabled: boolean
+      checkIntegrity: boolean
+      maxTotalBackups: number
+      throttleInterval: number
+    }
+  }
   thumbnails: {
-    enabled: boolean;
-    format: string;
-    quality: number;
-    dimensions: { bg: number[]; avatar: number[]; persona: number[]; };
-  };
-  browserLaunchEnabled: boolean;
-  browserType: string;
+    enabled: boolean
+    format: string
+    quality: number
+    dimensions: { bg: number[]; avatar: number[]; persona: number[] }
+  }
+  browserLaunchEnabled: boolean
+  browserType: string
   ssl: {
-    enabled: boolean;
-    certPath: string;
-    keyPath: string;
-    keyPassphrase: string;
-  };
-  dnsPreferIPv6: boolean;
-  heartbeatInterval: number;
-  hostWhitelist: { enabled: boolean; scan: boolean; hosts: string[]; };
-  whitelistImportDomains: string[];
-  sessionTimeout: number;
-  disableCsrfProtection: boolean;
-  securityOverride: boolean;
-  allowKeysExposure: boolean;
-  skipContentCheck: boolean;
-  logging: { enableAccessLog: boolean; minLogLevel: number; };
+    enabled: boolean
+    certPath: string
+    keyPath: string
+    keyPassphrase: string
+  }
+  dnsPreferIPv6: boolean
+  heartbeatInterval: number
+  hostWhitelist: { enabled: boolean; scan: boolean; hosts: string[] }
+  whitelistImportDomains: string[]
+  sessionTimeout: number
+  disableCsrfProtection: boolean
+  securityOverride: boolean
+  allowKeysExposure: boolean
+  skipContentCheck: boolean
+  logging: { enableAccessLog: boolean; minLogLevel: number }
   performance: {
-    lazyLoadCharacters: boolean;
-    memoryCacheCapacity: string;
-    useDiskCache: boolean;
-  };
-  cacheBuster: { enabled: boolean; userAgentPattern: string; };
-  sso: { autheliaAuth: boolean; authentikAuth: boolean; };
-  extensions: { enabled: boolean; autoUpdate: boolean; };
-  enableServerPlugins: boolean;
-  enableServerPluginsAutoUpdate: boolean;
-  enableCorsProxy: boolean;
-  promptPlaceholder: string;
-  enableDownloadableTokenizers: boolean;
-};
+    lazyLoadCharacters: boolean
+    memoryCacheCapacity: string
+    useDiskCache: boolean
+  }
+  cacheBuster: { enabled: boolean; userAgentPattern: string }
+  sso: { autheliaAuth: boolean; authentikAuth: boolean }
+  extensions: { enabled: boolean; autoUpdate: boolean }
+  enableServerPlugins: boolean
+  enableServerPluginsAutoUpdate: boolean
+  enableCorsProxy: boolean
+  promptPlaceholder: string
+  enableDownloadableTokenizers: boolean
+}
 
 const tavernConfig = ref<TavernConfigPayload>({
   port: 8000,
@@ -130,19 +142,33 @@ const tavernConfig = ref<TavernConfigPayload>({
   whitelistMode: true,
   whitelist: [],
   cors: {
-    enabled: true, origin: ['null'], methods: ['OPTIONS'], allowedHeaders: [], exposedHeaders: [], credentials: false, maxAge: null
+    enabled: true,
+    origin: ['null'],
+    methods: ['OPTIONS'],
+    allowedHeaders: [],
+    exposedHeaders: [],
+    credentials: false,
+    maxAge: null,
   },
   requestProxy: { enabled: false, url: '', bypass: [] },
   backups: {
     common: { numberOfBackups: 50 },
-    chat: { enabled: true, checkIntegrity: true, maxTotalBackups: -1, throttleInterval: 10000 }
+    chat: { enabled: true, checkIntegrity: true, maxTotalBackups: -1, throttleInterval: 10000 },
   },
   thumbnails: {
-    enabled: true, format: 'jpg', quality: 95, dimensions: { bg: [160, 90], avatar: [96, 144], persona: [96, 144] }
+    enabled: true,
+    format: 'jpg',
+    quality: 95,
+    dimensions: { bg: [160, 90], avatar: [96, 144], persona: [96, 144] },
   },
   browserLaunchEnabled: true,
   browserType: 'default',
-  ssl: { enabled: false, certPath: './certs/cert.pem', keyPath: './certs/privkey.pem', keyPassphrase: '' },
+  ssl: {
+    enabled: false,
+    certPath: './certs/cert.pem',
+    keyPath: './certs/privkey.pem',
+    keyPassphrase: '',
+  },
   dnsPreferIPv6: false,
   heartbeatInterval: 0,
   hostWhitelist: { enabled: false, scan: true, hosts: [] },
@@ -161,129 +187,137 @@ const tavernConfig = ref<TavernConfigPayload>({
   enableServerPluginsAutoUpdate: true,
   enableCorsProxy: false,
   promptPlaceholder: '[Start a new chat]',
-  enableDownloadableTokenizers: true
-});
+  enableDownloadableTokenizers: true,
+})
 
-const isInitialLoad = ref(true);
+const isInitialLoad = ref(true)
 
 const loadConfig = async () => {
   try {
-    const fetchedConfig = await invoke<TavernConfigPayload>('get_sillytavern_global_config_options');
-    isInitialLoad.value = true;
-    tavernConfig.value = fetchedConfig;
-    setTimeout(() => { isInitialLoad.value = false; }, 50);
+    const fetchedConfig = await invoke<TavernConfigPayload>('get_sillytavern_global_config_options')
+    isInitialLoad.value = true
+    tavernConfig.value = fetchedConfig
+    setTimeout(() => {
+      isInitialLoad.value = false
+    }, 50)
   } catch (error: any) {
-    configError.value = typeof error === 'string' ? error : t('tavern.loadConfigFailed');
+    configError.value = typeof error === 'string' ? error : t('tavern.loadConfigFailed')
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const saveConfig = async () => {
-  if (isInitialLoad.value || loading.value || configError.value) return;
+  if (isInitialLoad.value || loading.value || configError.value) return
   if (saveInProgress.value) {
-    saveQueued.value = true;
-    return;
+    saveQueued.value = true
+    return
   }
 
-  saveInProgress.value = true;
+  saveInProgress.value = true
   try {
-    await invoke('update_sillytavern_global_config_options', { config: tavernConfig.value });
-  } catch (error) {
-    toast.error(t('tavern.saveFailed'));
+    await invoke('update_sillytavern_global_config_options', { config: tavernConfig.value })
+  } catch (_error) {
+    toast.error(t('tavern.saveFailed'))
   } finally {
-    saveInProgress.value = false;
+    saveInProgress.value = false
     if (saveQueued.value) {
-      saveQueued.value = false;
-      await saveConfig();
+      saveQueued.value = false
+      await saveConfig()
     }
   }
-};
+}
 
 const scheduleSave = () => {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { void saveConfig(); }, 500);
-};
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    void saveConfig()
+  }, 500)
+}
 
-watch(tavernConfig, () => {
-  if (!isInitialLoad.value && !loading.value) scheduleSave();
-}, { deep: true });
+watch(
+  tavernConfig,
+  () => {
+    if (!isInitialLoad.value && !loading.value) scheduleSave()
+  },
+  { deep: true },
+)
 
-onMounted(loadConfig);
+onMounted(loadConfig)
 
 const openConfigFile = async () => {
   try {
-    await invoke('open_sillytavern_global_config_file');
-  } catch (e) {
-    toast.error(t('tavern.cannotOpenFile'));
+    await invoke('open_sillytavern_global_config_file')
+  } catch (_e) {
+    toast.error(t('tavern.cannotOpenFile'))
   }
-};
+}
 
 const addDomain = () => {
-  tavernConfig.value.whitelistImportDomains.push('');
-};
+  tavernConfig.value.whitelistImportDomains.push('')
+}
 
 const removeDomain = (index: number) => {
-  tavernConfig.value.whitelistImportDomains.splice(index, 1);
-};
+  tavernConfig.value.whitelistImportDomains.splice(index, 1)
+}
 
 const addWhitelistIP = () => {
-  tavernConfig.value.whitelist.push('');
-};
+  tavernConfig.value.whitelist.push('')
+}
 
 const removeWhitelistIP = (index: number) => {
-  tavernConfig.value.whitelist.splice(index, 1);
-};
+  tavernConfig.value.whitelist.splice(index, 1)
+}
 
 const addHost = () => {
-  tavernConfig.value.hostWhitelist.hosts.push('');
-};
+  tavernConfig.value.hostWhitelist.hosts.push('')
+}
 
 const removeHost = (index: number) => {
-  tavernConfig.value.hostWhitelist.hosts.splice(index, 1);
-};
+  tavernConfig.value.hostWhitelist.hosts.splice(index, 1)
+}
 
 // CORS 相关方法
 const addCorsOrigin = () => {
-  tavernConfig.value.cors.origin.push('');
-};
+  tavernConfig.value.cors.origin.push('')
+}
 
 const removeCorsOrigin = (index: number) => {
-  tavernConfig.value.cors.origin.splice(index, 1);
-};
+  tavernConfig.value.cors.origin.splice(index, 1)
+}
 
 const addCorsMethod = () => {
-  tavernConfig.value.cors.methods.push('');
-};
+  tavernConfig.value.cors.methods.push('')
+}
 
 const removeCorsMethod = (index: number) => {
-  tavernConfig.value.cors.methods.splice(index, 1);
-};
+  tavernConfig.value.cors.methods.splice(index, 1)
+}
 
 const addCorsHeader = () => {
-  tavernConfig.value.cors.allowedHeaders.push('');
-};
+  tavernConfig.value.cors.allowedHeaders.push('')
+}
 
 const removeCorsHeader = (index: number) => {
-  tavernConfig.value.cors.allowedHeaders.splice(index, 1);
-};
+  tavernConfig.value.cors.allowedHeaders.splice(index, 1)
+}
 
 const addCorsExposedHeader = () => {
-  tavernConfig.value.cors.exposedHeaders.push('');
-};
+  tavernConfig.value.cors.exposedHeaders.push('')
+}
 
 const removeCorsExposedHeader = (index: number) => {
-  tavernConfig.value.cors.exposedHeaders.splice(index, 1);
-};
+  tavernConfig.value.cors.exposedHeaders.splice(index, 1)
+}
 
 // 代理相关方法
 const addBypass = () => {
-  tavernConfig.value.requestProxy.bypass.push('');
-};
+  tavernConfig.value.requestProxy.bypass.push('')
+}
 
 const removeBypass = (index: number) => {
-  tavernConfig.value.requestProxy.bypass.splice(index, 1);
-};
+  tavernConfig.value.requestProxy.bypass.splice(index, 1)
+}
 
 // SSL 证书文件选择
 const selectCertFile = async () => {
@@ -291,61 +325,69 @@ const selectCertFile = async () => {
     const selected = await open({
       title: t('tavern.selectCertFile'),
       multiple: false,
-      filters: [{
-        name: 'Certificate Files',
-        extensions: ['pem', 'crt', 'cer']
-      }]
-    });
+      filters: [
+        {
+          name: 'Certificate Files',
+          extensions: ['pem', 'crt', 'cer'],
+        },
+      ],
+    })
     if (selected) {
-      tavernConfig.value.ssl.certPath = selected.toString();
+      tavernConfig.value.ssl.certPath = selected.toString()
     }
-  } catch (error) {
-    toast.error(t('tavern.cannotOpenFile'));
+  } catch (_error) {
+    toast.error(t('tavern.cannotOpenFile'))
   }
-};
+}
 
 const selectKeyFile = async () => {
   try {
     const selected = await open({
       title: t('tavern.selectKeyFile'),
       multiple: false,
-      filters: [{
-        name: 'Key Files',
-        extensions: ['pem', 'key']
-      }]
-    });
+      filters: [
+        {
+          name: 'Key Files',
+          extensions: ['pem', 'key'],
+        },
+      ],
+    })
     if (selected) {
-      tavernConfig.value.ssl.keyPath = selected.toString();
+      tavernConfig.value.ssl.keyPath = selected.toString()
     }
-  } catch (error) {
-    toast.error(t('tavern.cannotOpenFile'));
+  } catch (_error) {
+    toast.error(t('tavern.cannotOpenFile'))
   }
-};
+}
 
 // 内存缓存容量处理
 const memoryCacheCapacityValue = ref<string>(
-  tavernConfig.value.performance.memoryCacheCapacity.replace('mb', '') || '100'
-);
+  tavernConfig.value.performance.memoryCacheCapacity.replace('mb', '') || '100',
+)
 
-watch(memoryCacheCapacityValue, (newValue) => {
-  const numValue = newValue.replace(/[^0-9]/g, '');
-  tavernConfig.value.performance.memoryCacheCapacity = numValue ? `${numValue}mb` : '0mb';
-});
+watch(memoryCacheCapacityValue, newValue => {
+  const numValue = newValue.replace(/[^0-9]/g, '')
+  tavernConfig.value.performance.memoryCacheCapacity = numValue ? `${numValue}mb` : '0mb'
+})
 
 // 监听配置变化，同步更新显示值
-watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
-  const numValue = newValue.replace('mb', '');
-  if (numValue !== memoryCacheCapacityValue.value) {
-    memoryCacheCapacityValue.value = numValue || '100';
-  }
-});
+watch(
+  () => tavernConfig.value.performance.memoryCacheCapacity,
+  newValue => {
+    const numValue = newValue.replace('mb', '')
+    if (numValue !== memoryCacheCapacityValue.value) {
+      memoryCacheCapacityValue.value = numValue || '100'
+    }
+  },
+)
 </script>
 
 <template>
   <div class="flex flex-col h-full bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
     <!-- Header -->
     <header
-      class="flex items-center justify-between p-6 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur sticky top-0 z-20">
+      class="flex items-center justify-between p-6 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur sticky top-0 z-20"
+    >
       <div class="flex items-center gap-4">
         <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20">
           <PhList :size="24" weight="fill" class="text-white" />
@@ -361,23 +403,31 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <div v-if="saveInProgress"
-          class="flex items-center gap-2 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
+        <div
+          v-if="saveInProgress"
+          class="flex items-center gap-2 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800"
+        >
           <PhCircleNotch :size="12" class="animate-spin" />
           {{ t('tavern.syncing') }}
         </div>
-        <div v-else
-          class="flex items-center gap-2 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
+        <div
+          v-else
+          class="flex items-center gap-2 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800"
+        >
           <PhCheckCircle :size="12" weight="fill" />
           {{ t('tavern.ready') }}
         </div>
-        <button @click="openConfigFile"
-          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all text-xs font-bold active:scale-95 shadow-sm">
+        <button
+          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
+          @click="openConfigFile"
+        >
           <PhFolderOpen :size="16" />
           {{ t('tavern.openConfigFile') }}
         </button>
-        <button @click="showMigrateDialog = true"
-          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-indigo-500 hover:text-indigo-500 transition-all text-xs font-bold active:scale-95 shadow-sm">
+        <button
+          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-indigo-500 hover:text-indigo-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
+          @click="showMigrateDialog = true"
+        >
           <PhArrowsDownUp :size="16" />
           {{ t('tavern.migrate.button') }}
         </button>
@@ -392,7 +442,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
 
       <div v-else class="max-w-4xl mx-auto space-y-4 pb-20">
         <!-- 1. 网络基础 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.network }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.network }">
           <div class="config-card-header" @click="toggleSection('network')">
             <div class="header-left">
               <div class="header-icon bg-blue-100 dark:bg-blue-900/50 text-blue-600">
@@ -410,40 +460,44 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.serverPort') }}</label>
-                  <input type="number" v-model="tavernConfig.port" class="form-input" />
+                  <input v-model="tavernConfig.port" type="number" class="form-input" />
                 </div>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.ipv4ListenAddress') }}</label>
-                  <input type="text" v-model="tavernConfig.listenAddress.ipv4" class="form-input"
-                    placeholder="0.0.0.0" />
+                  <input
+                    v-model="tavernConfig.listenAddress.ipv4"
+                    type="text"
+                    class="form-input"
+                    placeholder="0.0.0.0"
+                  />
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.ipv6ListenAddress') }}</label>
-                  <input type="text" v-model="tavernConfig.listenAddress.ipv6" class="form-input" placeholder="[::]" />
+                  <input v-model="tavernConfig.listenAddress.ipv6" type="text" class="form-input" placeholder="[::]" />
                 </div>
               </div>
 
               <div class="flex gap-4 pt-2">
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.listen">
+                  <input v-model="tavernConfig.listen" type="checkbox" />
                   <PhCheckCircle v-if="tavernConfig.listen" weight="fill" />
                   {{ t('tavern.allowLanAccess') }}
                 </label>
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.protocol.ipv4">
+                  <input v-model="tavernConfig.protocol.ipv4" type="checkbox" />
                   <PhCheckCircle v-if="tavernConfig.protocol.ipv4" weight="fill" />
                   {{ t('tavern.enableIPv4') }}
                 </label>
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.protocol.ipv6">
+                  <input v-model="tavernConfig.protocol.ipv6" type="checkbox" />
                   <PhCheckCircle v-if="tavernConfig.protocol.ipv6" weight="fill" />
                   {{ t('tavern.enableIPv6') }}
                 </label>
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.dnsPreferIPv6">
+                  <input v-model="tavernConfig.dnsPreferIPv6" type="checkbox" />
                   <PhCheckCircle v-if="tavernConfig.dnsPreferIPv6" weight="fill" />
                   {{ t('tavern.dnsPreferIPv6') }}
                 </label>
@@ -452,7 +506,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.heartbeatInterval') }}</label>
-                  <input type="number" v-model="tavernConfig.heartbeatInterval" class="form-input" placeholder="0" />
+                  <input v-model="tavernConfig.heartbeatInterval" type="number" class="form-input" placeholder="0" />
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.heartbeatIntervalDesc') }}</span>
                 </div>
                 <div class="input-group">
@@ -468,7 +522,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
 
               <div class="pt-2">
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.browserLaunchEnabled">
+                  <input v-model="tavernConfig.browserLaunchEnabled" type="checkbox" />
                   <PhCheckCircle v-if="tavernConfig.browserLaunchEnabled" weight="fill" />
                   {{ t('tavern.autoLaunchBrowser') }}
                 </label>
@@ -478,7 +532,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 2. 安全与账户 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.security }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.security }">
           <div class="config-card-header" @click="toggleSection('security')">
             <div class="header-left">
               <div class="header-icon bg-purple-100 dark:bg-purple-900/50 text-purple-600">
@@ -499,7 +553,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                     <span class="setting-label">{{ t('tavern.enableBasicAuth') }}</span>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" v-model="tavernConfig.basicAuthMode" class="sr-only peer">
+                    <input v-model="tavernConfig.basicAuthMode" type="checkbox" class="sr-only peer" />
                     <div class="toggle-slider"></div>
                   </label>
                 </div>
@@ -508,54 +562,66 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                     <span class="setting-label">{{ t('tavern.enableUserAccounts') }}</span>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" v-model="tavernConfig.enableUserAccounts" class="sr-only peer">
+                    <input v-model="tavernConfig.enableUserAccounts" type="checkbox" class="sr-only peer" />
                     <div class="toggle-slider"></div>
                   </label>
                 </div>
               </div>
 
-              <div v-if="tavernConfig.basicAuthMode"
-                class="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl animate-in">
+              <div
+                v-if="tavernConfig.basicAuthMode"
+                class="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl animate-in"
+              >
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.globalUsername') }}</label>
-                  <input type="text" v-model="tavernConfig.basicAuthUser.username" class="form-input" />
+                  <input v-model="tavernConfig.basicAuthUser.username" type="text" class="form-input" />
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.globalPassword') }}</label>
-                  <input type="password" v-model="tavernConfig.basicAuthUser.password" class="form-input" />
+                  <input v-model="tavernConfig.basicAuthUser.password" type="password" class="form-input" />
                 </div>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.enableDiscreetLogin">
+                  <input v-model="tavernConfig.enableDiscreetLogin" type="checkbox" />
                   {{ t('tavern.discreetLogin') }}
                 </label>
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.perUserBasicAuth">
+                  <input v-model="tavernConfig.perUserBasicAuth" type="checkbox" />
                   {{ t('tavern.perUserBasicAuth') }}
                 </label>
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.whitelistMode">
+                  <input v-model="tavernConfig.whitelistMode" type="checkbox" />
                   {{ t('tavern.enableWhitelist') }}
                 </label>
               </div>
 
-              <div v-if="tavernConfig.whitelistMode" class="space-y-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl animate-in">
+              <div
+                v-if="tavernConfig.whitelistMode"
+                class="space-y-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl animate-in"
+              >
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.whitelistIPs') }}</label>
                   <div class="space-y-2">
-                    <div v-for="(_ip, index) in tavernConfig.whitelist" :key="index" 
-                      class="flex items-center gap-2">
-                      <input type="text" v-model="tavernConfig.whitelist[index]" 
-                        class="form-input flex-1" :placeholder="t('tavern.ipPlaceholder')" />
-                      <button @click="removeWhitelistIP(index)" 
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                    <div v-for="(_ip, index) in tavernConfig.whitelist" :key="index" class="flex items-center gap-2">
+                      <input
+                        v-model="tavernConfig.whitelist[index]"
+                        type="text"
+                        class="form-input flex-1"
+                        :placeholder="t('tavern.ipPlaceholder')"
+                      />
+                      <button
+                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                        @click="removeWhitelistIP(index)"
+                      >
                         <PhX :size="16" weight="bold" />
                       </button>
                     </div>
-                    <button @click="addWhitelistIP" 
-                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                    <button
+                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                      @click="addWhitelistIP"
+                    >
                       <PhPlus :size="16" weight="bold" />
                       {{ t('common.add') }}
                     </button>
@@ -565,14 +631,16 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               </div>
 
               <div class="pt-4 border-t border-slate-100 dark:border-slate-700">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.hostWhitelist') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.hostWhitelist') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="setting-row">
                     <div class="setting-info">
                       <span class="setting-label">{{ t('tavern.hostWhitelistEnabled') }}</span>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="tavernConfig.hostWhitelist.enabled" class="sr-only peer">
+                      <input v-model="tavernConfig.hostWhitelist.enabled" type="checkbox" class="sr-only peer" />
                       <div class="toggle-slider"></div>
                     </label>
                   </div>
@@ -581,7 +649,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                       <span class="setting-label">{{ t('tavern.hostWhitelistScan') }}</span>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="tavernConfig.hostWhitelist.scan" class="sr-only peer">
+                      <input v-model="tavernConfig.hostWhitelist.scan" type="checkbox" class="sr-only peer" />
                       <div class="toggle-slider"></div>
                     </label>
                   </div>
@@ -589,17 +657,28 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <div v-if="tavernConfig.hostWhitelist.enabled" class="mt-3 input-group">
                   <label class="input-label">{{ t('tavern.addHost') }}</label>
                   <div class="space-y-2">
-                    <div v-for="(_host, index) in tavernConfig.hostWhitelist.hosts" :key="index" 
-                      class="flex items-center gap-2">
-                      <input type="text" v-model="tavernConfig.hostWhitelist.hosts[index]" 
-                        class="form-input flex-1" :placeholder="t('tavern.hostPlaceholder')" />
-                      <button @click="removeHost(index)" 
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                    <div
+                      v-for="(_host, index) in tavernConfig.hostWhitelist.hosts"
+                      :key="index"
+                      class="flex items-center gap-2"
+                    >
+                      <input
+                        v-model="tavernConfig.hostWhitelist.hosts[index]"
+                        type="text"
+                        class="form-input flex-1"
+                        :placeholder="t('tavern.hostPlaceholder')"
+                      />
+                      <button
+                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                        @click="removeHost(index)"
+                      >
                         <PhX :size="16" weight="bold" />
                       </button>
                     </div>
-                    <button @click="addHost" 
-                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                    <button
+                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                      @click="addHost"
+                    >
                       <PhPlus :size="16" weight="bold" />
                       {{ t('common.add') }}
                     </button>
@@ -608,19 +687,32 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               </div>
 
               <div class="pt-4 border-t border-slate-100 dark:border-slate-700">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.whitelistImportDomains') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.whitelistImportDomains') }}
+                </h3>
                 <div class="space-y-2">
-                  <div v-for="(_domain, index) in tavernConfig.whitelistImportDomains" :key="index" 
-                    class="flex items-center gap-2">
-                    <input type="text" v-model="tavernConfig.whitelistImportDomains[index]" 
-                      class="form-input flex-1" :placeholder="t('tavern.domainPlaceholder')" />
-                    <button @click="removeDomain(index)" 
-                      class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                  <div
+                    v-for="(_domain, index) in tavernConfig.whitelistImportDomains"
+                    :key="index"
+                    class="flex items-center gap-2"
+                  >
+                    <input
+                      v-model="tavernConfig.whitelistImportDomains[index]"
+                      type="text"
+                      class="form-input flex-1"
+                      :placeholder="t('tavern.domainPlaceholder')"
+                    />
+                    <button
+                      class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                      @click="removeDomain(index)"
+                    >
                       <PhX :size="16" weight="bold" />
                     </button>
                   </div>
-                  <button @click="addDomain" 
-                    class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                  <button
+                    class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                    @click="addDomain"
+                  >
                     <PhPlus :size="16" weight="bold" />
                     {{ t('common.add') }}
                   </button>
@@ -631,7 +723,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 3. SSL 证书 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.ssl }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.ssl }">
           <div class="config-card-header" @click="toggleSection('ssl')">
             <div class="header-left">
               <div class="header-icon bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600">
@@ -652,7 +744,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <span class="setting-desc">{{ t('tavern.enableSslDesc') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.ssl.enabled" class="sr-only peer">
+                  <input v-model="tavernConfig.ssl.enabled" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
@@ -660,9 +752,16 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.sslCertPath') }}</label>
                   <div class="flex gap-2">
-                    <input type="text" v-model="tavernConfig.ssl.certPath" class="form-input flex-1" :placeholder="t('tavern.sslCertPathPlaceholder')" />
-                    <button @click="selectCertFile" 
-                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2">
+                    <input
+                      v-model="tavernConfig.ssl.certPath"
+                      type="text"
+                      class="form-input flex-1"
+                      :placeholder="t('tavern.sslCertPathPlaceholder')"
+                    />
+                    <button
+                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
+                      @click="selectCertFile"
+                    >
                       <PhFile :size="16" weight="bold" />
                       {{ t('common.select') }}
                     </button>
@@ -672,9 +771,16 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.sslKeyPath') }}</label>
                   <div class="flex gap-2">
-                    <input type="text" v-model="tavernConfig.ssl.keyPath" class="form-input flex-1" :placeholder="t('tavern.sslKeyPathPlaceholder')" />
-                    <button @click="selectKeyFile" 
-                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2">
+                    <input
+                      v-model="tavernConfig.ssl.keyPath"
+                      type="text"
+                      class="form-input flex-1"
+                      :placeholder="t('tavern.sslKeyPathPlaceholder')"
+                    />
+                    <button
+                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
+                      @click="selectKeyFile"
+                    >
                       <PhFile :size="16" weight="bold" />
                       {{ t('common.select') }}
                     </button>
@@ -683,7 +789,12 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.sslKeyPassphrase') }}</label>
-                  <input type="password" v-model="tavernConfig.ssl.keyPassphrase" class="form-input" placeholder="••••••••" />
+                  <input
+                    v-model="tavernConfig.ssl.keyPassphrase"
+                    type="password"
+                    class="form-input"
+                    placeholder="••••••••"
+                  />
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.keyPassphraseDesc') }}</span>
                 </div>
               </div>
@@ -692,7 +803,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 4. 跨域配置 (CORS) -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.cors }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.cors }">
           <div class="config-card-header" @click="toggleSection('cors')">
             <div class="header-left">
               <div class="header-icon bg-orange-100 dark:bg-orange-900/50 text-orange-600">
@@ -712,7 +823,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <span class="setting-label">{{ t('tavern.enableCors') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.cors.enabled" class="sr-only peer">
+                  <input v-model="tavernConfig.cors.enabled" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
@@ -720,17 +831,28 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.allowedOrigins') }}</label>
                   <div class="space-y-2">
-                    <div v-for="(_origin, index) in tavernConfig.cors.origin" :key="index" 
-                      class="flex items-center gap-2">
-                      <input type="text" v-model="tavernConfig.cors.origin[index]" 
-                        class="form-input flex-1" :placeholder="t('tavern.originPlaceholder')" />
-                      <button @click="removeCorsOrigin(index)" 
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                    <div
+                      v-for="(_origin, index) in tavernConfig.cors.origin"
+                      :key="index"
+                      class="flex items-center gap-2"
+                    >
+                      <input
+                        v-model="tavernConfig.cors.origin[index]"
+                        type="text"
+                        class="form-input flex-1"
+                        :placeholder="t('tavern.originPlaceholder')"
+                      />
+                      <button
+                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                        @click="removeCorsOrigin(index)"
+                      >
                         <PhX :size="16" weight="bold" />
                       </button>
                     </div>
-                    <button @click="addCorsOrigin" 
-                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                    <button
+                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                      @click="addCorsOrigin"
+                    >
                       <PhPlus :size="16" weight="bold" />
                       {{ t('common.add') }}
                     </button>
@@ -740,17 +862,28 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.allowedMethods') }}</label>
                     <div class="space-y-2">
-                      <div v-for="(_method, index) in tavernConfig.cors.methods" :key="index" 
-                        class="flex items-center gap-2">
-                        <input type="text" v-model="tavernConfig.cors.methods[index]" 
-                          class="form-input flex-1" placeholder="GET, POST, PUT, DELETE, OPTIONS" />
-                        <button @click="removeCorsMethod(index)" 
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                      <div
+                        v-for="(_method, index) in tavernConfig.cors.methods"
+                        :key="index"
+                        class="flex items-center gap-2"
+                      >
+                        <input
+                          v-model="tavernConfig.cors.methods[index]"
+                          type="text"
+                          class="form-input flex-1"
+                          placeholder="GET, POST, PUT, DELETE, OPTIONS"
+                        />
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeCorsMethod(index)"
+                        >
                           <PhX :size="16" weight="bold" />
                         </button>
                       </div>
-                      <button @click="addCorsMethod" 
-                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                      <button
+                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                        @click="addCorsMethod"
+                      >
                         <PhPlus :size="16" weight="bold" />
                         {{ t('common.add') }}
                       </button>
@@ -758,24 +891,35 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   </div>
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.maxAge') }}</label>
-                    <input type="number" v-model="tavernConfig.cors.maxAge" class="form-input" />
+                    <input v-model="tavernConfig.cors.maxAge" type="number" class="form-input" />
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.allowedHeaders') }}</label>
                     <div class="space-y-2">
-                      <div v-for="(_header, index) in tavernConfig.cors.allowedHeaders" :key="index" 
-                        class="flex items-center gap-2">
-                        <input type="text" v-model="tavernConfig.cors.allowedHeaders[index]" 
-                          class="form-input flex-1" :placeholder="t('tavern.headerPlaceholder')" />
-                        <button @click="removeCorsHeader(index)" 
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                      <div
+                        v-for="(_header, index) in tavernConfig.cors.allowedHeaders"
+                        :key="index"
+                        class="flex items-center gap-2"
+                      >
+                        <input
+                          v-model="tavernConfig.cors.allowedHeaders[index]"
+                          type="text"
+                          class="form-input flex-1"
+                          :placeholder="t('tavern.headerPlaceholder')"
+                        />
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeCorsHeader(index)"
+                        >
                           <PhX :size="16" weight="bold" />
                         </button>
                       </div>
-                      <button @click="addCorsHeader" 
-                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                      <button
+                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                        @click="addCorsHeader"
+                      >
                         <PhPlus :size="16" weight="bold" />
                         {{ t('common.add') }}
                       </button>
@@ -784,17 +928,28 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.exposedHeaders') }}</label>
                     <div class="space-y-2">
-                      <div v-for="(_header, index) in tavernConfig.cors.exposedHeaders" :key="index" 
-                        class="flex items-center gap-2">
-                        <input type="text" v-model="tavernConfig.cors.exposedHeaders[index]" 
-                          class="form-input flex-1" :placeholder="t('tavern.exposedHeaderPlaceholder')" />
-                        <button @click="removeCorsExposedHeader(index)" 
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                      <div
+                        v-for="(_header, index) in tavernConfig.cors.exposedHeaders"
+                        :key="index"
+                        class="flex items-center gap-2"
+                      >
+                        <input
+                          v-model="tavernConfig.cors.exposedHeaders[index]"
+                          type="text"
+                          class="form-input flex-1"
+                          :placeholder="t('tavern.exposedHeaderPlaceholder')"
+                        />
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeCorsExposedHeader(index)"
+                        >
                           <PhX :size="16" weight="bold" />
                         </button>
                       </div>
-                      <button @click="addCorsExposedHeader" 
-                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                      <button
+                        class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                        @click="addCorsExposedHeader"
+                      >
                         <PhPlus :size="16" weight="bold" />
                         {{ t('common.add') }}
                       </button>
@@ -803,7 +958,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 </div>
                 <div class="flex gap-4">
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.cors.credentials">
+                    <input v-model="tavernConfig.cors.credentials" type="checkbox" />
                     {{ t('tavern.allowCredentials') }}
                   </label>
                 </div>
@@ -813,7 +968,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 5. 代理与备份 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.proxy }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.proxy }">
           <div class="config-card-header" @click="toggleSection('proxy')">
             <div class="header-left">
               <div class="header-icon bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600">
@@ -835,30 +990,45 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <span class="setting-desc">{{ t('tavern.enableProxyDesc') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.requestProxy.enabled" class="sr-only peer">
+                  <input v-model="tavernConfig.requestProxy.enabled" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
               <div v-if="tavernConfig.requestProxy.enabled" class="space-y-4 animate-in">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.proxyUrl') }}</label>
-                  <input type="text" v-model="tavernConfig.requestProxy.url" class="form-input"
-                    :placeholder="t('tavern.proxyUrlPlaceholder')" />
+                  <input
+                    v-model="tavernConfig.requestProxy.url"
+                    type="text"
+                    class="form-input"
+                    :placeholder="t('tavern.proxyUrlPlaceholder')"
+                  />
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.bypassList') }}</label>
                   <div class="space-y-2">
-                    <div v-for="(_bypass, index) in tavernConfig.requestProxy.bypass" :key="index" 
-                      class="flex items-center gap-2">
-                      <input type="text" v-model="tavernConfig.requestProxy.bypass[index]" 
-                        class="form-input flex-1" :placeholder="t('tavern.bypassPlaceholder')" />
-                      <button @click="removeBypass(index)" 
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95">
+                    <div
+                      v-for="(_bypass, index) in tavernConfig.requestProxy.bypass"
+                      :key="index"
+                      class="flex items-center gap-2"
+                    >
+                      <input
+                        v-model="tavernConfig.requestProxy.bypass[index]"
+                        type="text"
+                        class="form-input flex-1"
+                        :placeholder="t('tavern.bypassPlaceholder')"
+                      />
+                      <button
+                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                        @click="removeBypass(index)"
+                      >
                         <PhX :size="16" weight="bold" />
                       </button>
                     </div>
-                    <button @click="addBypass" 
-                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2">
+                    <button
+                      class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                      @click="addBypass"
+                    >
                       <PhPlus :size="16" weight="bold" />
                       {{ t('common.add') }}
                     </button>
@@ -871,30 +1041,30 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
             <div class="p-5 border-t border-slate-100 dark:border-slate-700 space-y-4">
               <div class="input-group">
                 <label class="input-label">{{ t('tavern.commonBackups') }}</label>
-                <input type="number" v-model="tavernConfig.backups.common.numberOfBackups" class="form-input" />
+                <input v-model="tavernConfig.backups.common.numberOfBackups" type="number" class="form-input" />
               </div>
               <div class="setting-row">
                 <div class="setting-info">
                   <span class="setting-label">{{ t('tavern.enableChatBackup') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.backups.chat.enabled" class="sr-only peer">
+                  <input v-model="tavernConfig.backups.chat.enabled" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
               <div v-if="tavernConfig.backups.chat.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.maxTotalBackups') }}</label>
-                  <input type="number" v-model="tavernConfig.backups.chat.maxTotalBackups" class="form-input" />
+                  <input v-model="tavernConfig.backups.chat.maxTotalBackups" type="number" class="form-input" />
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.throttleInterval') }}</label>
-                  <input type="number" v-model="tavernConfig.backups.chat.throttleInterval" class="form-input" />
+                  <input v-model="tavernConfig.backups.chat.throttleInterval" type="number" class="form-input" />
                 </div>
               </div>
               <div v-if="tavernConfig.backups.chat.enabled" class="pt-2">
                 <label class="checkbox-pill">
-                  <input type="checkbox" v-model="tavernConfig.backups.chat.checkIntegrity">
+                  <input v-model="tavernConfig.backups.chat.checkIntegrity" type="checkbox" />
                   {{ t('tavern.checkIntegrity') }}
                 </label>
               </div>
@@ -903,7 +1073,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 6. 缩略图设置 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.thumbnail }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.thumbnail }">
           <div class="config-card-header" @click="toggleSection('thumbnail')">
             <div class="header-left">
               <div class="header-icon bg-pink-100 dark:bg-pink-900/50 text-pink-600">
@@ -923,7 +1093,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <span class="setting-label">{{ t('tavern.enableThumbnails') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.thumbnails.enabled" class="sr-only peer">
+                  <input v-model="tavernConfig.thumbnails.enabled" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
@@ -931,9 +1101,13 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                 <div class="grid grid-cols-2 gap-4">
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.imageFormat') }}</label>
-                    <select v-model="tavernConfig.thumbnails.format"
+                    <select
+                      v-model="tavernConfig.thumbnails.format"
                       class="form-input appearance-none bg-no-repeat bg-right pr-10"
-                      style="background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http%32.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M8 11L3 6h10l-5 5z%22/%3E%3C/svg%3E')">
+                      style="
+                        background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http%32.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M8 11L3 6h10l-5 5z%22/%3E%3C/svg%3E');
+                      "
+                    >
                       <option value="jpg">JPEG ({{ t('tavern.default') }})</option>
                       <option value="png">PNG</option>
                       <option value="webp">WebP ({{ t('tavern.recommended') }})</option>
@@ -941,47 +1115,75 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   </div>
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.compressionQuality') }}</label>
-                    <input type="number" v-model="tavernConfig.thumbnails.quality" min="1" max="100"
-                      class="form-input" />
+                    <input
+                      v-model="tavernConfig.thumbnails.quality"
+                      type="number"
+                      min="1"
+                      max="100"
+                      class="form-input"
+                    />
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.backgroundDimensions') }}</label>
                     <div class="flex gap-2">
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.bg[0]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.width')" />
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.bg[1]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.height')" />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.bg[0]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.width')"
+                      />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.bg[1]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.height')"
+                      />
                     </div>
                   </div>
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.avatarDimensions') }}</label>
                     <div class="flex gap-2">
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.avatar[0]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.width')" />
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.avatar[1]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.height')" />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.avatar[0]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.width')"
+                      />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.avatar[1]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.height')"
+                      />
                     </div>
                   </div>
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.personaDimensions') }}</label>
                     <div class="flex gap-2">
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.persona[0]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.width')" />
-                      <input type="number" v-model="tavernConfig.thumbnails.dimensions.persona[1]"
-                        class="form-input flex-1 min-w-[60px]" :placeholder="t('tavern.height')" />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.persona[0]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.width')"
+                      />
+                      <input
+                        v-model="tavernConfig.thumbnails.dimensions.persona[1]"
+                        type="number"
+                        class="form-input flex-1 min-w-[60px]"
+                        :placeholder="t('tavern.height')"
+                      />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- 7. 性能优化 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.performance }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.performance }">
           <div class="config-card-header" @click="toggleSection('performance')">
             <div class="header-left">
               <div class="header-icon bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600">
@@ -1003,7 +1205,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                     <span class="setting-desc">{{ t('tavern.lazyLoadCharactersDesc') }}</span>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" v-model="tavernConfig.performance.lazyLoadCharacters" class="sr-only peer">
+                    <input v-model="tavernConfig.performance.lazyLoadCharacters" type="checkbox" class="sr-only peer" />
                     <div class="toggle-slider"></div>
                   </label>
                 </div>
@@ -1012,15 +1214,20 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                     <span class="setting-label">{{ t('tavern.useDiskCache') }}</span>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" v-model="tavernConfig.performance.useDiskCache" class="sr-only peer">
+                    <input v-model="tavernConfig.performance.useDiskCache" type="checkbox" class="sr-only peer" />
                     <div class="toggle-slider"></div>
                   </label>
                 </div>
               </div>
               <div class="input-group">
                 <label class="input-label">{{ t('tavern.memoryCacheCapacity') }}</label>
-                <input type="number" v-model="memoryCacheCapacityValue" class="form-input"
-                  :placeholder="t('tavern.memoryCacheCapacityDesc')" min="0" />
+                <input
+                  v-model="memoryCacheCapacityValue"
+                  type="number"
+                  class="form-input"
+                  :placeholder="t('tavern.memoryCacheCapacityDesc')"
+                  min="0"
+                />
                 <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.mbMegabytes') }}</span>
               </div>
             </div>
@@ -1028,7 +1235,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 8. 日志与调试 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.logging }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.logging }">
           <div class="config-card-header" @click="toggleSection('logging')">
             <div class="header-left">
               <div class="header-icon bg-slate-100 dark:bg-slate-700 text-slate-600">
@@ -1048,7 +1255,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                   <span class="setting-label">{{ t('tavern.enableAccessLog') }}</span>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" v-model="tavernConfig.logging.enableAccessLog" class="sr-only peer">
+                  <input v-model="tavernConfig.logging.enableAccessLog" type="checkbox" class="sr-only peer" />
                   <div class="toggle-slider"></div>
                 </label>
               </div>
@@ -1066,7 +1273,7 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
         </div>
 
         <!-- 9. 会话与安全 -->
-        <div class="config-card" :class="{ 'collapsed': collapsedSections.other }">
+        <div class="config-card" :class="{ collapsed: collapsedSections.other }">
           <div class="config-card-header" @click="toggleSection('other')">
             <div class="header-left">
               <div class="header-icon bg-red-100 dark:bg-red-900/50 text-red-600">
@@ -1084,47 +1291,51 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.promptPlaceholder') }}</label>
-                  <input type="text" v-model="tavernConfig.promptPlaceholder" class="form-input" />
+                  <input v-model="tavernConfig.promptPlaceholder" type="text" class="form-input" />
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.promptPlaceholderDesc') }}</span>
                 </div>
                 <div class="input-group">
                   <label class="input-label">{{ t('tavern.sessionTimeout') }}</label>
-                  <input type="number" v-model="tavernConfig.sessionTimeout" class="form-input" />
+                  <input v-model="tavernConfig.sessionTimeout" type="number" class="form-input" />
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.sessionTimeoutDesc') }}</span>
                 </div>
               </div>
-        
+
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.securityOptions') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.securityOptions') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.disableCsrfProtection">
+                    <input v-model="tavernConfig.disableCsrfProtection" type="checkbox" />
                     {{ t('tavern.disableCsrfProtection') }}
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.securityOverride">
+                    <input v-model="tavernConfig.securityOverride" type="checkbox" />
                     {{ t('tavern.securityOverride') }}
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.allowKeysExposure">
+                    <input v-model="tavernConfig.allowKeysExposure" type="checkbox" />
                     {{ t('tavern.allowKeysExposure') }}
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.skipContentCheck">
+                    <input v-model="tavernConfig.skipContentCheck" type="checkbox" />
                     {{ t('tavern.skipContentCheck') }}
                   </label>
                 </div>
               </div>
-        
+
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.extensionsPlugins') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.extensionsPlugins') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="setting-row">
                     <div class="setting-info">
                       <span class="setting-label">{{ t('tavern.extensionsEnabled') }}</span>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="tavernConfig.extensions.enabled" class="sr-only peer">
+                      <input v-model="tavernConfig.extensions.enabled" type="checkbox" class="sr-only peer" />
                       <div class="toggle-slider"></div>
                     </label>
                   </div>
@@ -1133,65 +1344,76 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
                       <span class="setting-label">{{ t('tavern.extensionsAutoUpdate') }}</span>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="tavernConfig.extensions.autoUpdate" class="sr-only peer">
+                      <input v-model="tavernConfig.extensions.autoUpdate" type="checkbox" class="sr-only peer" />
                       <div class="toggle-slider"></div>
                     </label>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.enableServerPlugins">
+                    <input v-model="tavernConfig.enableServerPlugins" type="checkbox" />
                     {{ t('tavern.enableServerPlugins') }}
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.enableServerPluginsAutoUpdate">
+                    <input v-model="tavernConfig.enableServerPluginsAutoUpdate" type="checkbox" />
                     {{ t('tavern.enableServerPluginsAutoUpdate') }}
                   </label>
                 </div>
               </div>
-        
+
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.ssoConfig') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.ssoConfig') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.sso.autheliaAuth">
+                    <input v-model="tavernConfig.sso.autheliaAuth" type="checkbox" />
                     Authelia SSO
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.sso.authentikAuth">
+                    <input v-model="tavernConfig.sso.authentikAuth" type="checkbox" />
                     Authentik SSO
                   </label>
                 </div>
               </div>
-        
+
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.cacheBuster') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.cacheBuster') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="setting-row">
                     <div class="setting-info">
                       <span class="setting-label">{{ t('tavern.cacheBusterEnabled') }}</span>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="tavernConfig.cacheBuster.enabled" class="sr-only peer">
+                      <input v-model="tavernConfig.cacheBuster.enabled" type="checkbox" class="sr-only peer" />
                       <div class="toggle-slider"></div>
                     </label>
                   </div>
                   <div class="input-group">
                     <label class="input-label">{{ t('tavern.cacheBusterPattern') }}</label>
-                    <input type="text" v-model="tavernConfig.cacheBuster.userAgentPattern" class="form-input" :placeholder="t('tavern.cacheBusterPatternDesc')" />
+                    <input
+                      v-model="tavernConfig.cacheBuster.userAgentPattern"
+                      type="text"
+                      class="form-input"
+                      :placeholder="t('tavern.cacheBusterPatternDesc')"
+                    />
                   </div>
                 </div>
               </div>
-        
+
               <div class="border-t border-slate-100 dark:border-slate-700 pt-4">
-                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{{ t('tavern.otherSettings') }}</h3>
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+                  {{ t('tavern.otherSettings') }}
+                </h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.enableCorsProxy">
+                    <input v-model="tavernConfig.enableCorsProxy" type="checkbox" />
                     {{ t('tavern.enableCorsProxy') }}
                   </label>
                   <label class="checkbox-pill">
-                    <input type="checkbox" v-model="tavernConfig.enableDownloadableTokenizers">
+                    <input v-model="tavernConfig.enableDownloadableTokenizers" type="checkbox" />
                     {{ t('tavern.enableDownloadableTokenizers') }}
                   </label>
                 </div>
@@ -1199,17 +1421,12 @@ watch(() => tavernConfig.value.performance.memoryCacheCapacity, (newValue) => {
             </div>
           </div>
         </div>
-
       </div>
     </main>
   </div>
 
   <!-- 配置迁移弹窗 -->
-  <ConfigMigrateDialog
-    :open="showMigrateDialog"
-    @close="showMigrateDialog = false"
-    @migrated="loadConfig"
-  />
+  <ConfigMigrateDialog :open="showMigrateDialog" @close="showMigrateDialog = false" @migrated="loadConfig" />
 </template>
 
 <style>

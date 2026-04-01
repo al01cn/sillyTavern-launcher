@@ -4,6 +4,7 @@
 pub mod character;
 pub mod chat;
 pub mod config;
+pub mod elevation;
 pub mod extensions;
 pub mod finderst;
 pub mod git;
@@ -12,7 +13,6 @@ pub mod sillytavern;
 pub mod types;
 pub mod utils;
 pub mod worldinfo;
-pub mod elevation;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 顶层 use
@@ -22,8 +22,8 @@ use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::Mutex;
 
-use crate::types::{InstallState, ProcessState};
 use crate::config::{apply_saved_window_position, setup_window_position_tracking};
+use crate::types::{InstallState, ProcessState};
 use crate::utils::{ensure_standard_layout, init_logger};
 
 /// 在 setup 中提前构建、通过 manage 传递给 run 回调，解决生命周期问题
@@ -75,7 +75,8 @@ pub fn run() {
             if let Err(e) = ensure_standard_layout(&path) {
                 #[cfg(target_os = "windows")]
                 {
-                    if e.kind() == std::io::ErrorKind::PermissionDenied && !elevation::is_elevated() {
+                    if e.kind() == std::io::ErrorKind::PermissionDenied && !elevation::is_elevated()
+                    {
                         tracing::warn!("检测到无法写入应用目录且未提权，尝试自动请求管理员权限...");
                         let _ = elevation::elevate_process(app.handle().clone());
                     }
@@ -96,7 +97,8 @@ pub fn run() {
                 let handle2 = app.handle().clone();
                 main_win.on_window_event(move |event| {
                     if let tauri::WindowEvent::Destroyed = event {
-                        if let Some(desktop_win) = handle2.get_webview_window("sillytavern-desktop") {
+                        if let Some(desktop_win) = handle2.get_webview_window("sillytavern-desktop")
+                        {
                             tracing::info!("主窗口已销毁，强制关闭 sillytavern-desktop 子窗口");
                             let _ = desktop_win.close();
                         }
@@ -119,6 +121,11 @@ pub fn run() {
             config::open_directory,
             config::fetch_github_proxies,
             config::get_system_cpu_cores,
+            config::test_network_proxy,
+            config::test_github_connection,
+            config::test_github_multi,
+            config::test_download_speed,
+            config::get_system_proxy_info,
             // Node.js / npm
             node::check_nodejs,
             node::check_nodejs_both,
@@ -128,6 +135,7 @@ pub fn run() {
             git::check_git,
             git::check_git_both,
             git::install_git,
+            git::cancel_git_node_install,
             // SillyTavern 版本管理
             sillytavern::fetch_sillytavern_releases,
             sillytavern::get_installed_sillytavern_versions,
@@ -167,6 +175,7 @@ pub fn run() {
             sillytavern::get_local_ip_addresses,
             sillytavern::get_public_ip_addresses,
             sillytavern::check_network_availability,
+            sillytavern::repair_missing_deps,
             // 扩展管理
             extensions::get_extensions,
             extensions::toggle_extension_enable,
@@ -218,7 +227,9 @@ pub fn run() {
                     // 在进入 async 之前，从 state 里取出 Arc（同步代码，无生命周期问题）
                     let git_child_pid_arc: Arc<Mutex<Option<u32>>> = {
                         let owned = app.state::<OwnedArcs>();
-                        owned.cancel_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                        owned
+                            .cancel_flag
+                            .store(true, std::sync::atomic::Ordering::SeqCst);
                         // 将 Arc 内容通过 unsafe transmute_copy 延长生命周期 —— 实际上
                         // 我们只需要让编译器知道这个 Arc 可以独立存活，而 Arc 本身是
                         // 引用计数安全的。用更安全的方式：将内部指针重建为独立 Arc。
@@ -236,7 +247,7 @@ pub fn run() {
                         rt.block_on(async move {
                             // 停止本地酒馆扫描
                             let _ = finderst::cancel_scan_local_sillytavern().await;
-                            
+
                             // 获取 ProcessState 并停止酒馆（同时还原 git config）
                             let state = app.state::<ProcessState>();
                             let _ = crate::sillytavern::stop_sillytavern(app.clone(), state).await;
@@ -263,7 +274,8 @@ pub fn run() {
                             }
                         });
                     }
-                }).join();
+                })
+                .join();
             }
             _ => {}
         });

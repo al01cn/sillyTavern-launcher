@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use crate::types::{ExtensionInfo, ExtensionManifest};
 use crate::utils::get_config_path;
+use std::path::PathBuf;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as TokioCommand;
@@ -31,7 +31,10 @@ fn is_official_extension(manifest: &ExtensionManifest) -> bool {
 }
 
 /// 获取酒馆根目录
-fn get_st_dir(version: &crate::types::LocalTavernItem, data_dir: &PathBuf) -> Result<PathBuf, String> {
+fn get_st_dir(
+    version: &crate::types::LocalTavernItem,
+    data_dir: &PathBuf,
+) -> Result<PathBuf, String> {
     if version.version.is_empty() && version.path.is_empty() {
         return Err("未指定酒馆版本，无法安装全局扩展".to_string());
     }
@@ -105,7 +108,10 @@ pub async fn install_extension_zip(
     let file2 = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(file2).map_err(|e| e.to_string())?;
 
-    let is_official = manifest_opt.as_ref().map(is_official_extension).unwrap_or(false);
+    let is_official = manifest_opt
+        .as_ref()
+        .map(is_official_extension)
+        .unwrap_or(false);
 
     // ── 第二步：根据官方 / 第三方决定安装目录 ─────────────────────────────────
     // 官方扩展：无论用户选择 scope，统一安装到全局 public/scripts/extensions/{id}
@@ -162,7 +168,11 @@ pub async fn install_extension_zip(
     let final_id = if single_root {
         if let Some(root) = root_dir {
             let r = root.trim_end_matches('/');
-            if !r.is_empty() { r.to_string() } else { file_stem.clone() }
+            if !r.is_empty() {
+                r.to_string()
+            } else {
+                file_stem.clone()
+            }
         } else {
             file_stem.clone()
         }
@@ -221,10 +231,22 @@ pub async fn install_extension_zip(
     if is_third_party {
         let config = crate::config::read_app_config_from_disk(&app);
         if config.auto_repair_git {
-            let repair_scope = if is_official { "global".to_string() } else { scope.clone() };
+            let repair_scope = if is_official {
+                "global".to_string()
+            } else {
+                scope.clone()
+            };
             let exact_dir = extract_target.to_string_lossy().to_string();
             let dummy_pid = std::sync::Arc::new(tokio::sync::Mutex::new(None::<u32>));
-            match repair_extension_git_inner(app, dummy_pid, final_id, repair_scope, Some(exact_dir)).await {
+            match repair_extension_git_inner(
+                app,
+                dummy_pid,
+                final_id,
+                repair_scope,
+                Some(exact_dir),
+            )
+            .await
+            {
                 Ok(true) => tracing::info!("自动修复 Git 环境成功（在线）"),
                 Ok(false) => tracing::info!("自动修复 Git 环境完成（离线保底）"),
                 Err(e) => tracing::warn!("自动修复 Git 环境失败: {}", e),
@@ -320,10 +342,7 @@ pub async fn get_extensions(
                                                     .map(|s| s.to_string());
                                             }
                                             exts.push(ExtensionInfo {
-                                                id: entry
-                                                    .file_name()
-                                                    .to_string_lossy()
-                                                    .to_string(),
+                                                id: entry.file_name().to_string_lossy().to_string(),
                                                 manifest: m,
                                                 dir_path: entry
                                                     .path()
@@ -370,7 +389,7 @@ pub async fn get_extensions(
                 .join("scripts")
                 .join("extensions")
         };
-        
+
         if global_official_dir.exists() {
             scan_dir(&global_official_dir, true, "global", &mut extensions);
 
@@ -541,17 +560,14 @@ pub fn open_extension_folder(
         if version.version.is_empty() {
             return Err("未指定酒馆版本，无法打开全局扩展目录".to_string());
         }
-        
+
         let st_dir = if version.path.is_empty() {
             data_dir.join("sillytavern").join(&version.version)
         } else {
             std::path::PathBuf::from(&version.path)
         };
-        
-        st_dir
-            .join("public")
-            .join("scripts")
-            .join("extensions")
+
+        st_dir.join("public").join("scripts").join("extensions")
     } else {
         data_dir
             .join("st_data")
@@ -625,9 +641,7 @@ pub fn open_specific_extension_folder(
 }
 
 #[tauri::command]
-pub async fn verify_extension_zip_from_bytes(
-    bytes: Vec<u8>,
-) -> Result<ExtensionManifest, String> {
+pub async fn verify_extension_zip_from_bytes(bytes: Vec<u8>) -> Result<ExtensionManifest, String> {
     tokio::task::spawn_blocking(move || {
         let reader = std::io::Cursor::new(bytes);
         let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
@@ -676,155 +690,175 @@ pub async fn install_extension_zip_from_bytes(
     let scope_clone = scope.clone();
     let bytes_clone = bytes.clone();
 
-    let (final_id, is_third_party, extract_target_str) = tokio::task::spawn_blocking(move || -> Result<(String, bool, String), String> {
-        let data_dir = get_config_path(&app_clone)
-            .parent()
-            .unwrap_or(&std::path::PathBuf::from("."))
-            .to_path_buf();
+    let (final_id, is_third_party, extract_target_str) =
+        tokio::task::spawn_blocking(move || -> Result<(String, bool, String), String> {
+            let data_dir = get_config_path(&app_clone)
+                .parent()
+                .unwrap_or(&std::path::PathBuf::from("."))
+                .to_path_buf();
 
-        // ── 第一步：读取 manifest，判断官方 / 第三方 ─────────────────────────
-        let reader = std::io::Cursor::new(bytes_clone.clone());
-        let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
+            // ── 第一步：读取 manifest，判断官方 / 第三方 ─────────────────────────
+            let reader = std::io::Cursor::new(bytes_clone.clone());
+            let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
 
-        let mut manifest_opt: Option<ExtensionManifest> = None;
-        for i in 0..archive.len() {
-            let mut f = archive.by_index(i).map_err(|e| e.to_string())?;
-            let name = f.name().to_string();
-            if name == "manifest.json" || name.ends_with("/manifest.json") {
-                let mut contents = String::new();
-                std::io::Read::read_to_string(&mut f, &mut contents).map_err(|e| e.to_string())?;
-                manifest_opt = serde_json::from_str::<ExtensionManifest>(&contents).ok();
-                break;
-            }
-        }
-
-        let is_official = manifest_opt.as_ref().map(is_official_extension).unwrap_or(false);
-
-        // ── 第二步：根据官方 / 第三方决定安装目录 ────────────────────────────
-        let (target_dir, is_third_party) = if is_official {
-            let st_dir = get_st_dir(&version, &data_dir)?;
-            let dir = st_dir.join("public").join("scripts").join("extensions");
-            (dir, false)
-        } else if scope_clone == "user" {
-            let dir = data_dir
-                .join("st_data")
-                .join("default-user")
-                .join("extensions")
-                .join("third-party");
-            (dir, true)
-        } else {
-            let st_dir = get_st_dir(&version, &data_dir)?;
-            let dir = st_dir
-                .join("public")
-                .join("scripts")
-                .join("extensions")
-                .join("third-party");
-            (dir, true)
-        };
-
-        if !target_dir.exists() {
-            std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
-        }
-
-        // ── 第三步：检测 zip 内根目录 ─────────────────────────────────────────
-        let reader2 = std::io::Cursor::new(bytes_clone.clone());
-        let mut archive = zip::ZipArchive::new(reader2).map_err(|e| e.to_string())?;
-
-        let mut root_dir: Option<String> = None;
-        let mut single_root = true;
-
-        for i in 0..archive.len() {
-            let file = archive.by_index(i).map_err(|e| e.to_string())?;
-            let name = file.name().to_string();
-            let first = name.split('/').next().unwrap_or("").to_string();
-
-            if root_dir.is_none() {
-                root_dir = Some(first.clone());
-            } else if root_dir.as_ref().unwrap() != &first {
-                single_root = false;
-                break;
-            }
-        }
-
-        let file_stem = std::path::Path::new(&filename)
-            .file_stem()
-            .unwrap_or(std::ffi::OsStr::new("extension"))
-            .to_string_lossy()
-            .to_string();
-
-        let mut final_id = file_stem.clone();
-        if single_root {
-            if let Some(root) = root_dir {
-                let r = root.trim_end_matches('/');
-                if !r.is_empty() {
-                    final_id = r.to_string();
+            let mut manifest_opt: Option<ExtensionManifest> = None;
+            for i in 0..archive.len() {
+                let mut f = archive.by_index(i).map_err(|e| e.to_string())?;
+                let name = f.name().to_string();
+                if name == "manifest.json" || name.ends_with("/manifest.json") {
+                    let mut contents = String::new();
+                    std::io::Read::read_to_string(&mut f, &mut contents)
+                        .map_err(|e| e.to_string())?;
+                    manifest_opt = serde_json::from_str::<ExtensionManifest>(&contents).ok();
+                    break;
                 }
             }
-        }
 
-        let extract_target = target_dir.join(&final_id);
+            let is_official = manifest_opt
+                .as_ref()
+                .map(is_official_extension)
+                .unwrap_or(false);
 
-        if !extract_target.exists() {
-            std::fs::create_dir_all(&extract_target).map_err(|e| e.to_string())?;
-        }
-
-        // ── 第四步：解压文件 ──────────────────────────────────────────────────
-        let reader3 = std::io::Cursor::new(bytes_clone);
-        let mut archive = zip::ZipArchive::new(reader3).map_err(|e| e.to_string())?;
-
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-            let outpath = match file.enclosed_name() {
-                Some(p) => p.to_owned(),
-                None => continue,
+            // ── 第二步：根据官方 / 第三方决定安装目录 ────────────────────────────
+            let (target_dir, is_third_party) = if is_official {
+                let st_dir = get_st_dir(&version, &data_dir)?;
+                let dir = st_dir.join("public").join("scripts").join("extensions");
+                (dir, false)
+            } else if scope_clone == "user" {
+                let dir = data_dir
+                    .join("st_data")
+                    .join("default-user")
+                    .join("extensions")
+                    .join("third-party");
+                (dir, true)
+            } else {
+                let st_dir = get_st_dir(&version, &data_dir)?;
+                let dir = st_dir
+                    .join("public")
+                    .join("scripts")
+                    .join("extensions")
+                    .join("third-party");
+                (dir, true)
             };
 
-            // 如果 zip 内部有根目录，解压时去掉那一层
-            let target_path = if single_root {
-                let mut components = outpath.components();
-                components.next(); // 跳过根目录
-                let stripped = components.as_path();
-                if stripped.as_os_str().is_empty() {
-                    continue;
+            if !target_dir.exists() {
+                std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+            }
+
+            // ── 第三步：检测 zip 内根目录 ─────────────────────────────────────────
+            let reader2 = std::io::Cursor::new(bytes_clone.clone());
+            let mut archive = zip::ZipArchive::new(reader2).map_err(|e| e.to_string())?;
+
+            let mut root_dir: Option<String> = None;
+            let mut single_root = true;
+
+            for i in 0..archive.len() {
+                let file = archive.by_index(i).map_err(|e| e.to_string())?;
+                let name = file.name().to_string();
+                let first = name.split('/').next().unwrap_or("").to_string();
+
+                if root_dir.is_none() {
+                    root_dir = Some(first.clone());
+                } else if root_dir.as_ref().unwrap() != &first {
+                    single_root = false;
+                    break;
                 }
-                extract_target.join(stripped)
-            } else {
-                extract_target.join(&outpath)
-            };
+            }
 
-            if file.name().ends_with('/') {
-                std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-            } else {
-                if let Some(p) = target_path.parent() {
-                    if !p.exists() {
-                        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+            let file_stem = std::path::Path::new(&filename)
+                .file_stem()
+                .unwrap_or(std::ffi::OsStr::new("extension"))
+                .to_string_lossy()
+                .to_string();
+
+            let mut final_id = file_stem.clone();
+            if single_root {
+                if let Some(root) = root_dir {
+                    let r = root.trim_end_matches('/');
+                    if !r.is_empty() {
+                        final_id = r.to_string();
                     }
                 }
-                let mut outfile = std::fs::File::create(&target_path)
-                    .map_err(|e| e.to_string())?;
-                std::io::copy(&mut file, &mut outfile)
-                    .map_err(|e| e.to_string())?;
             }
-        }
 
-        Ok((final_id, is_third_party, extract_target.to_string_lossy().to_string()))
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+            let extract_target = target_dir.join(&final_id);
+
+            if !extract_target.exists() {
+                std::fs::create_dir_all(&extract_target).map_err(|e| e.to_string())?;
+            }
+
+            // ── 第四步：解压文件 ──────────────────────────────────────────────────
+            let reader3 = std::io::Cursor::new(bytes_clone);
+            let mut archive = zip::ZipArchive::new(reader3).map_err(|e| e.to_string())?;
+
+            for i in 0..archive.len() {
+                let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+                let outpath = match file.enclosed_name() {
+                    Some(p) => p.to_owned(),
+                    None => continue,
+                };
+
+                // 如果 zip 内部有根目录，解压时去掉那一层
+                let target_path = if single_root {
+                    let mut components = outpath.components();
+                    components.next(); // 跳过根目录
+                    let stripped = components.as_path();
+                    if stripped.as_os_str().is_empty() {
+                        continue;
+                    }
+                    extract_target.join(stripped)
+                } else {
+                    extract_target.join(&outpath)
+                };
+
+                if file.name().ends_with('/') {
+                    std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+                } else {
+                    if let Some(p) = target_path.parent() {
+                        if !p.exists() {
+                            std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                        }
+                    }
+                    let mut outfile =
+                        std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
+                    std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+                }
+            }
+
+            Ok((
+                final_id,
+                is_third_party,
+                extract_target.to_string_lossy().to_string(),
+            ))
+        })
+        .await
+        .map_err(|e| e.to_string())??;
 
     // ── 第五步：自动修复（仅第三方扩展）─────────────────────────────────────
     if is_third_party {
         let config = crate::config::read_app_config_from_disk(&app);
         if config.auto_repair_git {
             let dummy_pid = std::sync::Arc::new(tokio::sync::Mutex::new(None::<u32>));
-            match repair_extension_git_inner(app.clone(), dummy_pid, final_id, scope, Some(extract_target_str)).await {
+            match repair_extension_git_inner(
+                app.clone(),
+                dummy_pid,
+                final_id,
+                scope,
+                Some(extract_target_str),
+            )
+            .await
+            {
                 Ok(true) => tracing::info!("自动修复 Git 环境成功（在线）"),
                 Ok(false) => tracing::info!("自动修复 Git 环境完成（离线保底）"),
                 Err(e) => {
-                    let _ = app.emit("git-install-log", format!(
-                        "[{}] ! 自动修复 Git 环境失败: {}",
-                        chrono::Local::now().format("%H:%M:%S"), e
-                    ));
+                    let _ = app.emit(
+                        "git-install-log",
+                        format!(
+                            "[{}] ! 自动修复 Git 环境失败: {}",
+                            chrono::Local::now().format("%H:%M:%S"),
+                            e
+                        ),
+                    );
                 }
             }
         }
@@ -852,7 +886,10 @@ pub async fn install_extension_git(
         version.version
     );
     let start_time = chrono::Local::now().format("%H:%M:%S").to_string();
-    let _ = app.emit("git-install-log", format!("[{}] > 初始化安装环境...", start_time));
+    let _ = app.emit(
+        "git-install-log",
+        format!("[{}] > 初始化安装环境...", start_time),
+    );
 
     let app_handle = app.clone();
     let config = crate::config::read_app_config_from_disk(&app_handle);
@@ -866,7 +903,8 @@ pub async fn install_extension_git(
         .to_path_buf();
 
     // 确定仓库名称
-    let repo_name = url.trim_end_matches('/')
+    let repo_name = url
+        .trim_end_matches('/')
         .split('/')
         .last()
         .unwrap_or("extension")
@@ -884,13 +922,13 @@ pub async fn install_extension_git(
         if version.version.is_empty() {
             return Err("未指定酒馆版本，无法安装全局扩展".to_string());
         }
-        
+
         let st_dir = if version.path.is_empty() {
             data_dir.join("sillytavern").join(&version.version)
         } else {
             std::path::PathBuf::from(&version.path)
         };
-        
+
         st_dir
             .join("public")
             .join("scripts")
@@ -903,56 +941,95 @@ pub async fn install_extension_git(
     }
 
     let target_dir = target_parent.join(&repo_name);
-    let _ = app.emit("git-install-log", format!("[{}] > 目标路径: {}", chrono::Local::now().format("%H:%M:%S"), target_dir.display()));
-    
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] > 目标路径: {}",
+            chrono::Local::now().format("%H:%M:%S"),
+            target_dir.display()
+        ),
+    );
+
     if target_dir.exists() {
-        let _ = app.emit("git-install-log", format!("[{}] ! 错误: 目录已存在", chrono::Local::now().format("%H:%M:%S")));
-        return Err(format!("目录 {} 已存在，请先删除旧扩展或更换仓库名称", repo_name));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] ! 错误: 目录已存在",
+                chrono::Local::now().format("%H:%M:%S")
+            ),
+        );
+        return Err(format!(
+            "目录 {} 已存在，请先删除旧扩展或更换仓库名称",
+            repo_name
+        ));
     }
 
     // 准备 Git 命令
     let mut cmd = TokioCommand::new(git_exe);
     cmd.arg("clone");
     cmd.arg("--progress"); // 关键：开启进度输出以便捕获详细日志
-    
+
     if let Some(ref b) = branch_opt {
         if !b.trim().is_empty() {
             cmd.arg("-b").arg(b);
         }
     }
-    
+
     cmd.arg("--depth").arg("1");
 
     // 处理 GitHub 加速 URL
     let mut final_url = url.clone();
-    if config.github_proxy.enable && !config.github_proxy.url.is_empty() && url.contains("github.com") {
+    let use_accelerate = config.github_proxy.enable
+        && !config.github_proxy.url.is_empty()
+        && url.contains("github.com");
+
+    if use_accelerate {
         let proxy_url = config.github_proxy.url.trim_end_matches('/');
         final_url = format!("{}/{}", proxy_url, url.trim_start_matches('/'));
+        // 使用加速地址时，禁用 Git 交互式凭据提示，避免弹窗
+        // 公开的 GitHub 仓库不需要凭据，私人仓库不使用加速地址所以不会走到这里
+        std::env::set_var("GIT_TERMINAL_PROMPT", "0");
         tracing::info!("使用 GitHub 加速地址: {}", final_url);
-        let _ = app.emit("git-install-log", format!("[{}] > 使用 GitHub 加速: {}", chrono::Local::now().format("%H:%M:%S"), final_url));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] > 使用 GitHub 加速: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                final_url
+            ),
+        );
     } else {
-        let _ = app.emit("git-install-log", format!("[{}] > 原始地址: {}", chrono::Local::now().format("%H:%M:%S"), url));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] > 原始地址: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                url
+            ),
+        );
     }
 
     cmd.arg(&final_url);
     cmd.arg(&target_dir);
 
     cmd.stdout(std::process::Stdio::piped())
-       .stderr(std::process::Stdio::piped());
+        .stderr(std::process::Stdio::piped());
 
     #[cfg(target_os = "windows")]
     {
         cmd.creation_flags(0x08000000);
     }
 
-    let mut child = cmd.spawn().map_err(|e| format!("执行 Git 命令失败: {}", e))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("执行 Git 命令失败: {}", e))?;
 
     // 记录 git 子进程 PID，供程序退出时安全终止
     if let Some(pid) = child.id() {
         *state.git_child_pid.lock().await = Some(pid);
         tracing::info!("git clone 子进程 PID={}", pid);
     }
-    
+
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
@@ -975,18 +1052,36 @@ pub async fn install_extension_git(
         }
     });
 
-    let _ = app.emit("git-install-log", format!("[{}] > 开始克隆仓库...", chrono::Local::now().format("%H:%M:%S")));
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] > 开始克隆仓库...",
+            chrono::Local::now().format("%H:%M:%S")
+        ),
+    );
     let status = child.wait().await.map_err(|e| e.to_string())?;
 
     // 克隆完成，清除 PID 记录
     *state.git_child_pid.lock().await = None;
 
     if !status.success() {
-        let _ = app.emit("git-install-log", format!("[{}] ! 克隆失败，请检查网络或仓库权限。", chrono::Local::now().format("%H:%M:%S")));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] ! 克隆失败，请检查网络或仓库权限。",
+                chrono::Local::now().format("%H:%M:%S")
+            ),
+        );
         return Err("Git 克隆失败，请检查日志。".to_string());
     }
 
-    let _ = app.emit("git-install-log", format!("[{}] √ 克隆并安装成功！", chrono::Local::now().format("%H:%M:%S")));
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] √ 克隆并安装成功！",
+            chrono::Local::now().format("%H:%M:%S")
+        ),
+    );
     Ok(())
 }
 
@@ -1026,8 +1121,11 @@ fn write_offline_git_skeleton(target_dir: &PathBuf, remote_url: &str) -> Result<
         .map_err(|e| format!("写入 config 失败: {}", e))?;
 
     // packed-refs（空文件）
-    std::fs::write(git_dir.join("packed-refs"), "# pack-refs with: peeled fully-peeled sorted\n")
-        .map_err(|e| format!("写入 packed-refs 失败: {}", e))?;
+    std::fs::write(
+        git_dir.join("packed-refs"),
+        "# pack-refs with: peeled fully-peeled sorted\n",
+    )
+    .map_err(|e| format!("写入 packed-refs 失败: {}", e))?;
 
     // ORIG_HEAD 不写，info/exclude 可写可不写
     Ok(())
@@ -1065,20 +1163,32 @@ async fn repair_extension_git_inner(
         .parent()
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
-    
+
     // 2. 构造目标目录
     // 优先使用前端传来的精确路径；没有时才按 scope 推算（兼容旧调用）
     let target_dir = if let Some(ref dp) = dir_path {
         PathBuf::from(dp)
     } else if scope == "user" {
-        data_dir.join("st_data").join("default-user").join("extensions").join("third-party").join(&id)
+        data_dir
+            .join("st_data")
+            .join("default-user")
+            .join("extensions")
+            .join("third-party")
+            .join(&id)
     } else {
         let st_dir = if !config.sillytavern.version.path.is_empty() {
             PathBuf::from(&config.sillytavern.version.path)
         } else {
-            data_dir.join("sillytavern").join(&config.sillytavern.version.version)
+            data_dir
+                .join("sillytavern")
+                .join(&config.sillytavern.version.version)
         };
-        st_dir.join("public").join("scripts").join("extensions").join("third-party").join(&id)
+        st_dir
+            .join("public")
+            .join("scripts")
+            .join("extensions")
+            .join("third-party")
+            .join(&id)
     };
 
     if !target_dir.exists() {
@@ -1096,19 +1206,28 @@ async fn repair_extension_git_inner(
         return Err("未找到 manifest.json".to_string());
     };
 
-    let content = std::fs::read_to_string(&active_manifest).map_err(|e| format!("读取配置失败: {}", e))?;
-    let manifest: crate::types::ExtensionManifest = serde_json::from_str(&content).map_err(|e| format!("解析配置失败: {}", e))?;
-    
-    let url = manifest.home_page.clone().ok_or("该扩展 manifest.json 中未定义 homePage，无法定位远程仓库。")?;
-    
+    let content =
+        std::fs::read_to_string(&active_manifest).map_err(|e| format!("读取配置失败: {}", e))?;
+    let manifest: crate::types::ExtensionManifest =
+        serde_json::from_str(&content).map_err(|e| format!("解析配置失败: {}", e))?;
+
+    let url = manifest
+        .home_page
+        .clone()
+        .ok_or("该扩展 manifest.json 中未定义 homePage，无法定位远程仓库。")?;
+
     // 扩展修复标准：
     // 1. auto_update 字段为 true (旧标准)
     // 2. 或者 homePage 是一个标准的 Git 仓库链接 (新标准)
     let is_git_url = {
         let u = url.to_lowercase();
-        u.contains("github.com") || u.contains("gitee.com") || u.contains("gitcode.com") || u.contains("gitlab.com") || u.ends_with(".git")
+        u.contains("github.com")
+            || u.contains("gitee.com")
+            || u.contains("gitcode.com")
+            || u.contains("gitlab.com")
+            || u.ends_with(".git")
     };
-    
+
     let can_repair = manifest.auto_update.unwrap_or(false) || is_git_url;
 
     if !can_repair {
@@ -1116,14 +1235,21 @@ async fn repair_extension_git_inner(
     }
 
     if url.trim().is_empty() || url == "None" {
-         return Err("该扩展 manifest.json 中 homePage 为空，无法定位远程仓库。".to_string());
+        return Err("该扩展 manifest.json 中 homePage 为空，无法定位远程仓库。".to_string());
     }
 
     // 处理加速 URL
     let mut final_url = url.clone();
-    if config.github_proxy.enable && !config.github_proxy.url.is_empty() && url.contains("github.com") {
+    let use_accelerate = config.github_proxy.enable
+        && !config.github_proxy.url.is_empty()
+        && url.contains("github.com");
+
+    if use_accelerate {
         let proxy_url = config.github_proxy.url.trim_end_matches('/');
         final_url = format!("{}/{}", proxy_url, url.trim_start_matches('/'));
+        // 使用加速地址时，禁用 Git 交互式凭据提示，避免弹窗
+        // 公开的 GitHub 仓库不需要凭据，私人仓库不使用加速地址所以不会走到这里
+        std::env::set_var("GIT_TERMINAL_PROMPT", "0");
     }
 
     // 4. 执行 Git 修复
@@ -1131,36 +1257,88 @@ async fn repair_extension_git_inner(
     let has_git = git_exe.exists() || git_exe.to_string_lossy() == "git";
 
     // 发送初始化日志
-    let _ = app.emit("git-install-log", format!("[{}] > 正在修复扩展 Git 环境: {}", chrono::Local::now().format("%H:%M:%S"), id));
-    let _ = app.emit("git-install-log", format!("[{}] > 远程仓库: {}", chrono::Local::now().format("%H:%M:%S"), final_url));
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] > 正在修复扩展 Git 环境: {}",
+            chrono::Local::now().format("%H:%M:%S"),
+            id
+        ),
+    );
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] > 远程仓库: {}",
+            chrono::Local::now().format("%H:%M:%S"),
+            final_url
+        ),
+    );
 
     // ── 4-a. 有 Git 可执行文件：尝试在线修复 ────────────────────────────────
     if has_git {
         // git init
         let mut cmd = TokioCommand::new(&git_exe);
         cmd.current_dir(&target_dir).arg("init");
-        #[cfg(target_os = "windows")] { cmd.creation_flags(0x08000000); }
-        let _ = cmd.spawn().map_err(|e| format!("git init 失败: {}", e))?.wait().await;
+        #[cfg(target_os = "windows")]
+        {
+            cmd.creation_flags(0x08000000);
+        }
+        let _ = cmd
+            .spawn()
+            .map_err(|e| format!("git init 失败: {}", e))?
+            .wait()
+            .await;
 
         // git remote remove origin（忽略失败）
         let mut cmd_rm = TokioCommand::new(&git_exe);
-        cmd_rm.current_dir(&target_dir).arg("remote").arg("remove").arg("origin");
-        #[cfg(target_os = "windows")] { cmd_rm.creation_flags(0x08000000); }
+        cmd_rm
+            .current_dir(&target_dir)
+            .arg("remote")
+            .arg("remove")
+            .arg("origin");
+        #[cfg(target_os = "windows")]
+        {
+            cmd_rm.creation_flags(0x08000000);
+        }
         let _ = cmd_rm.spawn().map_err(|e| e.to_string())?.wait().await;
 
         // git remote add origin
         let mut cmd_add = TokioCommand::new(&git_exe);
-        cmd_add.current_dir(&target_dir)
-               .arg("remote").arg("add").arg("origin").arg(&final_url);
-        #[cfg(target_os = "windows")] { cmd_add.creation_flags(0x08000000); }
-        let _ = cmd_add.spawn().map_err(|e| format!("git remote add 失败: {}", e))?.wait().await;
+        cmd_add
+            .current_dir(&target_dir)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(&final_url);
+        #[cfg(target_os = "windows")]
+        {
+            cmd_add.creation_flags(0x08000000);
+        }
+        let _ = cmd_add
+            .spawn()
+            .map_err(|e| format!("git remote add 失败: {}", e))?
+            .wait()
+            .await;
 
         // git fetch (depth 1)
-        let _ = app.emit("git-install-log", format!("[{}] > 正在从远程拉取数据...", chrono::Local::now().format("%H:%M:%S")));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] > 正在从远程拉取数据...",
+                chrono::Local::now().format("%H:%M:%S")
+            ),
+        );
         let mut cmd_fetch = TokioCommand::new(&git_exe);
-        cmd_fetch.current_dir(&target_dir)
-                 .arg("fetch").arg("--depth").arg("1").arg("origin");
-        #[cfg(target_os = "windows")] { cmd_fetch.creation_flags(0x08000000); }
+        cmd_fetch
+            .current_dir(&target_dir)
+            .arg("fetch")
+            .arg("--depth")
+            .arg("1")
+            .arg("origin");
+        #[cfg(target_os = "windows")]
+        {
+            cmd_fetch.creation_flags(0x08000000);
+        }
 
         match cmd_fetch.spawn() {
             Ok(mut child) => {
@@ -1175,60 +1353,86 @@ async fn repair_extension_git_inner(
                 match wait_result {
                     Ok(status) if status.success() => {
                         // ✅ 在线修复成功
-                        let _ = app.emit("git-install-log", format!(
-                            "[{}] √ 修复成功！现在该扩展已具备完整 Git 环境。",
-                            chrono::Local::now().format("%H:%M:%S")
-                        ));
+                        let _ = app.emit(
+                            "git-install-log",
+                            format!(
+                                "[{}] √ 修复成功！现在该扩展已具备完整 Git 环境。",
+                                chrono::Local::now().format("%H:%M:%S")
+                            ),
+                        );
                         return Ok(true);
                     }
                     Ok(_) => {
-                        let _ = app.emit("git-install-log", format!(
-                            "[{}] ! git fetch 返回错误，尝试离线保底修复...",
-                            chrono::Local::now().format("%H:%M:%S")
-                        ));
+                        let _ = app.emit(
+                            "git-install-log",
+                            format!(
+                                "[{}] ! git fetch 返回错误，尝试离线保底修复...",
+                                chrono::Local::now().format("%H:%M:%S")
+                            ),
+                        );
                     }
                     Err(e) => {
-                        let _ = app.emit("git-install-log", format!(
-                            "[{}] ! git fetch 执行失败 ({})，尝试离线保底修复...",
-                            chrono::Local::now().format("%H:%M:%S"), e
-                        ));
+                        let _ = app.emit(
+                            "git-install-log",
+                            format!(
+                                "[{}] ! git fetch 执行失败 ({})，尝试离线保底修复...",
+                                chrono::Local::now().format("%H:%M:%S"),
+                                e
+                            ),
+                        );
                     }
                 }
             }
             Err(e) => {
-                let _ = app.emit("git-install-log", format!(
-                    "[{}] ! 无法启动 git fetch ({})，尝试离线保底修复...",
-                    chrono::Local::now().format("%H:%M:%S"), e
-                ));
+                let _ = app.emit(
+                    "git-install-log",
+                    format!(
+                        "[{}] ! 无法启动 git fetch ({})，尝试离线保底修复...",
+                        chrono::Local::now().format("%H:%M:%S"),
+                        e
+                    ),
+                );
             }
         }
     } else {
-        let _ = app.emit("git-install-log", format!(
-            "[{}] ! 未检测到 Git 可执行文件，跳过在线修复，执行离线保底...",
-            chrono::Local::now().format("%H:%M:%S")
-        ));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] ! 未检测到 Git 可执行文件，跳过在线修复，执行离线保底...",
+                chrono::Local::now().format("%H:%M:%S")
+            ),
+        );
     }
 
     // ── 4-b. 离线保底：手动写最小 .git 结构 ─────────────────────────────────
-    let _ = app.emit("git-install-log", format!(
-        "[{}] > 正在写入最小 .git 结构（离线保底）...",
-        chrono::Local::now().format("%H:%M:%S")
-    ));
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] > 正在写入最小 .git 结构（离线保底）...",
+            chrono::Local::now().format("%H:%M:%S")
+        ),
+    );
 
     // 用原始 url（非加速），保证 remote 记录的是真实仓库地址
     write_offline_git_skeleton(&target_dir, &url).map_err(|e| {
-        let _ = app.emit("git-install-log", format!(
-            "[{}] ✗ 离线保底失败: {}",
-            chrono::Local::now().format("%H:%M:%S"), e
-        ));
+        let _ = app.emit(
+            "git-install-log",
+            format!(
+                "[{}] ✗ 离线保底失败: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                e
+            ),
+        );
         e
     })?;
 
-    let _ = app.emit("git-install-log", format!(
-        "[{}] ~ 离线保底完成。扩展已可被酒馆识别，联网后可正常更新。",
-        chrono::Local::now().format("%H:%M:%S")
-    ));
+    let _ = app.emit(
+        "git-install-log",
+        format!(
+            "[{}] ~ 离线保底完成。扩展已可被酒馆识别，联网后可正常更新。",
+            chrono::Local::now().format("%H:%M:%S")
+        ),
+    );
 
     Ok(false) // false = 离线保底（非完整修复）
 }
-

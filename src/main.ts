@@ -19,12 +19,12 @@ app.mount('#app')
 
 if (import.meta.env.PROD) {
   // 禁用右键菜单
-  document.addEventListener('contextmenu', (e) => {
+  document.addEventListener('contextmenu', e => {
     e.preventDefault()
   })
 
   // 禁用 F12 和一些常见的开发者工具快捷键
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', e => {
     if (
       e.key === 'F12' ||
       (e.ctrlKey && e.shiftKey && e.key === 'I') ||

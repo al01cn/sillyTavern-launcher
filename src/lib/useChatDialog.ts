@@ -7,11 +7,7 @@ export const chatDialogState = reactive({
   fileName: '',
 })
 
-export function openChatDialog(opts: {
-  charName: string
-  charFolder: string
-  fileName: string
-}) {
+export function openChatDialog(opts: { charName: string; charFolder: string; fileName: string }) {
   chatDialogState.charName = opts.charName
   chatDialogState.charFolder = opts.charFolder
   chatDialogState.fileName = opts.fileName

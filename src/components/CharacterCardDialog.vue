@@ -38,18 +38,18 @@ const formatDateTime = (input: unknown) => {
 }
 
 const positionMap: Record<string, string> = {
-  'before_char': t('resources.positionBeforeChar'),
-  'after_char': t('resources.positionAfterChar'),
+  before_char: t('resources.positionBeforeChar'),
+  after_char: t('resources.positionAfterChar'),
   '0': t('resources.positionBeforeChar'),
   '1': t('resources.positionAfterChar'),
   '2': t('resources.positionAfterAN'),
-  'before_example': t('resources.positionBeforeExample'),
-  'after_example': t('resources.positionAfterExample'),
-  'before_prompt': t('resources.positionBeforePrompt'),
-  'after_prompt': t('resources.positionAfterPrompt'),
-  'before_author': t('resources.positionBeforeAuthor'),
-  'after_author': t('resources.positionAfterAN'),
-  'at_depth': t('resources.positionAtDepth'),
+  before_example: t('resources.positionBeforeExample'),
+  after_example: t('resources.positionAfterExample'),
+  before_prompt: t('resources.positionBeforePrompt'),
+  after_prompt: t('resources.positionAfterPrompt'),
+  before_author: t('resources.positionBeforeAuthor'),
+  after_author: t('resources.positionAfterAN'),
+  at_depth: t('resources.positionAtDepth'),
 }
 
 const translatePosition = (pos: string) => {
@@ -60,7 +60,8 @@ const translatePosition = (pos: string) => {
 
 const title = computed(() => {
   if (!info.value) return characterCardDialogState.fileName
-  const name = getValueByPath<string>(info.value as any, 'name', '') || getValueByPath<string>(info.value as any, 'data.name', '')
+  const name =
+    getValueByPath<string>(info.value as any, 'name', '') || getValueByPath<string>(info.value as any, 'data.name', '')
   return name || characterCardDialogState.fileName
 })
 
@@ -71,7 +72,11 @@ const spec = computed(() => {
 
 const specVersion = computed(() => {
   if (!info.value) return ''
-  return getFirstValueByPath<string>(info.value as any, ['spec_version', 'specVersion', 'raw.spec_version', 'raw.specVersion'], '')
+  return getFirstValueByPath<string>(
+    info.value as any,
+    ['spec_version', 'specVersion', 'raw.spec_version', 'raw.specVersion'],
+    '',
+  )
 })
 
 const createDate = computed(() => {
@@ -79,7 +84,7 @@ const createDate = computed(() => {
   const raw = getFirstValueByPath<any>(
     info.value as any,
     ['data.create_date', 'data.createDate', 'raw.create_date', 'createDate', 'data.create_time', 'data.createTime'],
-    null
+    null,
   )
   return formatDateTime(raw)
 })
@@ -89,7 +94,7 @@ const description = computed(() => {
   const v = getFirstValueByPath<string>(
     info.value as any,
     ['data.description', 'description', 'raw.data.description', 'raw.description'],
-    ''
+    '',
   )
   return typeof v === 'string' ? v : ''
 })
@@ -107,7 +112,11 @@ const worldInfoName = computed(() => {
 
 const hasCharacterBook = computed(() => {
   if (!info.value) return false
-  const book = getFirstValueByPath<any>(info.value as any, ['data.character_book', 'data.characterBook', 'raw.data.character_book', 'raw.data.characterBook'], null)
+  const book = getFirstValueByPath<any>(
+    info.value as any,
+    ['data.character_book', 'data.characterBook', 'raw.data.character_book', 'raw.data.characterBook'],
+    null,
+  )
   return !!book
 })
 
@@ -115,15 +124,28 @@ const characterBookName = computed(() => {
   if (!info.value) return ''
   return getFirstValueByPath<string>(
     info.value as any,
-    ['data.character_book.name', 'data.characterBook.name', 'raw.data.character_book.name', 'raw.data.characterBook.name'],
-    ''
+    [
+      'data.character_book.name',
+      'data.characterBook.name',
+      'raw.data.character_book.name',
+      'raw.data.characterBook.name',
+    ],
+    '',
   )
 })
 
 const characterBookEntriesCount = computed(() => {
   if (!info.value) return 0
-  const entries =
-    getFirstValueByPath<any>(info.value as any, ['data.character_book.entries', 'data.characterBook.entries', 'raw.data.character_book.entries', 'raw.data.characterBook.entries'], null)
+  const entries = getFirstValueByPath<any>(
+    info.value as any,
+    [
+      'data.character_book.entries',
+      'data.characterBook.entries',
+      'raw.data.character_book.entries',
+      'raw.data.characterBook.entries',
+    ],
+    null,
+  )
   if (Array.isArray(entries)) return entries.length
   return 0
 })
@@ -131,6 +153,15 @@ const characterBookEntriesCount = computed(() => {
 const hasWorldInfo = computed(() => {
   if (!info.value) return false
   return worldEntriesCount.value > 0 || !!worldInfoName.value
+})
+
+const creatorName = computed(() => {
+  if (!info.value) return ''
+  return (
+    getValueByPath<string>(info.value as any, 'data.creator', '') ||
+    getValueByPath<string>(info.value as any, 'creator', '') ||
+    ''
+  )
 })
 
 const preferredBookSource = computed<'character_book' | 'worldInfo' | 'none'>(() => {
@@ -174,15 +205,16 @@ const preferredBookEntries = computed<WorldBookEntry[]>(() => {
   if (preferredBookSource.value === 'character_book') {
     rawEntries = getFirstValueByPath<any>(
       info.value as any,
-      ['data.character_book.entries', 'data.characterBook.entries', 'raw.data.character_book.entries', 'raw.data.characterBook.entries'],
-      []
+      [
+        'data.character_book.entries',
+        'data.characterBook.entries',
+        'raw.data.character_book.entries',
+        'raw.data.characterBook.entries',
+      ],
+      [],
     )
   } else if (preferredBookSource.value === 'worldInfo') {
-    rawEntries = getFirstValueByPath<any>(
-      info.value as any,
-      ['worldInfo.entries', 'raw.worldInfo.entries'],
-      []
-    )
+    rawEntries = getFirstValueByPath<any>(info.value as any, ['worldInfo.entries', 'raw.worldInfo.entries'], [])
   }
 
   if (!Array.isArray(rawEntries)) return []
@@ -199,8 +231,16 @@ const preferredBookEntries = computed<WorldBookEntry[]>(() => {
   }
 
   const normalizeKeys = (v: any): string[] => {
-    if (Array.isArray(v)) return v.map(x => String(x)).map(s => s.trim()).filter(Boolean)
-    if (typeof v === 'string') return v.split(',').map(s => s.trim()).filter(Boolean)
+    if (Array.isArray(v))
+      return v
+        .map(x => String(x))
+        .map(s => s.trim())
+        .filter(Boolean)
+    if (typeof v === 'string')
+      return v
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
     return []
   }
 
@@ -227,7 +267,12 @@ const tags = computed(() => {
   if (!info.value) return []
   const value = getValueByPath<string[] | string>(info.value as any, 'data.tags', []) as any
   if (Array.isArray(value)) return value.slice(0, 30)
-  if (typeof value === 'string') return value.split(',').map(s => s.trim()).filter(Boolean).slice(0, 30)
+  if (typeof value === 'string')
+    return value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .slice(0, 30)
   return []
 })
 
@@ -240,20 +285,20 @@ const revokeImageUrl = () => {
 
 const handleImport = async () => {
   if (!characterCardDialogState.importSourcePath) return
-  
+
   isImporting.value = true
   try {
     await invoke('import_character_card', { sourcePath: characterCardDialogState.importSourcePath })
     window.dispatchEvent(new Event('character-card-imported'))
     Dialog.success({
       title: t('resources.importCardSuccess'),
-      context: t('resources.importCardSuccessMsg', { name: characterCardDialogState.fileName })
+      context: t('resources.importCardSuccessMsg', { name: characterCardDialogState.fileName }),
     })
     closeCharacterCardDialog()
   } catch (e: any) {
     Dialog.error({
       title: t('resources.importCardFailed'),
-      context: e?.message || String(e)
+      context: e?.message || String(e),
     })
   } finally {
     isImporting.value = false
@@ -273,7 +318,7 @@ const loadDetail = async () => {
     } else {
       bytes = await invoke<number[]>('read_character_card_png', { fileName: characterCardDialogState.fileName })
     }
-    
+
     const u8 = new Uint8Array(bytes)
     imageUrl.value = URL.createObjectURL(new Blob([u8], { type: 'image/png' }))
     info.value = (await getCharacterInfo(u8)) as CharacterInfo
@@ -295,7 +340,7 @@ watch(
       return
     }
     await loadDetail()
-  }
+  },
 )
 
 onUnmounted(() => {
@@ -304,20 +349,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div :class="[
-    'absolute inset-0 z-[320] flex items-center justify-center px-4 transition-all duration-300',
-    characterCardDialogState.show ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-  ]">
+  <div
+    :class="[
+      'absolute inset-0 z-[320] flex items-center justify-center px-4 transition-all duration-300',
+      characterCardDialogState.show ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+    ]"
+  >
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md" @click="closeCharacterCardDialog()"></div>
 
-    <div :class="[
-      'relative bg-white w-full max-w-3xl rounded-4xl shadow-modal border border-slate-100 overflow-hidden transition-all duration-300 transform',
-      characterCardDialogState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8'
-    ]">
+    <div
+      :class="[
+        'relative bg-white w-full max-w-3xl rounded-4xl shadow-modal border border-slate-100 overflow-hidden transition-all duration-300 transform',
+        characterCardDialogState.show ? 'scale-100 translate-y-0' : 'scale-95 translate-y-8',
+      ]"
+    >
       <button
         type="button"
-        @click="closeCharacterCardDialog()"
         class="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors z-10"
+        @click="closeCharacterCardDialog()"
       >
         <X class="w-5 h-5" />
       </button>
@@ -342,84 +391,94 @@ onUnmounted(() => {
             <div class="flex-1 overflow-y-auto pr-4 pb-2 -mr-4 custom-scrollbar">
               <div class="grid grid-cols-2 gap-3">
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
-                  <User class="w-4 h-4 text-blue-500" />
-                  {{ t('resources.author') }}
+                  <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
+                    <User class="w-4 h-4 text-blue-500" />
+                    {{ t('resources.author') }}
+                  </div>
+                  <div class="text-xs text-slate-500 mt-1 truncate">
+                    {{ info ? creatorName || t('resources.unknown') : '—' }}
+                  </div>
                 </div>
-                <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? (getValueByPath<string>(info as any, 'data.creator', '') || getValueByPath<string>(info as any, 'creator', '') || t('resources.unknown')) : '—' }}
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
+                    <BookOpen class="w-4 h-4 text-indigo-500" />
+                    {{ t('resources.worldBookEntries') }}
+                  </div>
+                  <div class="text-xs text-slate-500 mt-1">
+                    {{ info ? `${preferredBookLabel} / ${preferredBookEntriesCount}` : '—' }}
+                  </div>
                 </div>
               </div>
 
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
-                  <BookOpen class="w-4 h-4 text-indigo-500" />
-                  {{ t('resources.worldBookEntries') }}
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <div class="text-slate-700 text-sm font-semibold">{{ t('resources.createDate') }}</div>
+                  <div class="text-xs text-slate-500 mt-1 truncate">
+                    {{ info ? createDate || t('resources.unknown') : '—' }}
+                  </div>
                 </div>
-                <div class="text-xs text-slate-500 mt-1">
-                  {{ info ? `${preferredBookLabel} / ${preferredBookEntriesCount}` : '—' }}
-                </div>
-              </div>
-            </div>
 
-            <div class="mt-3 grid grid-cols-2 gap-3">
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.createDate') }}</div>
-                <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? (createDate || t('resources.unknown')) : '—' }}
-                </div>
-              </div>
-
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.specVersion') }}</div>
-                <div class="text-xs text-slate-500 mt-1 truncate">
-                  {{ info ? ((spec ? `${spec}` : t('resources.unknown')) + (specVersion ? ` / ${specVersion}` : '')) : '—' }}
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <div class="text-slate-700 text-sm font-semibold">{{ t('resources.specVersion') }}</div>
+                  <div class="text-xs text-slate-500 mt-1 truncate">
+                    {{
+                      info
+                        ? (spec ? `${spec}` : t('resources.unknown')) + (specVersion ? ` / ${specVersion}` : '')
+                        : '—'
+                    }}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div class="text-slate-700 text-sm font-semibold">{{ t('resources.description') }}</div>
-              <div v-if="info" class="text-xs text-slate-500 mt-1 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap">
-                {{ description || t('resources.none') }}
-              </div>
-              <div v-else class="text-xs text-slate-400 mt-1">—</div>
-            </div>
-
-            <div class="mt-4">
-              <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
-                <Tags class="w-4 h-4 text-emerald-500" />
-                {{ t('resources.tags') }}
-              </div>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <span
-                  v-for="tag in tags"
-                  :key="tag"
-                  class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100"
+              <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.description') }}</div>
+                <div
+                  v-if="info"
+                  class="text-xs text-slate-500 mt-1 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap"
                 >
-                  {{ tag }}
-                </span>
-                <span v-if="info && tags.length === 0" class="text-xs text-slate-500">{{ t('resources.none') }}</span>
-                <span v-if="!info" class="text-xs text-slate-400">—</span>
+                  {{ description || t('resources.none') }}
+                </div>
+                <div v-else class="text-xs text-slate-400 mt-1">—</div>
               </div>
-            </div>
 
-            <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div class="text-slate-700 text-sm font-semibold">{{ t('resources.worldBook') }}</div>
-              <div class="text-xs text-slate-500 mt-1 space-y-1">
-                <div v-if="info">
-                  <span class="font-medium text-slate-600">{{ t('resources.source') }}：</span>
-                  <span>{{ preferredBookLabel }}</span>
+              <div class="mt-4">
+                <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
+                  <Tags class="w-4 h-4 text-emerald-500" />
+                  {{ t('resources.tags') }}
                 </div>
-                <div v-if="info">
-                  <span class="font-medium text-slate-600">{{ t('resources.name') }}：</span>
-                  <span>{{ preferredBookSource === 'none' ? t('resources.none') : (preferredBookName || t('resources.unknown')) }}</span>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="tag in tags"
+                    :key="tag"
+                    class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100"
+                  >
+                    {{ tag }}
+                  </span>
+                  <span v-if="info && tags.length === 0" class="text-xs text-slate-500">{{ t('resources.none') }}</span>
+                  <span v-if="!info" class="text-xs text-slate-400">—</span>
                 </div>
-                <div v-if="info">
-                  <span class="font-medium text-slate-600">{{ t('resources.entries') }}：</span>
-                  <span>{{ preferredBookEntriesCount }}</span>
+              </div>
+
+              <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="text-slate-700 text-sm font-semibold">{{ t('resources.worldBook') }}</div>
+                <div class="text-xs text-slate-500 mt-1 space-y-1">
+                  <div v-if="info">
+                    <span class="font-medium text-slate-600">{{ t('resources.source') }}：</span>
+                    <span>{{ preferredBookLabel }}</span>
+                  </div>
+                  <div v-if="info">
+                    <span class="font-medium text-slate-600">{{ t('resources.name') }}：</span>
+                    <span>{{
+                      preferredBookSource === 'none' ? t('resources.none') : preferredBookName || t('resources.unknown')
+                    }}</span>
+                  </div>
+                  <div v-if="info">
+                    <span class="font-medium text-slate-600">{{ t('resources.entries') }}：</span>
+                    <span>{{ preferredBookEntriesCount }}</span>
+                  </div>
+                  <div v-if="!info" class="text-slate-400">—</div>
                 </div>
-                <div v-if="!info" class="text-slate-400">—</div>
               </div>
 
               <div v-if="info && preferredBookSource === 'none'" class="mt-3 text-xs text-slate-400">
@@ -455,10 +514,16 @@ onUnmounted(() => {
                           ? 'bg-slate-50 text-slate-500 border-slate-200'
                           : entry.enabled
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
+                            : 'bg-slate-50 text-slate-500 border-slate-200',
                       ]"
                     >
-                      {{ entry.enabled === null ? t('resources.unknownStatus') : (entry.enabled ? t('resources.enabled') : t('resources.disabled')) }}
+                      {{
+                        entry.enabled === null
+                          ? t('resources.unknownStatus')
+                          : entry.enabled
+                            ? t('resources.enabled')
+                            : t('resources.disabled')
+                      }}
                     </span>
                   </summary>
 
@@ -492,7 +557,6 @@ onUnmounted(() => {
                 </details>
               </div>
             </div>
-            </div>
           </div>
         </div>
 
@@ -506,20 +570,23 @@ onUnmounted(() => {
         </div>
 
         <!-- Import Actions -->
-        <div v-if="characterCardDialogState.isImportMode && !loading && !errorMsg" class="shrink-0 mt-6 pt-4 border-t border-slate-100 flex justify-end gap-3">
+        <div
+          v-if="characterCardDialogState.isImportMode && !loading && !errorMsg"
+          class="shrink-0 mt-6 pt-4 border-t border-slate-100 flex justify-end gap-3"
+        >
           <button
             type="button"
-            @click="closeCharacterCardDialog"
             class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
             :disabled="isImporting"
+            @click="closeCharacterCardDialog"
           >
             {{ t('common.cancel') }}
           </button>
           <button
             type="button"
-            @click="handleImport"
             class="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors flex items-center gap-2"
             :disabled="isImporting"
+            @click="handleImport"
           >
             <Loader2 v-if="isImporting" class="w-4 h-4 animate-spin" />
             {{ isImporting ? t('resources.addingCard') : t('resources.confirmAdd') }}

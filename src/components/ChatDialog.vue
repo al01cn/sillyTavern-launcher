@@ -23,14 +23,14 @@ const messagesEl = ref<HTMLElement | null>(null)
 // 打开时加载消息
 watch(
   () => chatDialogState.show,
-  async (show) => {
+  async show => {
     if (show) {
       await loadChat()
     } else {
       messages.value = []
       errorMsg.value = ''
     }
-  }
+  },
 )
 
 async function loadChat() {
@@ -81,10 +81,7 @@ function parseFileTitle(name: string): string {
 
 <template>
   <Teleport to="body">
-    <div
-      v-if="chatDialogState.show"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
-    >
+    <div v-if="chatDialogState.show" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
       <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeChatDialog" />
 
@@ -109,8 +106,8 @@ function parseFileTitle(name: string): string {
             {{ t('resources.chat.totalMessages', { count: messages.length }) }}
           </div>
           <button
-            @click="closeChatDialog"
             class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            @click="closeChatDialog"
           >
             <X class="w-4 h-4" />
           </button>
@@ -137,10 +134,7 @@ function parseFileTitle(name: string): string {
           </div>
 
           <!-- 空消息 -->
-          <div
-            v-else-if="messages.length === 0"
-            class="flex items-center justify-center h-32 text-slate-400 text-sm"
-          >
+          <div v-else-if="messages.length === 0" class="flex items-center justify-center h-32 text-slate-400 text-sm">
             {{ t('resources.chat.noMessages') }}
           </div>
 
@@ -150,11 +144,13 @@ function parseFileTitle(name: string): string {
               v-for="(msg, idx) in messages"
               :key="idx"
               class="flex items-end gap-2"
-              :class="msg.isSystem ? 'justify-center' : (msg.isUser ? 'flex-row-reverse' : 'flex-row')"
+              :class="msg.isSystem ? 'justify-center' : msg.isUser ? 'flex-row-reverse' : 'flex-row'"
             >
               <!-- 系统消息 -->
               <template v-if="msg.isSystem">
-                <div class="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full max-w-[80%] text-center">
+                <div
+                  class="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full max-w-[80%] text-center"
+                >
                   <span v-html="renderMes(msg.mes)" />
                 </div>
               </template>
@@ -164,18 +160,17 @@ function parseFileTitle(name: string): string {
                 <!-- 头像 -->
                 <div
                   class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mb-0.5"
-                  :class="msg.isUser
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400'"
+                  :class="
+                    msg.isUser
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400'
+                  "
                 >
                   {{ (msg.name || (msg.isUser ? 'U' : chatDialogState.charName[0] || 'A'))[0].toUpperCase() }}
                 </div>
 
                 <!-- 气泡 -->
-                <div
-                  class="max-w-[72%] flex flex-col"
-                  :class="msg.isUser ? 'items-end' : 'items-start'"
-                >
+                <div class="max-w-[72%] flex flex-col" :class="msg.isUser ? 'items-end' : 'items-start'">
                   <!-- 发送者名字 -->
                   <div class="text-xs text-slate-400 dark:text-slate-500 mb-1 px-1">
                     {{ msg.name || (msg.isUser ? t('resources.chat.you') : chatDialogState.charName) }}
@@ -184,18 +179,17 @@ function parseFileTitle(name: string): string {
                   <!-- 消息内容 -->
                   <div
                     class="px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
-                    :class="msg.isUser
-                      ? 'bg-blue-500 text-white rounded-br-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm'"
+                    :class="
+                      msg.isUser
+                        ? 'bg-blue-500 text-white rounded-br-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm'
+                    "
                   >
                     <span v-html="renderMes(msg.mes)" />
                   </div>
 
                   <!-- 时间戳 -->
-                  <div
-                    v-if="msg.sendDate"
-                    class="text-xs text-slate-400 dark:text-slate-500 mt-1 px-1"
-                  >
+                  <div v-if="msg.sendDate" class="text-xs text-slate-400 dark:text-slate-500 mt-1 px-1">
                     {{ msg.sendDate }}
                   </div>
                 </div>
@@ -205,7 +199,9 @@ function parseFileTitle(name: string): string {
         </div>
 
         <!-- 底部文件名 -->
-        <div class="px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-400 dark:text-slate-500 text-center shrink-0 truncate">
+        <div
+          class="px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-400 dark:text-slate-500 text-center shrink-0 truncate"
+        >
           {{ chatDialogState.fileName }}
         </div>
       </div>

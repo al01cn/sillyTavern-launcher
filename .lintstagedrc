@@ -1,0 +1,10 @@
+{
+  "*.{js,ts,vue}": [
+    "eslint --fix",
+    "prettier --write"
+  ],
+  "src-tauri/**/*.rs": [
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --",
+    "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings"
+  ]
+}

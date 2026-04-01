@@ -3,5 +3,16 @@
     "css.lint.unknownAtRules": "ignore",
     "tailwindCSS.includeLanguages": {
         "vue": "html"
-    }
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "eslint.validate": [
+        "vue",
+        "typescript",
+        "javascript"
+    ],
+    "rust-analyzer.check.command": "clippy"
 }

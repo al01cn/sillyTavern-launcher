@@ -1,29 +1,24 @@
 {
-  "lang": "zh-CN",
-  "theme": "light",
+  "lang": "auto",
+  "theme": "auto",
   "rememberWindowPosition": true,
   "windowPosition": {
-    "x": 345,
-    "y": 181
+    "x": 458,
+    "y": 205
   },
   "githubProxy": {
     "enable": true,
-    "url": "https://gh.sixyin.com"
+    "url": "https://gh.llkk.cc"
   },
   "sillytavern": {
     "version": {
       "path": "",
-      "version": "1.16.0",
+      "version": "1.17.0",
       "hasNodeModules": false
     }
   },
   "npmRegistry": "https://registry.npmmirror.com/",
   "localSillytavernList": [
-    {
-      "path": "E:\\code_project\\app\\sillytavern",
-      "version": "1.16.0",
-      "hasNodeModules": true
-    },
     {
       "path": "E:\\Tools\\SillyTavern-1.14.0",
       "version": "1.14.0",
@@ -37,7 +32,12 @@
   "hasScannedOnce": false,
   "autoRepairGit": true,
   "setupCheckpoint": null,
-  "useSystemNode": true,
-  "useSystemGit": true,
-  "launchMode": "desktop"
+  "useSystemNode": false,
+  "useSystemGit": false,
+  "launchMode": "desktop",
+  "networkProxy": {
+    "mode": "none",
+    "host": "127.0.0.1",
+    "port": 7890
+  }
 }
