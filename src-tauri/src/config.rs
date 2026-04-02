@@ -438,6 +438,7 @@ pub fn get_system_cpu_cores() -> usize {
 // ─── Windows 系统代理读取（三级回退） ────────────────────────────────────────
 
 /// 从各渠道收集到的代理原始值，统一解析
+#[cfg(target_os = "windows")]
 fn parse_proxy_values(server_raw: &str, enable_raw: &str) -> Option<(String, bool)> {
     let server = server_raw.trim().to_string();
     if server.is_empty() {

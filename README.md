@@ -249,6 +249,14 @@ lib.rs          ← 入口（模块声明 + run()）
 2. **提交 PR**：Fork 后在新分支开发，PR 前请确保 `cargo check` 无错误
 3. **完善文档**：改进 README 或添加使用说明
 
+### 👥 贡献者
+
+感谢所有为本项目做出贡献的朋友！
+
+<a href="https://github.com/al01cn/sillyTavern-launcher/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=al01cn/sillyTavern-launcher" alt="Contributors" />
+</a>
+
 ---
 
 ### 💖 鸣谢
@@ -426,6 +434,15 @@ All frontend operations communicate with the Rust backend via **Tauri Commands**
 1. **Issues**: Report bugs or suggest features via [GitHub Issues](https://github.com/al01cn/sillyTavern-launcher/issues)
 2. **Pull Requests**: Fork → new branch → develop → `cargo check` → PR
 3. **Docs**: Improvements to README or usage guides are welcome
+
+### 👥 Contributors
+
+Thanks to all contributors who have helped build this project!
+
+<a href="https://github.com/al01cn/sillyTavern-launcher/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=al01cn/sillyTavern-launcher" alt="Contributors" />
+</a>
+
 
 ---
 

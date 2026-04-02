@@ -5,6 +5,11 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范。
 
 ---
+## [0.1.8] - 2026-04-02
+
+### 修复
+
+- **MacOS**：紧急修复MacOS端构建失败的问题。
 
 ## [0.1.7] - 2026-04-02
 
