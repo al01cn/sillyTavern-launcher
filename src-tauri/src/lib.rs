@@ -67,12 +67,37 @@ pub fn run() {
                 git_child_pid: git_child_pid_arc,
             });
 
-            let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            if path.ends_with("src-tauri") {
-                path.pop();
+            let path = {
+                let exe = match std::env::current_exe() {
+                    Ok(p) => p.canonicalize().unwrap_or(p),
+                    Err(e) => {
+                        eprintln!("获取可执行文件路径失败: {e}，回退到当前工作目录");
+                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                    }
+                };
+                let exe_str = exe.to_string_lossy();
+                if cfg!(target_os = "macos") && exe_str.contains(".app/Contents/MacOS/") {
+                    // macOS .app bundle：使用 .app 所在目录
+                    exe.parent() // -> MacOS/
+                        .and_then(|p| p.parent()) // -> Contents/
+                        .and_then(|p| p.parent()) // -> AppName.app/
+                        .and_then(|p| p.parent()) // -> .app 所在目录
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or_else(|| PathBuf::from("."))
+                } else {
+                    let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                    if p.ends_with("src-tauri") {
+                        p.pop();
+                    }
+                    p
+                }
+            };
+            if let Err(e) = std::env::set_current_dir(&path) {
+                eprintln!("设置工作目录失败: {e}");
             }
 
             if let Err(e) = ensure_standard_layout(&path) {
+                #[cfg(target_os = "windows")]
                 #[cfg(target_os = "windows")]
                 {
                     if e.kind() == std::io::ErrorKind::PermissionDenied && !elevation::is_elevated()

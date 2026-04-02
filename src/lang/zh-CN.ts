@@ -562,6 +562,7 @@ export default {
   console: {
     title: '控制台',
     serviceConsole: '服务控制台',
+    followLogs: '回到底部',
     notStarted: '未启动',
     starting: '启动中...',
     started: '启动成功',

@@ -477,6 +477,7 @@ export default {
   console: {
     title: 'Console',
     serviceConsole: 'Service Console',
+    followLogs: 'Scroll to bottom',
     notStarted: 'Not Started',
     starting: 'Starting...',
     started: 'Started Successfully',
