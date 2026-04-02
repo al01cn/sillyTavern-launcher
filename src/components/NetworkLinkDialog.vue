@@ -1,5 +1,7 @@
+<!-- eslint-disable prettier/prettier -->
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -51,6 +53,22 @@ const emit = defineEmits<{
 const ipv4 = ref('')
 const ipv6 = ref('')
 const loading = ref(false)
+
+type NetworkInterfaceInfo = {
+  label: string
+  name: string
+  desc?: string | null
+  alias?: string | null
+  is_up?: boolean
+  is_virtual?: boolean
+  is_virtual_name?: boolean
+  ipv4: string[]
+  ipv6: string[]
+}
+
+const interfaces = ref<NetworkInterfaceInfo[]>([])
+
+const selectedInterfaceIndex = ref(0)
 
 // 可用性检测相关
 const checkingAvailability = ref(false)
@@ -150,6 +168,20 @@ const buildUrl = (host: string, port: number) => {
   return `http://${host}:${port}`
 }
 
+const formatInterfaceIpSummary = (iface: NetworkInterfaceInfo) => {
+  const segments: string[] = []
+  if (iface.ipv4?.length) {
+    segments.push(`IPv4: ${iface.ipv4[0]}`)
+  }
+  if (iface.ipv6?.length) {
+    segments.push(`IPv6: ${iface.ipv6[0]}`)
+  }
+  if (!segments.length) {
+    segments.push(t('networkLink.ipUnavailable'))
+  }
+  return segments.join(' ｜ ')
+}
+
 const renderQr = async (canvas: HTMLCanvasElement | null, url: string) => {
   if (!canvas || !url) return
   try {
@@ -195,15 +227,69 @@ const fetchIps = async () => {
   noChrome.value = false
   itdogUrlV4.value = ''
   itdogUrlV6.value = ''
+  interfaces.value = []
+  selectedInterfaceIndex.value = 0
 
   try {
     if (props.mode === 'lan') {
-      const res = await invoke<{ ipv4: string[]; ipv6: string[] }>('get_local_ip_addresses')
-      ipv4.value = res.ipv4?.[0] ?? ''
-      ipv6.value = res.ipv6?.[0] ?? ''
+      const res = await invoke<{
+        ipv4: string[]
+        ipv6: string[]
+        interfaces?: Array<{
+          name: string
+          desc?: string | null
+          alias?: string | null
+          is_up?: boolean
+          is_virtual?: boolean
+          ipv4: string[]
+          ipv6: string[]
+        }>
+      }>('get_local_ip_addresses')
+
+      const list = Array.isArray(res.interfaces) ? res.interfaces : []
+      interfaces.value = list
+        .filter(iface => iface.ipv4?.length || iface.ipv6?.length || iface.name === 'default')
+        .map((iface, idx) => {
+          const normalizedName = iface.name?.trim() || `IF-${idx + 1}`
+          const label = `${t('networkLink.interfaceDisplayPrefix')} ${idx + 1}`
+          const normalizedLower = normalizedName.toLowerCase()
+          const isBlacklistedName = normalizedLower.includes('虚拟') || normalizedLower.includes('virtual')
+          return {
+            label,
+            name: normalizedName,
+            desc: iface.desc,
+            alias: iface.alias,
+            is_up: iface.is_up ?? true,
+            is_virtual: iface.is_virtual ?? false,
+            is_virtual_name: isBlacklistedName,
+            ipv4: iface.ipv4 ?? [],
+            ipv6: iface.ipv6 ?? [],
+          }
+        })
+
+      const preferredIndex = interfaces.value.findIndex(
+        iface => !iface.is_virtual && iface.is_up && !iface.is_virtual_name && iface.ipv4.length > 0,
+      )
+
+      if (preferredIndex >= 0) {
+        selectedInterfaceIndex.value = preferredIndex
+      } else {
+        const ipv6Index = interfaces.value.findIndex(
+          iface => !iface.is_virtual && iface.is_up && !iface.is_virtual_name && iface.ipv6.length > 0,
+        )
+
+        if (ipv6Index >= 0) {
+          selectedInterfaceIndex.value = ipv6Index
+        }
+      }
+
+      applyInterfaceSelection()
     } else {
+      interfaces.value = []
+      selectedInterfaceIndex.value = 0
       const res = await invoke<{ ipv4: string | null; ipv6: string | null }>('get_public_ip_addresses')
       ipv4.value = res.ipv4 ?? ''
+
       ipv6.value = res.ipv6 ?? ''
     }
   } catch (e) {
@@ -355,6 +441,40 @@ const handleRefresh = () => {
   availabilityCache = null
   fetchIps()
 }
+
+const applyInterfaceSelection = (userTriggered = false) => {
+  if (props.mode !== 'lan' || interfaces.value.length === 0) {
+    return
+  }
+  const target = interfaces.value[selectedInterfaceIndex.value]
+  if (!target) return
+
+  ipv4.value = target.ipv4?.[0] ?? ''
+  ipv6.value = target.ipv6?.[0] ?? ''
+
+  nextTick().then(async () => {
+    if (ipv4.value) {
+      await renderQr(qrCanvas4.value, buildUrl(ipv4.value, props.port))
+    } else if (qrCanvas4.value) {
+      const ctx = qrCanvas4.value.getContext('2d')
+      ctx?.clearRect(0, 0, qrCanvas4.value.width, qrCanvas4.value.height)
+    }
+    if (ipv6.value) {
+      await renderQr(qrCanvas6.value, buildUrl(ipv6.value, props.port))
+    } else if (qrCanvas6.value) {
+      const ctx = qrCanvas6.value.getContext('2d')
+      ctx?.clearRect(0, 0, qrCanvas6.value.width, qrCanvas6.value.height)
+    }
+  })
+
+  if (userTriggered) {
+    toast.success(t('networkLink.interfaceSwitched'))
+  }
+}
+
+const handleInterfaceChange = (_event?: Event) => {
+  applyInterfaceSelection(true)
+}
 </script>
 
 <template>
@@ -406,7 +526,64 @@ const handleRefresh = () => {
         </div>
 
         <!-- Body -->
-        <div class="p-6">
+        <div class="p-6 space-y-4">
+          <div v-if="props.mode === 'lan'" class="border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+            <div class="flex flex-col gap-3">
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                      {{ t('networkLink.interfaceLabel') }}
+                    </p>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                      {{ t('networkLink.virtualHint') }}
+                    </p>
+                  </div>
+                  <button
+                    class="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white"
+                    @click="fetchIps"
+                  >
+                    {{ t('common.refresh') }}
+                  </button>
+                </div>
+                <div v-if="loading" class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <PhSpinner :size="14" class="animate-spin" />
+                  <span>{{ t('networkLink.fetchingIp') }}</span>
+                </div>
+                <template v-else>
+                  <div v-if="interfaces.length" class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>{{ t('networkLink.selectedInterface') }}</span>
+                      <span class="text-[11px] text-slate-400">
+                        {{ t('networkLink.interfaceCount', { count: interfaces.length }) }}
+                      </span>
+                    </div>
+
+                    <div class="relative">
+                      <select
+                        v-model.number="selectedInterfaceIndex"
+                        class="w-full appearance-none rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-400"
+                        @change="handleInterfaceChange"
+                      >
+                        <option v-for="(iface, idx) in interfaces" :key="`${iface.label}-${idx}`" :value="idx">
+                          {{ formatInterfaceIpSummary(iface) }}
+                        </option>
+                      </select>
+                      <span
+                        class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400 text-[10px]"
+                      >
+                        ▼
+                      </span>
+                    </div>
+                  </div>
+                  <p v-else class="text-xs text-amber-500 dark:text-amber-400">
+                    {{ t('networkLink.noInterface') }}
+                  </p>
+                </template>
+              </div>
+            </div>
+          </div>
+
           <!-- 加载中 -->
           <div v-if="loading" class="flex flex-col items-center justify-center py-10 gap-3">
             <div class="w-10 h-10 rounded-full border-2 border-t-transparent border-blue-500 animate-spin"></div>

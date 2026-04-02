@@ -946,5 +946,18 @@ export default {
     timeoutRate: 'Timeout',
     availabilityRate: 'Availability',
     nodes: 'nodes',
+    interfaceLabel: 'Interface',
+    interfaceSwitched: 'Interface updated',
+    virtualHint: 'Virtual adapters are hidden by default, pick manually if needed',
+    virtualTag: 'Virtual',
+    noInterface: 'No active network interface detected, please check connection',
+    interfaceDisplayPrefix: 'Adapter',
+    selectedInterface: 'Selected interface',
+    interfaceCount: '{count} interfaces detected',
+
   },
 }
+
+
+
+

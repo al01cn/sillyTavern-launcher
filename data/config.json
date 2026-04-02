@@ -34,7 +34,7 @@
   "setupCheckpoint": null,
   "useSystemNode": false,
   "useSystemGit": false,
-  "launchMode": "desktop",
+  "launchMode": "lan",
   "networkProxy": {
     "mode": "none",
     "host": "127.0.0.1",

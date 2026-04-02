@@ -1022,5 +1022,18 @@ export default {
     timeoutRate: '超时率',
     availabilityRate: '可用率',
     nodes: '节点',
+    interfaceLabel: '网卡',
+    interfaceSwitched: '已切换网卡',
+    virtualHint: '虚拟网卡已默认排除，可手动选择',
+    virtualTag: '虚拟',
+    noInterface: '未找到可用网卡，请检查网络连接',
+    interfaceDisplayPrefix: '网卡',
+    selectedInterface: '当前网卡',
+    interfaceCount: '共 {count} 个接口',
+
   },
 }
+
+
+
+

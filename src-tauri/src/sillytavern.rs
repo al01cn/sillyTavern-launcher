@@ -7,6 +7,9 @@ use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 use crate::config::{get_current_lang, read_app_config_from_disk, write_app_config_to_disk};
 use crate::git::get_git_exe;
 use crate::node::run_npm_install;
@@ -4215,72 +4218,77 @@ pub async fn open_tavern_desktop_window(
 pub async fn get_local_ip_addresses() -> Result<serde_json::Value, String> {
     use std::net::{IpAddr, UdpSocket};
 
-    let mut ipv4_list: Vec<String> = Vec::new();
-    let mut ipv6_list: Vec<String> = Vec::new();
+    #[derive(Debug, Clone)]
+    struct LanInterface {
+        name: String,
+        desc: Option<String>,
+        iface_type: Option<String>,
+        is_up: bool,
+        is_virtual_guess: bool,
+        ipv4_addrs: Vec<String>,
+        ipv6_addrs: Vec<String>,
+    }
 
-    // 通过 UDP 连接公网 DNS（不实际发包）探测出站 IP
-    // IPv4
+    let mut interfaces: Vec<LanInterface> = Vec::new();
+
+    // ─── 基础探测：通过 UDP 连接探测当前默认出站接口 ────────────────────────────
+    let mut primary_ipv4: Option<String> = None;
+    let mut primary_ipv6: Option<String> = None;
+
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
         if socket.connect("8.8.8.8:80").is_ok() {
             if let Ok(addr) = socket.local_addr() {
                 let ip = addr.ip().to_string();
                 if !ip.starts_with("127.") {
-                    ipv4_list.push(ip);
+                    primary_ipv4 = Some(ip);
                 }
             }
         }
     }
 
-    // IPv6
     if let Ok(socket) = UdpSocket::bind("[::]:0") {
         if socket.connect("[2001:4860:4860::8888]:80").is_ok() {
             if let Ok(addr) = socket.local_addr() {
-                let ip = addr.ip();
-                if let IpAddr::V6(v6) = ip {
+                if let IpAddr::V6(v6) = addr.ip() {
                     let s = v6.to_string();
-                    // 排除回环和本地链路
                     if !s.starts_with("::1") && !s.starts_with("fe80") {
-                        ipv6_list.push(format!("[{}]", s));
+                        primary_ipv6 = Some(format!("[{}]", s));
                     }
                 }
             }
         }
     }
 
-    // 兜底：通过 hostname 枚举所有网络接口
-    if ipv4_list.is_empty() && ipv6_list.is_empty() {
-        if let Ok(hostname) = std::process::Command::new("hostname").output() {
-            let _ = hostname; // 只做触发
-        }
-        // 使用系统 API 枚举接口（平台无关方法：解析 route 输出）
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            if let Ok(out) = std::process::Command::new("powershell")
-                .args(["-Command", "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -ExpandProperty IPAddress"])
-                .creation_flags(0x08000000)
-                .output()
-            {
-                let s = String::from_utf8_lossy(&out.stdout);
-                for line in s.lines() {
-                    let ip = line.trim().to_string();
-                    if !ip.is_empty() && ipv4_list.iter().all(|x| x != &ip) {
-                        ipv4_list.push(ip);
+    // ─── get_if_addrs 枚举所有网卡 ───────────────────────────────────────────────
+    let mut ifaddr_map: std::collections::HashMap<String, LanInterface> = std::collections::HashMap::new();
+    if let Ok(all_ifaces) = get_if_addrs::get_if_addrs() {
+        for iface in all_ifaces {
+            let name = iface.name.clone();
+            let entry = ifaddr_map.entry(name.clone()).or_insert_with(|| LanInterface {
+                name: name.clone(),
+                desc: None,
+                iface_type: None,
+                is_up: true,
+                is_virtual_guess: false,
+                ipv4_addrs: Vec::new(),
+                ipv6_addrs: Vec::new(),
+            });
+            let ip = iface.addr.ip();
+            match ip {
+                IpAddr::V4(v4) => {
+                    let ip_str = v4.to_string();
+                    if !ip_str.starts_with("127.") && !ip_str.starts_with("169.254") {
+                        if entry.ipv4_addrs.iter().all(|x| x != &ip_str) {
+                            entry.ipv4_addrs.push(ip_str);
+                        }
                     }
                 }
-            }
-            if let Ok(out) = std::process::Command::new("powershell")
-                .args(["-Command", "Get-NetIPAddress -AddressFamily IPv6 | Where-Object { $_.IPAddress -notlike '::1' -and $_.IPAddress -notlike 'fe80*' } | Select-Object -ExpandProperty IPAddress"])
-                .creation_flags(0x08000000)
-                .output()
-            {
-                let s = String::from_utf8_lossy(&out.stdout);
-                for line in s.lines() {
-                    let ip = line.trim().to_string();
-                    if !ip.is_empty() {
-                        let formatted = format!("[{}]", ip);
-                        if ipv6_list.iter().all(|x| x != &formatted) {
-                            ipv6_list.push(formatted);
+                IpAddr::V6(v6) => {
+                    let s = v6.to_string();
+                    if !s.starts_with("::1") && !s.starts_with("fe80") {
+                        let formatted = format!("[{}]", s);
+                        if entry.ipv6_addrs.iter().all(|x| x != &formatted) {
+                            entry.ipv6_addrs.push(formatted);
                         }
                     }
                 }
@@ -4288,10 +4296,199 @@ pub async fn get_local_ip_addresses() -> Result<serde_json::Value, String> {
         }
     }
 
+    // ─── Windows 下获取网卡描述 / 状态 / InterfaceAlias ─────────────────────────
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::{Command, Stdio};
+
+        fn run_powershell_json(script: &str) -> Option<serde_json::Value> {
+            let output = Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command", script])
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+                .ok()?;
+            serde_json::from_slice(&output.stdout).ok()
+        }
+
+        if let Some(value) = run_powershell_json("Get-NetAdapter | Select-Object -Property Name, InterfaceDescription, Status, InterfaceAlias, ifIndex | ConvertTo-Json") {
+            match value {
+                serde_json::Value::Array(arr) => {
+                    for item in arr {
+                        if let Some(name) = item.get("Name").and_then(|v| v.as_str()) {
+                            let desc = item
+                                .get("InterfaceDescription")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                            let iface_type = item
+                                .get("InterfaceAlias")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                            let status = item
+                                .get("Status")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown")
+                                .to_string();
+
+                            let entry = ifaddr_map.entry(name.to_string()).or_insert_with(|| LanInterface {
+                                name: name.to_string(),
+                                desc: None,
+                                iface_type: None,
+                                is_up: true,
+                                is_virtual_guess: false,
+                                ipv4_addrs: Vec::new(),
+                                ipv6_addrs: Vec::new(),
+                            });
+
+                            entry.desc = desc.or_else(|| entry.desc.clone());
+                            entry.iface_type = iface_type.or_else(|| entry.iface_type.clone());
+                            entry.is_up = status.eq_ignore_ascii_case("up") || status.eq_ignore_ascii_case("connected");
+                        }
+                    }
+                }
+                serde_json::Value::Object(obj) => {
+                    if let Some(name) = obj.get("Name").and_then(|v| v.as_str()) {
+                        let desc = obj
+                            .get("InterfaceDescription")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let iface_type = obj
+                            .get("InterfaceAlias")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let status = obj
+                            .get("Status")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        let entry = ifaddr_map.entry(name.to_string()).or_insert_with(|| LanInterface {
+                            name: name.to_string(),
+                            desc: None,
+                            iface_type: None,
+                            is_up: true,
+                            is_virtual_guess: false,
+                            ipv4_addrs: Vec::new(),
+                            ipv6_addrs: Vec::new(),
+                        });
+
+                        entry.desc = desc.or_else(|| entry.desc.clone());
+                        entry.iface_type = iface_type.or_else(|| entry.iface_type.clone());
+                        entry.is_up = status.eq_ignore_ascii_case("up") || status.eq_ignore_ascii_case("connected");
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // ─── 构建最终接口列表 ──────────────────────────────────────────────────────
+    for (_, mut iface) in ifaddr_map.into_iter() {
+        iface.is_virtual_guess = is_virtual_adapter(iface.desc.as_deref(), iface.name.as_str());
+        if iface.ipv4_addrs.is_empty() && iface.ipv6_addrs.is_empty() {
+            continue;
+        }
+        interfaces.push(iface);
+    }
+
+    // 如果 UDP 探测有结果但接口列表为空，直接返回探测值
+    if interfaces.is_empty() {
+        let mut fallback_ipv4 = Vec::new();
+        let mut fallback_ipv6 = Vec::new();
+        if let Some(v4) = primary_ipv4 {
+            fallback_ipv4.push(v4);
+        }
+        if let Some(v6) = primary_ipv6 {
+            fallback_ipv6.push(v6);
+        }
+        return Ok(serde_json::json!({
+            "ipv4": fallback_ipv4,
+            "ipv6": fallback_ipv6,
+            "interfaces": Vec::<serde_json::Value>::new(),
+        }));
+    }
+
+    // 首选网卡：优先不是虚拟网卡、状态 Up、含 IPv4 地址的第一项；其次 IPv6；失败则取第一项
+    let mut preferred_index: Option<usize> = None;
+    for (idx, iface) in interfaces.iter().enumerate() {
+        let name_lower = iface.name.to_lowercase();
+        let is_blacklisted_name = name_lower.contains("虚拟") || name_lower.contains("virtual");
+        if !iface.ipv4_addrs.is_empty() && !iface.is_virtual_guess && iface.is_up && !is_blacklisted_name {
+            preferred_index = Some(idx);
+            break;
+        }
+    }
+    if preferred_index.is_none() {
+        for (idx, iface) in interfaces.iter().enumerate() {
+            let name_lower = iface.name.to_lowercase();
+            let is_blacklisted_name = name_lower.contains("虚拟") || name_lower.contains("virtual");
+            if !iface.ipv6_addrs.is_empty() && !iface.is_virtual_guess && iface.is_up && !is_blacklisted_name {
+                preferred_index = Some(idx);
+                break;
+            }
+        }
+    }
+    if preferred_index.is_none() && !interfaces.is_empty() {
+        preferred_index = Some(0);
+    }
+
+    let mut ipv4_list: Vec<String> = Vec::new();
+    let mut ipv6_list: Vec<String> = Vec::new();
+    if let Some(index) = preferred_index {
+        if let Some(preferred) = interfaces.get(index) {
+            if let Some(ip) = preferred.ipv4_addrs.first() {
+                ipv4_list.push(ip.clone());
+            }
+            if let Some(ip) = preferred.ipv6_addrs.first() {
+                ipv6_list.push(ip.clone());
+            }
+        }
+    }
+
     Ok(serde_json::json!({
         "ipv4": ipv4_list,
         "ipv6": ipv6_list,
+        "interfaces": interfaces
+            .into_iter()
+            .map(|iface| serde_json::json!({
+                "name": iface.name,
+                "desc": iface.desc,
+                "alias": iface.iface_type,
+                "is_up": iface.is_up,
+                "is_virtual": iface.is_virtual_guess,
+                "ipv4": iface.ipv4_addrs,
+                "ipv6": iface.ipv6_addrs,
+            }))
+            .collect::<Vec<_>>(),
     }))
+}
+
+fn is_virtual_adapter(desc: Option<&str>, name: &str) -> bool {
+    let desc_lower = desc.unwrap_or("").to_lowercase();
+    let name_lower = name.to_lowercase();
+    let keywords = [
+        "virtual",
+        "vmware",
+        "hyper-v",
+        "loopback",
+        "vnic",
+        "vpn",
+        "packet",
+        "adapter for loopback",
+        "docker",
+        "wintap",
+        "tap-",
+        "pnet",
+    ];
+    for key in keywords {
+        if desc_lower.contains(key) || name_lower.contains(key) {
+            return true;
+        }
+    }
+    false
 }
 
 /// 从本机网卡探测 GUA IPv6（全局单播地址，2xxx:: / 3xxx::）

@@ -51,6 +51,7 @@ sevenz-rust = "0.6.1"
 catch-unwind = "0.3.0"
 headless_chrome = { version = "1", features = [] }
 regex = "1"
+get_if_addrs = "0.5"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.52"
