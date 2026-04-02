@@ -2,7 +2,17 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { TerminalSquare, Play, Square, CircleDashed, CheckCircle2, XCircle, Trash2 } from 'lucide-vue-next'
+import {
+  TerminalSquare,
+  Play,
+  Square,
+  CircleDashed,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  ArrowDownToLine,
+} from 'lucide-vue-next'
+
 import {
   consoleStatus as status,
   consoleLogs as logs,
@@ -23,21 +33,40 @@ const route = useRoute()
 const router = useRouter()
 const logsContainer = ref<HTMLElement | null>(null)
 const showNetworkDialog = ref(false)
+const autoScroll = ref(true)
+const SCROLL_THRESHOLD = 32
+
+const isNearBottom = () => {
+  if (!logsContainer.value) return true
+  const el = logsContainer.value
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_THRESHOLD
+}
+
+const handleLogsScroll = () => {
+  autoScroll.value = isNearBottom()
+}
 
 // 自动滚动到底部
 const scrollToBottom = () => {
-  if (logsContainer.value) {
-    logsContainer.value.scrollTop = logsContainer.value.scrollHeight
-  }
+  if (!logsContainer.value) return
+  const el = logsContainer.value
+  requestAnimationFrame(() => {
+    el.scrollTop = el.scrollHeight
+  })
 }
 
 watch(
   logs,
   () => {
+    if (!autoScroll.value) return
     nextTick(scrollToBottom)
   },
   { deep: true },
 )
+
+watch(autoScroll, newVal => {
+  if (newVal) nextTick(scrollToBottom)
+})
 
 onMounted(() => {
   scrollToBottom()
@@ -50,6 +79,11 @@ onMounted(() => {
     }, 1000)
   }
 })
+
+const handleToggleAutoScroll = () => {
+  autoScroll.value = true
+  scrollToBottom()
+}
 
 watch(status, newStatus => {
   if (route.query.action === 'one_click_start') {
@@ -127,6 +161,7 @@ const handleOpenUrl = async (url: string) => {
     <!-- 顶部栏：macOS 风格控制台头部 -->
     <div
       class="h-14 shrink-0 bg-[#1a1d27] border-b border-[#2a2d3d] px-4 flex items-center justify-between shadow-sm select-none"
+      data-tauri-drag-region
     >
       <!-- 左侧：状态指示器与标题 -->
       <div class="flex items-center gap-3">
@@ -232,6 +267,7 @@ const handleOpenUrl = async (url: string) => {
       <!-- 右侧：操作按钮 -->
       <div class="flex items-center gap-2">
         <button
+          data-tauri-drag-region="false"
           :title="t('console.clearLogs')"
           class="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-[#2a2d3d] transition-colors"
           @click="clearLogs"
@@ -241,8 +277,22 @@ const handleOpenUrl = async (url: string) => {
 
         <div class="h-4 w-px bg-[#2a2d3d] mx-1"></div>
 
-        <!-- 停止进程按钮 -->
         <button
+          v-if="!autoScroll"
+          data-tauri-drag-region="false"
+          class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition-colors"
+          @click="handleToggleAutoScroll"
+        >
+          <ArrowDownToLine class="w-3.5 h-3.5" />
+          {{ t('console.followLogs') }}
+        </button>
+
+        <div class="h-4 w-px bg-[#2a2d3d] mx-1"></div>
+
+        <!-- 停止进程按钮 -->
+
+        <button
+          data-tauri-drag-region="false"
           :disabled="status === 0 || status === 3 || status === 4"
           class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="
@@ -259,6 +309,7 @@ const handleOpenUrl = async (url: string) => {
         <!-- 启动按钮 -->
         <button
           id="btn-console-start"
+          data-tauri-drag-region="false"
           :disabled="status === 1 || status === 2"
           class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="
@@ -277,7 +328,8 @@ const handleOpenUrl = async (url: string) => {
     <!-- 日志内容区域 -->
     <div
       ref="logsContainer"
-      class="flex-1 overflow-y-auto p-4 text-sm font-mono leading-relaxed selection:bg-blue-500/30 scroll-smooth custom-scrollbar"
+      class="flex-1 overflow-y-auto p-4 text-sm font-mono leading-relaxed selection:bg-blue-500/30 custom-scrollbar"
+      @scroll="handleLogsScroll"
     >
       <div class="max-w-full flex flex-col gap-1">
         <!-- 初始提示 -->

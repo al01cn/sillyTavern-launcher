@@ -98,6 +98,7 @@ pub fn run() {
 
             if let Err(e) = ensure_standard_layout(&path) {
                 #[cfg(target_os = "windows")]
+                #[cfg(target_os = "windows")]
                 {
                     if e.kind() == std::io::ErrorKind::PermissionDenied && !elevation::is_elevated()
                     {
