@@ -75,3 +75,8 @@ updater.key.pub
 # App Specific Data (SillyTavern)
 # =========================
 data/
+data/config.json
+data/**
+/data/
+/data/**
+/data/config.json

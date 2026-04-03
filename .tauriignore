@@ -1,0 +1,4 @@
+# Files and directories to exclude from Tauri bundles
+# Keep runtime/user data out of packaged installers
+/data
+/data/**
