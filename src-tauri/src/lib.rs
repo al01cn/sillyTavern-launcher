@@ -32,11 +32,62 @@ struct OwnedArcs {
     git_child_pid: Arc<Mutex<Option<u32>>>,
 }
 
+fn resolve_app_working_dir() -> PathBuf {
+    let exe_path = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("获取可执行文件路径失败: {e}，回退到当前工作目录");
+            return std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let exe_str = exe_path.to_string_lossy();
+        if exe_str.contains(".app/Contents/MacOS/") {
+            if let Some(bundle_dir) = exe_path
+                .parent() // -> MacOS/
+                .and_then(|p| p.parent()) // -> Contents/
+                .and_then(|p| p.parent()) // -> AppName.app/
+                .and_then(|p| p.parent())
+            {
+                return bundle_dir.to_path_buf();
+            }
+        }
+    }
+
+    let exe_dir = exe_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    let looks_like_target_build = {
+        let components: Vec<String> = exe_dir
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+            .collect();
+        components.windows(2).any(|pair| {
+            pair[0] == "target" && (pair[1] == "debug" || pair[1] == "release")
+        })
+    };
+
+    if cfg!(debug_assertions) || looks_like_target_build {
+        let mut cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        if cwd.ends_with("src-tauri") {
+            cwd.pop();
+        }
+        cwd
+    } else {
+        exe_dir
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 应用入口
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -67,34 +118,11 @@ pub fn run() {
                 git_child_pid: git_child_pid_arc,
             });
 
-            let path = {
-                let exe = match std::env::current_exe() {
-                    Ok(p) => p.canonicalize().unwrap_or(p),
-                    Err(e) => {
-                        eprintln!("获取可执行文件路径失败: {e}，回退到当前工作目录");
-                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-                    }
-                };
-                let exe_str = exe.to_string_lossy();
-                if cfg!(target_os = "macos") && exe_str.contains(".app/Contents/MacOS/") {
-                    // macOS .app bundle：使用 .app 所在目录
-                    exe.parent() // -> MacOS/
-                        .and_then(|p| p.parent()) // -> Contents/
-                        .and_then(|p| p.parent()) // -> AppName.app/
-                        .and_then(|p| p.parent()) // -> .app 所在目录
-                        .map(|p| p.to_path_buf())
-                        .unwrap_or_else(|| PathBuf::from("."))
-                } else {
-                    let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                    if p.ends_with("src-tauri") {
-                        p.pop();
-                    }
-                    p
-                }
-            };
+            let path = resolve_app_working_dir();
             if let Err(e) = std::env::set_current_dir(&path) {
                 eprintln!("设置工作目录失败: {e}");
             }
+
 
             if let Err(e) = ensure_standard_layout(&path) {
                 #[cfg(target_os = "windows")]

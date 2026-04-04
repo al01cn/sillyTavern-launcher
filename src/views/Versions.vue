@@ -125,37 +125,41 @@
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-            :title="t('versions.importLocalTooltip')"
-            @click="handleSelectExistingTavern"
-          >
-            <FolderPlus class="w-4 h-4" />
-          </button>
-          <button
-            v-if="!scanManager.state.isScanning"
-            class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-            :title="t('versions.startScan')"
-            @click="startScan(true)"
-          >
-            <Search class="w-4 h-4" />
-          </button>
-          <button
-            v-else
-            class="text-red-400 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-            :title="t('versions.cancelScan')"
-            @click="scanManager.cancelScan()"
-          >
-            <X class="w-4 h-4" />
-          </button>
-          <button
+          <AppTooltip :text="t('versions.importLocalTooltip')">
+            <button
+              class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              @click="handleSelectExistingTavern"
+            >
+              <FolderPlus class="w-4 h-4" />
+            </button>
+          </AppTooltip>
+          <AppTooltip v-if="!scanManager.state.isScanning" :text="t('versions.startScan')">
+            <button
+              class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              @click="startScan(true)"
+            >
+              <Search class="w-4 h-4" />
+            </button>
+          </AppTooltip>
+          <AppTooltip v-else :text="t('versions.cancelScan')">
+            <button
+              class="text-red-400 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+              @click="scanManager.cancelScan()"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </AppTooltip>
+          <AppTooltip
             v-if="scanManager.state.isScanning || scanManager.state.scanLogPaths.length > 0"
-            class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-            :title="t('versions.scanLog')"
-            @click="showScanLog"
+            :text="t('versions.scanLog')"
           >
-            <FileText class="w-4 h-4" />
-          </button>
+            <button
+              class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              @click="showScanLog"
+            >
+              <FileText class="w-4 h-4" />
+            </button>
+          </AppTooltip>
         </div>
       </div>
 
@@ -271,13 +275,14 @@
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-            :title="t('versions.forceRefresh')"
-            @click="refresh(true)"
-          >
-            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
-          </button>
+          <AppTooltip :text="t('versions.forceRefresh')">
+            <button
+              class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              @click="refresh(true)"
+            >
+              <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+            </button>
+          </AppTooltip>
         </div>
       </div>
 
@@ -522,6 +527,7 @@ import { installState, resetInstallState } from '../lib/useInstall'
 import { Dialog } from '../lib/useDialog'
 import { toast } from 'vue-sonner'
 import { useReleases } from '../lib/useReleases'
+import AppTooltip from '../components/AppTooltip.vue'
 import { updateOneClickMessage, startOneClickSetup, simulateClickEffect } from '../lib/useOneClick'
 
 const { t } = useI18n()

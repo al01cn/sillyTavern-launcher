@@ -28,6 +28,7 @@ import { openUploadWorldInfoDialog } from '../lib/useUploadWorldInfo'
 import { openChatDialog } from '../lib/useChatDialog'
 import { Dialog } from '../lib/useDialog'
 import ResourceMigrateDialog from '../components/ResourceMigrateDialog.vue'
+import AppTooltip from '../components/AppTooltip.vue'
 
 const { t } = useI18n()
 const activeTab = ref<'characters' | 'worlds' | 'chats'>('characters')
@@ -485,40 +486,48 @@ onUnmounted(() => {
     <div class="flex items-center justify-between mb-6 px-1">
       <h1 class="text-2xl font-bold dark:text-slate-100">{{ t('resources.title') }}</h1>
       <div class="flex items-center gap-2">
-        <button
-          v-if="activeTab === 'characters'"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
-          type="button"
-          @click="importCard()"
-        >
-          <PhPlus :size="16" weight="bold" />
-          {{ t('resources.addCharacterCard') }}
-        </button>
-        <button
-          v-if="activeTab === 'worlds'"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
-          type="button"
-          @click="importWorld()"
-        >
-          <PhPlus :size="16" weight="bold" />
-          {{ t('resources.addWorldInfo') }}
-        </button>
-        <button
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-          type="button"
-          @click="refreshCurrent"
-        >
-          <PhArrowsClockwise :size="16" weight="duotone" :class="loading ? 'animate-spin' : ''" />
-          {{ t('common.refresh') }}
-        </button>
-        <button
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-400 dark:hover:border-violet-600 flex items-center gap-2"
-          type="button"
-          @click="showMigrateDialog = true"
-        >
-          <PhArrowsDownUp :size="16" weight="duotone" />
-          {{ t('resources.migrate.button') }}
-        </button>
+        <AppTooltip :text="t('resources.addCharacterCard')">
+          <button
+            v-if="activeTab === 'characters'"
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
+            type="button"
+            @click="importCard()"
+          >
+            <PhPlus :size="16" weight="bold" />
+            {{ t('resources.addCharacterCard') }}
+          </button>
+        </AppTooltip>
+        <AppTooltip :text="t('resources.addWorldInfo')">
+          <button
+            v-if="activeTab === 'worlds'"
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2 border border-blue-200/50 dark:border-blue-800/50"
+            type="button"
+            @click="importWorld()"
+          >
+            <PhPlus :size="16" weight="bold" />
+            {{ t('resources.addWorldInfo') }}
+          </button>
+        </AppTooltip>
+        <AppTooltip :text="t('common.refresh')">
+          <button
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+            type="button"
+            @click="refreshCurrent"
+          >
+            <PhArrowsClockwise :size="16" weight="duotone" :class="loading ? 'animate-spin' : ''" />
+            {{ t('common.refresh') }}
+          </button>
+        </AppTooltip>
+        <AppTooltip :text="t('resources.migrate.button')">
+          <button
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-400 dark:hover:border-violet-600 flex items-center gap-2"
+            type="button"
+            @click="showMigrateDialog = true"
+          >
+            <PhArrowsDownUp :size="16" weight="duotone" />
+            {{ t('resources.migrate.button') }}
+          </button>
+        </AppTooltip>
       </div>
     </div>
 
@@ -652,14 +661,14 @@ onUnmounted(() => {
                 <Square v-else class="w-5 h-5 text-slate-300" />
               </div>
             </div>
-            <button
-              v-if="!isSelectMode"
-              class="absolute top-3 right-3 z-10 p-1.5 bg-white/90 backdrop-blur text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-              :title="t('common.delete')"
-              @click="deleteSingle(card.fileName, $event)"
-            >
-              <PhTrash :size="16" weight="bold" />
-            </button>
+            <AppTooltip v-if="!isSelectMode" :text="t('common.delete')">
+              <button
+                class="absolute top-3 right-3 z-10 p-1.5 bg-white/90 backdrop-blur text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                @click="deleteSingle(card.fileName, $event)"
+              >
+                <PhTrash :size="16" weight="bold" />
+              </button>
+            </AppTooltip>
             <div
               class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-soft transition-shadow overflow-hidden flex-1 flex flex-col"
             >
@@ -798,14 +807,14 @@ onUnmounted(() => {
               <CheckSquare v-if="selectedFiles.has(world.fileName)" class="w-5 h-5 text-blue-500" />
               <Square v-else class="w-5 h-5 text-slate-300" />
             </div>
-            <button
-              v-if="!isSelectMode"
-              class="absolute top-1/2 -translate-y-1/2 right-3 z-10 p-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-              :title="t('common.delete')"
-              @click="deleteSingle(world.fileName, $event)"
-            >
-              <PhTrash :size="16" weight="bold" />
-            </button>
+            <AppTooltip v-if="!isSelectMode" :text="t('common.delete')">
+              <button
+                class="absolute top-1/2 -translate-y-1/2 right-3 z-10 p-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                @click="deleteSingle(world.fileName, $event)"
+              >
+                <PhTrash :size="16" weight="bold" />
+              </button>
+            </AppTooltip>
             <div
               class="bg-white dark:bg-slate-800 rounded-xl border transition-all p-4 flex items-center gap-4"
               :class="[
@@ -1005,14 +1014,14 @@ onUnmounted(() => {
                 </div>
 
                 <!-- 删除按钮（非选择模式 hover 显示） -->
-                <button
-                  v-if="!isSelectMode"
-                  class="p-1.5 bg-white/90 dark:bg-slate-800/90 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm shrink-0"
-                  :title="t('common.delete')"
-                  @click="deleteSingleChat(group, file, $event)"
-                >
-                  <PhTrash :size="14" weight="bold" />
-                </button>
+                <AppTooltip v-if="!isSelectMode" :text="t('common.delete')">
+                  <button
+                    class="p-1.5 bg-white/90 dark:bg-slate-800/90 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm shrink-0"
+                    @click="deleteSingleChat(group, file, $event)"
+                  >
+                    <PhTrash :size="14" weight="bold" />
+                  </button>
+                </AppTooltip>
               </button>
             </div>
           </div>

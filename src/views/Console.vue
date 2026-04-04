@@ -28,6 +28,7 @@ import {
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { updateOneClickMessage, startOneClickSetup, finishOneClickSetup, simulateClickEffect } from '../lib/useOneClick'
 import NetworkLinkDialog from '../components/NetworkLinkDialog.vue'
+import AppTooltip from '../components/AppTooltip.vue'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -266,62 +267,68 @@ const handleOpenUrl = async (url: string) => {
 
       <!-- 右侧：操作按钮 -->
       <div class="flex items-center gap-2">
-        <button
-          data-tauri-drag-region="false"
-          :title="t('console.clearLogs')"
-          class="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-[#2a2d3d] transition-colors"
-          @click="clearLogs"
-        >
-          <Trash2 class="w-4 h-4" />
-        </button>
+        <AppTooltip :text="t('console.clearLogs')">
+          <button
+            data-tauri-drag-region="false"
+            class="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-[#2a2d3d] transition-colors"
+            @click="clearLogs"
+          >
+            <Trash2 class="w-4 h-4" />
+          </button>
+        </AppTooltip>
 
         <div class="h-4 w-px bg-[#2a2d3d] mx-1"></div>
 
-        <button
-          v-if="!autoScroll"
-          data-tauri-drag-region="false"
-          class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition-colors"
-          @click="handleToggleAutoScroll"
-        >
-          <ArrowDownToLine class="w-3.5 h-3.5" />
-          {{ t('console.followLogs') }}
-        </button>
+        <AppTooltip v-if="!autoScroll" :text="t('console.followLogs')">
+          <button
+            data-tauri-drag-region="false"
+            class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition-colors"
+            @click="handleToggleAutoScroll"
+          >
+            <ArrowDownToLine class="w-3.5 h-3.5" />
+            {{ t('console.followLogs') }}
+          </button>
+        </AppTooltip>
 
         <div class="h-4 w-px bg-[#2a2d3d] mx-1"></div>
 
         <!-- 停止进程按钮 -->
 
-        <button
-          data-tauri-drag-region="false"
-          :disabled="status === 0 || status === 3 || status === 4"
-          class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :class="
-            status === 0 || status === 3 || status === 4
-              ? 'text-slate-500 bg-[#2a2d3d]'
-              : 'text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20'
-          "
-          @click="stopProcess"
-        >
-          <Square class="w-3.5 h-3.5 fill-current" />
-          {{ t('console.stop') }}
-        </button>
+        <AppTooltip :text="t('console.stop')">
+          <button
+            data-tauri-drag-region="false"
+            :disabled="status === 0 || status === 3 || status === 4"
+            class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="
+              status === 0 || status === 3 || status === 4
+                ? 'text-slate-500 bg-[#2a2d3d]'
+                : 'text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20'
+            "
+            @click="stopProcess"
+          >
+            <Square class="w-3.5 h-3.5 fill-current" />
+            {{ t('console.stop') }}
+          </button>
+        </AppTooltip>
 
         <!-- 启动按钮 -->
-        <button
-          id="btn-console-start"
-          data-tauri-drag-region="false"
-          :disabled="status === 1 || status === 2"
-          class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :class="
-            status === 1 || status === 2
-              ? 'text-slate-500 bg-[#2a2d3d]'
-              : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20'
-          "
-          @click="startProcess"
-        >
-          <Play class="w-3.5 h-3.5 fill-current" />
-          {{ t('console.start') }}
-        </button>
+        <AppTooltip :text="t('console.start')">
+          <button
+            id="btn-console-start"
+            data-tauri-drag-region="false"
+            :disabled="status === 1 || status === 2"
+            class="h-8 px-3 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="
+              status === 1 || status === 2
+                ? 'text-slate-500 bg-[#2a2d3d]'
+                : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20'
+            "
+            @click="startProcess"
+          >
+            <Play class="w-3.5 h-3.5 fill-current" />
+            {{ t('console.start') }}
+          </button>
+        </AppTooltip>
       </div>
     </div>
 

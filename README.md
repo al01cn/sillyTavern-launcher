@@ -9,7 +9,7 @@
 
 **酒馆启动器** · 专为 SillyTavern 打造的跨平台桌面管理工具
 
-[![版本](https://img.shields.io/badge/版本-0.1.0-blue?style=flat-square)](https://github.com/al01cn/sillyTavern-launcher/releases)
+[![版本](https://img.shields.io/badge/版本-1.0.2-blue?style=flat-square)](https://github.com/al01cn/sillyTavern-launcher/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-orange?style=flat-square&logo=tauri)](https://v2.tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&logo=vue.js)](https://vuejs.org/)
 [![Rust](https://img.shields.io/badge/Rust-latest-CE422B?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -76,7 +76,7 @@
 | 层次             | 技术                                                                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | **前端框架**     | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/)                              |
-| **UI 组件**      | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)                                                      |
+| **UI 组件**      | [TailwindCSS v4](https://tailwindcss.com/) + [FluxUI](https://fluxui.dev/)（所有组件可用）                                             |
 | **图标库**       | [Lucide Vue Next](https://lucide.dev/) + [@phosphor-icons/vue](https://phosphoricons.com/) + [@iconify/vue](https://iconify.design/) |
 | **国际化**       | [vue-i18n v11](https://vue-i18n.intlify.dev/)                                                                                        |
 | **通知**         | [vue-sonner](https://vue-sonner.vercel.app/)                                                                                         |
@@ -92,41 +92,91 @@
 SillyTavern-Launcher/
 ├── src/                        # 前端 Vue 3 源码
 │   ├── assets/                 # 静态资源（图片、Logo 等）
-│   ├── components/             # 可复用公共组件
+│   ├── components/             # 可复用公共组件（15 个）
+│   │   ├── AppTooltip.vue      # 统一悬浮提示组件
+│   │   ├── GlobalDialog.vue   # 全局弹窗容器
+│   │   ├── InstallDialog.vue  # 版本安装弹窗
+│   │   ├── InstallExtensionDialog.vue  # 扩展安装弹窗
+│   │   ├── CharacterCardDialog.vue      # 角色卡预览弹窗
+│   │   ├── ChatDialog.vue     # 对话历史弹窗
+│   │   ├── NetworkLinkDialog.vue        # 局域网/公网链接面板
+│   │   ├── OneClickCapsule.vue          # 一键安装胶囊
+│   │   ├── ConfigMigrateDialog.vue      # 配置迁移弹窗
+│   │   ├── ResourceMigrateDialog.vue    # 资源迁移弹窗
+│   │   ├── RepairGitDialog.vue          # Git 修复弹窗
+│   │   ├── UploadCharacterCardDialog.vue  # 上传角色卡弹窗
+│   │   ├── UploadWorldInfoDialog.vue    # 上传世界书弹窗
+│   │   ├── WorldInfoDialog.vue          # 世界书预览弹窗
+│   │   └── Model.vue           # 通用的 FluxUI Modal 封装
 │   ├── lang/                   # 国际化语言文件（zh-CN / en-US）
-│   ├── layouts/                # 布局组件（自定义标题栏 Oheader）
-│   ├── lib/                    # 工具函数与 Tauri 命令封装
+│   ├── layouts/                # 布局组件（自定义标题栏）
+│   ├── lib/                    # 工具函数与 Tauri 命令封装（24 个）
+│   │   ├── config.ts           # 前端配置状态管理
+│   │   ├── consoleState.ts    # 控制台日志状态
+│   │   ├── st_list.ts          # SillyTavern 实例列表
+│   │   ├── theme.ts           # 主题切换
+│   │   ├── cache.ts            # 缓存管理
+│   │   ├── imageCache.ts       # 图片缓存
+│   │   ├── updater.ts          # 自动更新
+│   │   ├── useScan.ts          # 酒馆扫描逻辑（scanManager 单例）
+│   │   ├── useInstall.ts       # 版本安装/删除
+│   │   ├── useReleases.ts      # GitHub Releases 获取
+│   │   ├── useExtensions.ts    # 扩展列表与状态
+│   │   ├── useExtensionInstall.ts  # 扩展安装/修复/删除
+│   │   ├── useOneClick.ts      # 一键安装流程
+│   │   ├── useNodeGitInstall.ts  # Node.js / Git 安装进度
+│   │   ├── useDialog.ts        # 全局弹窗控制
+│   │   ├── useCharacterCardDialog.ts  # 角色卡弹窗
+│   │   ├── useChatDialog.ts    # 对话历史弹窗
+│   │   ├── useWorldInfoDialog.ts  # 世界书弹窗
+│   │   ├── useUploadCharacterCard.ts  # 上传角色卡
+│   │   ├── useUploadWorldInfo.ts  # 上传世界书
+│   │   ├── useCheckpoint.ts   # 检查点管理
+│   │   ├── useRepairGitDialog.ts  # Git 修复弹窗
+│   │   ├── useAnimations.ts   # 动画与性能检测
+│   │   └── index.ts            # lib 导出入口
 │   ├── router/                 # Vue Router 路由配置
 │   ├── views/                  # 页面视图
-│   │   ├── Home.vue            # 主页（启动/停止）
-│   │   ├── Versions.vue        # 版本管理
-│   │   ├── Tavern.vue          # 酒馆配置
+│   │   ├── Home.vue            # 主页（启动/停止/网络链接面板）
+│   │   ├── Versions.vue        # 版本管理（本地实例扫描/在线下载）
+│   │   ├── Tavern.vue          # 酒馆配置（config.yaml 可视化编辑器）
 │   │   ├── Extensions.vue      # 扩展管理
-│   │   ├── Resources.vue       # 资源管理（角色卡 / 世界书）
+│   │   ├── Resources.vue       # 资源管理（角色卡/世界书/对话历史）
 │   │   ├── Console.vue         # 控制台日志
 │   │   ├── Settings.vue        # 应用设置
-│   │   └── Tools.vue           # 实用工具
-│   └── App.vue                 # 根组件
+│   │   ├── Tools.vue           # 鸣谢页面
+│   │   └── App.vue             # 根组件
+│   ├── App.vue                 # 根组件
+│   ├── main.ts                 # 前端入口
+│   ├── style.css               # 全局样式
+│   └── tailwind.config.css     # Tailwind v4 配置
 │
 ├── src-tauri/                  # 后端 Rust 源码 (Tauri)
 │   ├── src/
-│   │   ├── lib.rs              # 应用入口 & 模块声明 & run()
-│   │   ├── types.rs            # 所有公共类型/结构体定义
-│   │   ├── utils.rs            # 日志、目录布局等工具函数
-│   │   ├── config.rs           # 应用配置读写 & 窗口管理
+│   │   ├── main.rs             # Rust 入口（Windows GUI 入口点）
+│   │   ├── lib.rs              # 模块声明与 run()
+│   │   ├── types.rs            # 所有公共类型/结构体/枚举定义
+│   │   ├── utils.rs            # 日志、目录布局、tracing 子scriber
+│   │   ├── config.rs           # AppConfig 读写、代理检测、窗口管理
 │   │   ├── node.rs             # Node.js / npm 检测与安装
-│   │   ├── sillytavern.rs      # ST 版本管理 & 启停 & 配置读写
-│   │   ├── extensions.rs       # 扩展管理
-│   │   ├── character.rs        # 角色卡管理
-│   │   └── worldinfo.rs        # 世界书管理
+│   │   ├── git.rs              # Git 检测、内置 MinGit、GitHub 加速逻辑
+│   │   ├── sillytavern.rs      # ST 版本管理、启停、YAML 配置读写
+│   │   ├── extensions.rs       # 扩展管理（列表/启用/安装/删除/修复）
+│   │   ├── character.rs        # 角色卡 PNG 管理
+│   │   ├── worldinfo.rs        # 世界书 JSON 管理
+│   │   ├── chat.rs             # 对话历史读取与删除
+│   │   ├── finderst.rs         # SillyTavern 全盘扫描（jwalk + walkdir）
+│   │   ├── logs.rs             # 应用运行日志读写
+│   │   ├── elevation.rs        # Windows UAC 提权辅助
+│   │   └── Cargo.toml          # Rust 依赖
 │   ├── icons/                  # 应用图标（多平台）
-│   ├── Cargo.toml              # Rust 依赖配置
 │   └── tauri.conf.json         # Tauri 配置文件
 │
 ├── data/                       # 运行时数据目录（自动生成）
 │   ├── config.json             # 应用全局配置
 │   ├── logs/                   # 应用运行日志（按天滚动）
 │   ├── node/                   # 内置 Node.js 环境（可选）
+│   ├── mingit/                 # 内置 PortableGit（可选）
 │   ├── st_data/                # SillyTavern 全局数据
 │   │   ├── config.yaml         # 全局酒馆配置
 │   │   ├── characters/         # 角色卡目录
@@ -138,7 +188,8 @@ SillyTavern-Launcher/
 ├── public/                     # Vite 静态资源
 ├── package.json
 ├── vite.config.ts
-├── tailwind.config.js
+├── tsconfig.json
+├── tsconfig.node.json
 ├── UPDATELOGS.md               # 版本更新记录
 └── README.md
 ```
@@ -199,15 +250,21 @@ bun run sync-version   # 同步 package.json 版本号到 Tauri
 #### Rust 后端模块划分
 
 ```
-lib.rs          ← 入口（模块声明 + run()）
-  ├── types.rs       所有共享数据结构（纯定义，无逻辑）
-  ├── utils.rs       日志、目录初始化、get_config_path
-  ├── config.rs      AppConfig 读写、窗口位置、代理拉取、通用命令
-  ├── node.rs        Node.js / npm 检测、下载安装
+main.rs           ← Rust 入口（Windows GUI 入口点）
+lib.rs            ← 模块声明与 run()
+  ├── types.rs       所有共享数据结构（类型/结构体/枚举，纯定义无逻辑）
+  ├── utils.rs       日志初始化、目录布局、tracing subscriber
+  ├── config.rs      AppConfig 读写、窗口管理、代理检测（PowerShell/reg）
+  ├── node.rs        Node.js / npm 检测与安装
+  ├── git.rs         Git 检测、内置 MinGit、GitHub 加速（--import / insteadOf）
   ├── sillytavern.rs ST 版本 CRUD、启停、YAML 配置读写
-  ├── extensions.rs  扩展列表、启用/禁用/安装/删除
+  ├── extensions.rs  扩展列表、启用/禁用/安装/删除/修复
   ├── character.rs   角色卡 PNG 管理
-  └── worldinfo.rs   世界书 JSON 管理
+  ├── worldinfo.rs   世界书 JSON 管理
+  ├── chat.rs        对话历史读取与删除
+  ├── finderst.rs    SillyTavern 全盘扫描（jwalk + walkdir 双引擎）
+  ├── logs.rs        应用运行日志读写
+  └── elevation.rs   Windows UAC 提权辅助
 ```
 
 #### 前后端通信
@@ -232,12 +289,13 @@ lib.rs          ← 入口（模块声明 + run()）
 ### 📝 开发规范
 
 - **组合式 API**：始终使用 Vue 3 `<script setup>` + TypeScript 严格模式。
-- **UI 结构**：页面内容必须放在 `<Oheader>` 组件内；弹窗放在 `<template #Modal>` 插槽。
+- **UI 组件**：统一使用 [FluxUI](https://fluxui.dev/) 组件库（`flux:card`、`flux:modal` 等），配合 TailwindCSS 工具类。
 - **图标**：统一使用 `lucide-vue-next`、`@phosphor-icons/vue` 或 `@iconify/vue`，禁止使用 emoji。
-- **样式**：使用 TailwindCSS 工具类 + DaisyUI 组件，禁止随意写内联 CSS。
+- **悬浮提示**：使用 `AppTooltip` 组件，prop 名统一为 `:text=`，组件会自动处理 Teleport 定位。
 - **后端交互**：所有系统操作、网络请求必须经由 Rust 后端处理，前端仅负责展示。
 - **跨平台**：Windows / macOS / Linux 三平台均需兼容，使用条件编译处理平台差异。
-- **包管理**：使用 `bun`，Rust 侧使用 `cargo`。
+- **包管理**：前端使用 `bun`，Rust 侧使用 `cargo`。
+- **lint**：提交前运行 `bun run allcheck`（typecheck + eslint + cargo fmt + cargo check）。
 
 ---
 
@@ -264,7 +322,7 @@ lib.rs          ← 入口（模块声明 + run()）
 本项目的开发离不开以下开源项目的支持：
 
 - **核心框架**: [Tauri](https://tauri.app/), [Vue.js](https://vuejs.org/), [Rust](https://www.rust-lang.org/)
-- **UI & 样式**: [TailwindCSS](https://tailwindcss.com/), [DaisyUI](https://daisyui.com/)
+- **UI & 样式**: [TailwindCSS](https://tailwindcss.com/), [FluxUI](https://fluxui.dev/)
 - **图标库**: [Lucide Icons](https://lucide.dev/), [Phosphor Icons](https://phosphoricons.com/), [Iconify](https://iconify.design/)
 - **功能插件**: [vue-i18n](https://vue-i18n.intlify.dev/), [vue-sonner](https://vue-sonner.vercel.app/), [reqwest](https://github.com/seanmonstar/reqwest), [tokio](https://tokio.rs/)
 - **特别鸣谢**: 感谢 [SillyTavern](https://github.com/SillyTavern/SillyTavern) 项目团队及其社区提供的出色工具。
@@ -331,7 +389,7 @@ lib.rs          ← 入口（模块声明 + run()）
 | Layer               | Technology                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Frontend**        | [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vite.dev/) |
-| **UI**              | [TailwindCSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)                         |
+| **UI**              | [TailwindCSS v4](https://tailwindcss.com/) + [FluxUI](https://fluxui.dev/) (full component library)         |
 | **Icons**           | Lucide Vue Next + Phosphor Icons + Iconify                                                              |
 | **i18n**            | vue-i18n v11                                                                                            |
 | **Backend**         | [Tauri v2](https://v2.tauri.app/) + [Rust](https://www.rust-lang.org/)                                  |
@@ -345,39 +403,108 @@ lib.rs          ← 入口（模块声明 + run()）
 ```text
 SillyTavern-Launcher/
 ├── src/                        # Frontend Vue 3 source
-│   ├── components/             # Shared components
+│   ├── assets/                 # Static assets (images, logos)
+│   ├── components/             # Reusable components (15 files)
+│   │   ├── AppTooltip.vue      # Unified hover tooltip
+│   │   ├── GlobalDialog.vue    # Global dialog container
+│   │   ├── InstallDialog.vue   # Version install dialog
+│   │   ├── InstallExtensionDialog.vue  # Extension install dialog
+│   │   ├── CharacterCardDialog.vue    # Character card preview
+│   │   ├── ChatDialog.vue      # Chat history dialog
+│   │   ├── NetworkLinkDialog.vue       # LAN/public link panel
+│   │   ├── OneClickCapsule.vue # One-click install capsule
+│   │   ├── ConfigMigrateDialog.vue     # Config migration
+│   │   ├── ResourceMigrateDialog.vue   # Resource migration
+│   │   ├── RepairGitDialog.vue # Git repair dialog
+│   │   ├── UploadCharacterCardDialog.vue  # Upload character card
+│   │   ├── UploadWorldInfoDialog.vue  # Upload world info
+│   │   ├── WorldInfoDialog.vue # World info preview
+│   │   └── Model.vue           # FluxUI Modal wrapper
 │   ├── lang/                   # i18n files (zh-CN / en-US)
 │   ├── layouts/                # Layout (custom titlebar)
-│   ├── lib/                    # Utilities & Tauri command wrappers
+│   ├── lib/                    # Utilities & Tauri command wrappers (24 files)
+│   │   ├── config.ts          # Frontend config state management
+│   │   ├── consoleState.ts    # Console log state
+│   │   ├── st_list.ts         # SillyTavern instance list
+│   │   ├── theme.ts           # Theme switching
+│   │   ├── cache.ts           # Cache management
+│   │   ├── imageCache.ts      # Image cache
+│   │   ├── updater.ts         # Auto updater
+│   │   ├── useScan.ts         # Tavern scanning (scanManager singleton)
+│   │   ├── useInstall.ts      # Version install/uninstall
+│   │   ├── useReleases.ts     # GitHub Releases fetch
+│   │   ├── useExtensions.ts   # Extension list & state
+│   │   ├── useExtensionInstall.ts  # Extension install/repair/delete
+│   │   ├── useOneClick.ts     # One-click install flow
+│   │   ├── useNodeGitInstall.ts  # Node.js / Git install progress
+│   │   ├── useDialog.ts       # Global dialog control
+│   │   ├── useCharacterCardDialog.ts  # Character card dialog
+│   │   ├── useChatDialog.ts   # Chat history dialog
+│   │   ├── useWorldInfoDialog.ts  # World info dialog
+│   │   ├── useUploadCharacterCard.ts  # Upload character card
+│   │   ├── useUploadWorldInfo.ts  # Upload world info
+│   │   ├── useCheckpoint.ts   # Checkpoint management
+│   │   ├── useRepairGitDialog.ts  # Git repair dialog
+│   │   ├── useAnimations.ts   # Animation & perf detection
+│   │   └── index.ts           # lib export entry
 │   ├── router/                 # Vue Router
-│   └── views/                  # Page views
-│       ├── Home.vue            # Dashboard (start/stop)
-│       ├── Versions.vue        # Version manager
-│       ├── Tavern.vue          # Tavern config editor
-│       ├── Extensions.vue      # Extension manager
-│       ├── Resources.vue       # Character cards & World info
-│       ├── Console.vue         # Process log viewer
-│       ├── Settings.vue        # App settings
-│       └── Tools.vue           # Utilities
+│   ├── views/                 # Page views
+│   │   ├── Home.vue           # Dashboard (start/stop/network panel)
+│   │   ├── Versions.vue       # Version manager (local scan / online)
+│   │   ├── Tavern.vue         # Tavern config (config.yaml editor)
+│   │   ├── Extensions.vue     # Extension manager
+│   │   ├── Resources.vue      # Resources (characters/worlds/chat history)
+│   │   ├── Console.vue        # Process log viewer
+│   │   ├── Settings.vue       # App settings
+│   │   ├── Tools.vue          # Acknowledgements
+│   │   └── App.vue            # Root component
+│   ├── App.vue                # Root component
+│   ├── main.ts                # Frontend entry
+│   ├── style.css              # Global styles
+│   └── tailwind.config.css    # Tailwind v4 config
 │
-├── src-tauri/                  # Rust backend
-│   └── src/
-│       ├── lib.rs              # Entry: module declarations + run()
-│       ├── types.rs            # Shared structs & enums
-│       ├── utils.rs            # Logger, layout, helpers
-│       ├── config.rs           # App config R/W, window tracking
-│       ├── node.rs             # Node.js / npm detection & install
-│       ├── sillytavern.rs      # ST version CRUD, start/stop, YAML config
-│       ├── extensions.rs       # Extension management
-│       ├── character.rs        # Character card management
-│       └── worldinfo.rs        # World info management
+├── src-tauri/                  # Rust backend (Tauri)
+│   ├── src/
+│   │   ├── main.rs            # Rust entry (Windows GUI entry point)
+│   │   ├── lib.rs             # Module declarations & run()
+│   │   ├── types.rs           # All shared types/structs/enums
+│   │   ├── utils.rs          # Logger, layout, tracing subscriber
+│   │   ├── config.rs         # AppConfig R/W, proxy detection, window mgmt
+│   │   ├── node.rs           # Node.js / npm detection & install
+│   │   ├── git.rs            # Git detection, bundled MinGit, GH accel
+│   │   ├── sillytavern.rs    # ST version CRUD, start/stop, YAML config
+│   │   ├── extensions.rs     # Extension mgmt (list/enable/install/delete)
+│   │   ├── character.rs      # Character card PNG management
+│   │   ├── worldinfo.rs       # World info JSON management
+│   │   ├── chat.rs           # Chat history read & delete
+│   │   ├── finderst.rs       # SillyTavern full-disk scan
+│   │   ├── logs.rs           # App log read/write
+│   │   ├── elevation.rs      # Windows UAC elevation helper
+│   │   └── Cargo.toml        # Rust dependencies
+│   ├── icons/                 # App icons (multi-platform)
+│   └── tauri.conf.json       # Tauri config
 │
 └── data/                       # Runtime data (auto-created)
-    ├── config.json             # App configuration
-    ├── logs/                   # Daily rolling logs
-    ├── node/                   # (Optional) bundled Node.js
-    ├── st_data/                # Global SillyTavern data
-    └── sillytavern/            # Installed ST versions
+    ├── config.json            # App configuration
+    ├── logs/                  # Daily rolling logs
+    ├── node/                  # (Optional) bundled Node.js
+    ├── mingit/                # (Optional) bundled PortableGit
+    ├── st_data/               # Global SillyTavern data
+    │   ├── config.yaml        # Global tavern config
+    │   ├── characters/        # Character cards
+    │   └── worlds/            # World info files
+    └── sillytavern/           # Installed ST versions
+        └── <version>/         # e.g. release-v1.12.0
+│
+├── scripts/                    # Build scripts
+├── public/                     # Vite static assets
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+├── tsconfig.node.json
+├── eslint.config.js
+├── UPDATELOGS.md               # Changelog
+└── README.md
 ```
 
 ---
@@ -418,14 +545,35 @@ Build output: `src-tauri/target/release/bundle/`
 
 ### 🏗️ Architecture
 
+#### Rust Backend Modules
+
+```
+main.rs           ← Rust entry (Windows GUI entry point)
+lib.rs            ← Module declarations & run()
+  ├── types.rs       All shared types/structs/enums
+  ├── utils.rs       Logger init, layout, tracing subscriber
+  ├── config.rs      AppConfig R/W, window mgmt, proxy detection
+  ├── node.rs        Node.js / npm detection & install
+  ├── git.rs         Git detection, bundled MinGit, GH acceleration
+  ├── sillytavern.rs ST version CRUD, start/stop, YAML config
+  ├── extensions.rs  Extension list/enable/install/delete/repair
+  ├── character.rs   Character card PNG management
+  ├── worldinfo.rs   World info JSON management
+  ├── chat.rs        Chat history read & delete
+  ├── finderst.rs    Full-disk ST scan (jwalk + walkdir dual-engine)
+  ├── logs.rs        App log read/write
+  └── elevation.rs   Windows UAC elevation helper
+```
+
 All frontend operations communicate with the Rust backend via **Tauri Commands** (`invoke`). Long-running tasks (download, extract, npm install) emit progress events back to the frontend:
 
-| Event               | Description                           |
-| ------------------- | ------------------------------------- |
-| `install-progress`  | ST version install/delete progress    |
-| `download-progress` | Node.js download/extract progress     |
-| `process-log`       | SillyTavern real-time stdout/stderr   |
-| `process-exit`      | SillyTavern process exit notification |
+| Event                | Description                                |
+| -------------------- | ------------------------------------------ |
+| `install-progress`   | ST version install/delete progress        |
+| `download-progress`  | Node.js / Git download/extract progress    |
+| `process-log`        | SillyTavern real-time stdout/stderr       |
+| `process-exit`       | SillyTavern process exit notification      |
+| `repair-missing-deps`| 运行时检测到 node_modules 缺包，触发自动修复 |
 
 ---
 
@@ -434,6 +582,8 @@ All frontend operations communicate with the Rust backend via **Tauri Commands**
 1. **Issues**: Report bugs or suggest features via [GitHub Issues](https://github.com/al01cn/sillyTavern-launcher/issues)
 2. **Pull Requests**: Fork → new branch → develop → `cargo check` → PR
 3. **Docs**: Improvements to README or usage guides are welcome
+
+Before committing, run `bun run allcheck` (typecheck + eslint + cargo fmt + cargo check).
 
 ### 👥 Contributors
 
@@ -451,7 +601,7 @@ Thanks to all contributors who have helped build this project!
 This project would not be possible without these amazing open-source projects:
 
 - **Core Frameworks**: [Tauri](https://tauri.app/), [Vue.js](https://vuejs.org/), [Rust](https://www.rust-lang.org/)
-- **UI & Styling**: [TailwindCSS](https://tailwindcss.com/), [DaisyUI](https://daisyui.com/)
+- **UI & Styling**: [TailwindCSS](https://tailwindcss.com/), [FluxUI](https://fluxui.dev/)
 - **Icon Libraries**: [Lucide Icons](https://lucide.dev/), [Phosphor Icons](https://phosphoricons.com/), [Iconify](https://iconify.design/)
 - **Plugins & Libraries**: [vue-i18n](https://vue-i18n.intlify.dev/), [vue-sonner](https://vue-sonner.vercel.app/), [reqwest](https://github.com/seanmonstar/reqwest), [tokio](https://tokio.rs/)
 - **Special Thanks**: Huge thanks to the [SillyTavern](https://github.com/SillyTavern/SillyTavern) team and their community for creating such a wonderful tool.

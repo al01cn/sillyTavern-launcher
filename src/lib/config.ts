@@ -184,6 +184,18 @@ export default {
             url: 'https://github.com/SillyTavern/SillyTavern',
             key: 'sillytavernCommunity',
           },
+          {
+            name: 'Github Proxy',
+            version: '',
+            url: 'https://github.akams.cn/',
+            key: 'githubProxy',
+          },
+          {
+            name: 'Github Proxy - ghfast',
+            version: '',
+            url: 'https://ghfast.top/',
+            key: 'ghfast',
+          },
         ],
       },
     ],

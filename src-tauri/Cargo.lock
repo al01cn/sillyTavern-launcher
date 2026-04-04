@@ -4937,7 +4937,7 @@ dependencies = [
 
 [[package]]
 name = "sillytavern-launcher-gui"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "catch-unwind",
  "chrono",

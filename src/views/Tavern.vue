@@ -26,6 +26,7 @@ import {
 } from '@phosphor-icons/vue'
 import { useI18n } from 'vue-i18n'
 import ConfigMigrateDialog from '../components/ConfigMigrateDialog.vue'
+import AppTooltip from '../components/AppTooltip.vue'
 
 const { t } = useI18n()
 
@@ -417,20 +418,24 @@ watch(
           <PhCheckCircle :size="12" weight="fill" />
           {{ t('tavern.ready') }}
         </div>
-        <button
-          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
-          @click="openConfigFile"
-        >
-          <PhFolderOpen :size="16" />
-          {{ t('tavern.openConfigFile') }}
-        </button>
-        <button
-          class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-indigo-500 hover:text-indigo-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
-          @click="showMigrateDialog = true"
-        >
-          <PhArrowsDownUp :size="16" />
-          {{ t('tavern.migrate.button') }}
-        </button>
+        <AppTooltip :text="t('tavern.openConfigFile')">
+          <button
+            class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
+            @click="openConfigFile"
+          >
+            <PhFolderOpen :size="16" />
+            {{ t('tavern.openConfigFile') }}
+          </button>
+        </AppTooltip>
+        <AppTooltip :text="t('tavern.migrate.button')">
+          <button
+            class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:border-indigo-500 hover:text-indigo-500 transition-all text-xs font-bold active:scale-95 shadow-sm"
+            @click="showMigrateDialog = true"
+          >
+            <PhArrowsDownUp :size="16" />
+            {{ t('tavern.migrate.button') }}
+          </button>
+        </AppTooltip>
       </div>
     </header>
 
@@ -611,12 +616,14 @@ watch(
                         class="form-input flex-1"
                         :placeholder="t('tavern.ipPlaceholder')"
                       />
-                      <button
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                        @click="removeWhitelistIP(index)"
-                      >
-                        <PhX :size="16" weight="bold" />
-                      </button>
+                      <AppTooltip :text="t('common.remove')">
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeWhitelistIP(index)"
+                        >
+                          <PhX :size="16" weight="bold" />
+                        </button>
+                      </AppTooltip>
                     </div>
                     <button
                       class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -668,12 +675,14 @@ watch(
                         class="form-input flex-1"
                         :placeholder="t('tavern.hostPlaceholder')"
                       />
-                      <button
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                        @click="removeHost(index)"
-                      >
-                        <PhX :size="16" weight="bold" />
-                      </button>
+                      <AppTooltip :text="t('common.remove')">
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeHost(index)"
+                        >
+                          <PhX :size="16" weight="bold" />
+                        </button>
+                      </AppTooltip>
                     </div>
                     <button
                       class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -702,12 +711,14 @@ watch(
                       class="form-input flex-1"
                       :placeholder="t('tavern.domainPlaceholder')"
                     />
-                    <button
-                      class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                      @click="removeDomain(index)"
-                    >
-                      <PhX :size="16" weight="bold" />
-                    </button>
+                      <AppTooltip :text="t('common.remove')">
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeDomain(index)"
+                        >
+                          <PhX :size="16" weight="bold" />
+                        </button>
+                      </AppTooltip>
                   </div>
                   <button
                     class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -758,13 +769,15 @@ watch(
                       class="form-input flex-1"
                       :placeholder="t('tavern.sslCertPathPlaceholder')"
                     />
-                    <button
-                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
-                      @click="selectCertFile"
-                    >
-                      <PhFile :size="16" weight="bold" />
-                      {{ t('common.select') }}
-                    </button>
+                    <AppTooltip :text="t('tavern.selectCertFile')">
+                      <button
+                        class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
+                        @click="selectCertFile"
+                      >
+                        <PhFile :size="16" weight="bold" />
+                        {{ t('common.select') }}
+                      </button>
+                    </AppTooltip>
                   </div>
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.certificateFileDesc') }}</span>
                 </div>
@@ -777,13 +790,15 @@ watch(
                       class="form-input flex-1"
                       :placeholder="t('tavern.sslKeyPathPlaceholder')"
                     />
-                    <button
-                      class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
-                      @click="selectKeyFile"
-                    >
-                      <PhFile :size="16" weight="bold" />
-                      {{ t('common.select') }}
-                    </button>
+                    <AppTooltip :text="t('tavern.selectKeyFile')">
+                      <button
+                        class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 transition-all active:scale-95 flex items-center gap-2"
+                        @click="selectKeyFile"
+                      >
+                        <PhFile :size="16" weight="bold" />
+                        {{ t('common.select') }}
+                      </button>
+                    </AppTooltip>
                   </div>
                   <span class="text-[10px] text-slate-400 mt-1">{{ t('tavern.privateKeyFileDesc') }}</span>
                 </div>
@@ -842,12 +857,14 @@ watch(
                         class="form-input flex-1"
                         :placeholder="t('tavern.originPlaceholder')"
                       />
-                      <button
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                        @click="removeCorsOrigin(index)"
-                      >
-                        <PhX :size="16" weight="bold" />
-                      </button>
+                      <AppTooltip :text="t('common.remove')">
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeCorsOrigin(index)"
+                        >
+                          <PhX :size="16" weight="bold" />
+                        </button>
+                      </AppTooltip>
                     </div>
                     <button
                       class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -873,12 +890,14 @@ watch(
                           class="form-input flex-1"
                           placeholder="GET, POST, PUT, DELETE, OPTIONS"
                         />
+                      <AppTooltip :text="t('common.remove')">
                         <button
                           class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
                           @click="removeCorsMethod(index)"
                         >
                           <PhX :size="16" weight="bold" />
                         </button>
+                      </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -909,12 +928,14 @@ watch(
                           class="form-input flex-1"
                           :placeholder="t('tavern.headerPlaceholder')"
                         />
+                      <AppTooltip :text="t('common.remove')">
                         <button
                           class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
                           @click="removeCorsHeader(index)"
                         >
                           <PhX :size="16" weight="bold" />
                         </button>
+                      </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -939,12 +960,14 @@ watch(
                           class="form-input flex-1"
                           :placeholder="t('tavern.exposedHeaderPlaceholder')"
                         />
+                      <AppTooltip :text="t('common.remove')">
                         <button
                           class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
                           @click="removeCorsExposedHeader(index)"
                         >
                           <PhX :size="16" weight="bold" />
                         </button>
+                      </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -1018,12 +1041,14 @@ watch(
                         class="form-input flex-1"
                         :placeholder="t('tavern.bypassPlaceholder')"
                       />
-                      <button
-                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                        @click="removeBypass(index)"
-                      >
-                        <PhX :size="16" weight="bold" />
-                      </button>
+                      <AppTooltip :text="t('common.remove')">
+                        <button
+                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                          @click="removeBypass(index)"
+                        >
+                          <PhX :size="16" weight="bold" />
+                        </button>
+                      </AppTooltip>
                     </div>
                     <button
                       class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"

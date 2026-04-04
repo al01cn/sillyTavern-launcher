@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use sys_locale::get_locale;
-use tauri::{AppHandle, Manager, PhysicalPosition, Position, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, WebviewWindow, WindowEvent};
 
 use crate::types::{AppConfig, GithubProxyConfig, Lang};
 use crate::utils::get_config_path;
@@ -154,6 +154,42 @@ pub fn write_app_config_to_disk(app: &AppHandle, config: &AppConfig) -> Result<(
 // 窗口位置
 // ─────────────────────────────────────────────
 
+fn clamp_window_position(
+    window: &WebviewWindow,
+    target: PhysicalPosition<i32>,
+    saved_size: Option<PhysicalSize<u32>>,
+) -> PhysicalPosition<i32> {
+    let Ok(monitors) = window.available_monitors() else {
+        return target;
+    };
+
+    let mut clamped = target;
+    let size = saved_size.unwrap_or_else(|| window.outer_size().unwrap_or(PhysicalSize::new(1200, 800)));
+    let width = size.width as i32;
+    let height = size.height as i32;
+
+    for monitor in monitors {
+        let area = monitor.position();
+        let monitor_size = monitor.size();
+        let mx = area.x;
+        let my = area.y;
+        let mw = monitor_size.width as i32;
+        let mh = monitor_size.height as i32;
+
+        let max_x = mx + mw - width.max(0);
+        let max_y = my + mh - height.max(0);
+
+        if target.x >= mx && target.x <= max_x && target.y >= my && target.y <= max_y {
+            return target;
+        }
+
+        clamped.x = clamped.x.clamp(mx, max_x);
+        clamped.y = clamped.y.clamp(my, max_y);
+    }
+
+    clamped
+}
+
 pub fn apply_saved_window_position(app: &AppHandle) {
     let config = read_app_config_from_disk(app);
     let Some(window) = app.get_webview_window("main") else {
@@ -162,9 +198,19 @@ pub fn apply_saved_window_position(app: &AppHandle) {
 
     if config.remember_window_position {
         if let Some(position) = config.window_position {
-            let _ = window.set_position(Position::Physical(PhysicalPosition::new(
-                position.x, position.y,
-            )));
+            let saved_size = match (position.width, position.height) {
+                (Some(w), Some(h)) if w > 0 && h > 0 => Some(PhysicalSize::new(w as u32, h as u32)),
+                _ => None,
+            };
+            let clamped = clamp_window_position(
+                &window,
+                PhysicalPosition::new(position.x, position.y),
+                saved_size,
+            );
+            let _ = window.set_position(Position::Physical(clamped));
+            if let Some(size) = saved_size {
+                let _ = window.set_size(size);
+            }
             return;
         }
     }
@@ -186,9 +232,13 @@ pub fn setup_window_position_tracking(app: &AppHandle) {
                 return;
             }
             if let Ok(position) = window_clone.outer_position() {
+                let size = window_clone.outer_size().unwrap_or(PhysicalSize::new(1200, 800));
+                let clamped = clamp_window_position(&window_clone, position, Some(size));
                 config.window_position = Some(crate::types::WindowPosition {
-                    x: position.x,
-                    y: position.y,
+                    x: clamped.x,
+                    y: clamped.y,
+                    width: Some(size.width as i32),
+                    height: Some(size.height as i32),
                 });
                 let _ = write_app_config_to_disk(&app_handle, &config);
             }

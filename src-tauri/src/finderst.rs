@@ -309,8 +309,20 @@ pub async fn scan_local_sillytavern(app: AppHandle) -> Result<(), String> {
                                 }
                                 children.retain(|dir_entry_result| match dir_entry_result {
                                     Ok(e) => {
-                                        let name = e.file_name().to_string_lossy();
-                                        !should_skip_dir(&name)
+                                        let name_owned = e.file_name().to_string_lossy().to_string();
+                                        if should_skip_dir(&name_owned) {
+                                            return false;
+                                        }
+                                        #[cfg(target_os = "windows")]
+                                        {
+                                            if let Ok(md) = e.metadata() {
+                                                use std::os::windows::fs::MetadataExt;
+                                                if md.file_attributes() & 0x2 != 0 {
+                                                    return false;
+                                                }
+                                            }
+                                        }
+                                        true
                                     }
                                     Err(e) => {
                                         let err_msg = e.to_string().to_lowercase();

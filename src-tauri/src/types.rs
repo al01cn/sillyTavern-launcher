@@ -38,7 +38,10 @@ pub struct DownloadProgress {
 pub struct WindowPosition {
     pub x: i32,
     pub y: i32,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
 }
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
@@ -109,9 +112,15 @@ pub struct AppConfig {
 
 impl Default for WindowPosition {
     fn default() -> Self {
-        Self { x: 0, y: 0 }
+        Self {
+            x: 0,
+            y: 0,
+            width: None,
+            height: None,
+        }
     }
 }
+
 
 impl Default for GithubProxyConfig {
     fn default() -> Self {
