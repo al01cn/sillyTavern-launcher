@@ -1239,11 +1239,7 @@ pub async fn get_tavern_version(app: AppHandle) -> Result<crate::types::LocalTav
 // ─── ST 配置文件路径 ────────────────────────────────────────────────────────────
 
 fn get_st_config_path(app: &AppHandle, _version: &str) -> Result<PathBuf, String> {
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
-    let st_data = data_dir.join("st_data");
+    let st_data = crate::utils::get_st_data_dir(app);
 
     // 自动创建全局数据目录
     if !st_data.exists() {
@@ -1263,11 +1259,7 @@ fn get_st_config_path(app: &AppHandle, _version: &str) -> Result<PathBuf, String
 
 /// 获取全局配置文件路径（不需要版本号）
 fn get_st_global_config_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
-    let st_data = data_dir.join("st_data");
+    let st_data = crate::utils::get_st_data_dir(app);
 
     // 自动创建全局数据目录
     if !st_data.exists() {
@@ -2929,13 +2921,7 @@ pub async fn scan_migration_conflicts(
             .collect()
     };
 
-    let dest_root = {
-        let data_dir = get_config_path(&app)
-            .parent()
-            .unwrap_or(&PathBuf::from("."))
-            .to_path_buf();
-        data_dir.join("st_data")
-    };
+    let dest_root = crate::utils::get_st_data_dir(&app);
 
     let mut conflicts: Vec<ConflictFile> = Vec::new();
 
@@ -3026,13 +3012,7 @@ pub async fn execute_resource_migration(
             .collect()
     };
 
-    let dest_root = {
-        let data_dir = get_config_path(&app)
-            .parent()
-            .unwrap_or(&PathBuf::from("."))
-            .to_path_buf();
-        data_dir.join("st_data")
-    };
+    let dest_root = crate::utils::get_st_data_dir(&app);
 
     // 确保目标根目录存在
     if !dest_root.exists() {
@@ -3192,11 +3172,7 @@ fn json_merge(dest: &mut serde_json::Value, src: &serde_json::Value) {
 pub fn generate_default_settings_for_version(app: &AppHandle, version: &str) -> Result<(), String> {
     let lang = get_current_lang(app);
 
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
-    let st_data = data_dir.join("st_data");
+    let st_data = crate::utils::get_st_data_dir(app);
 
     if !st_data.exists() {
         std::fs::create_dir_all(&st_data).map_err(|e| match lang {
@@ -3360,10 +3336,15 @@ pub async fn start_sillytavern(
     } else {
         PathBuf::from(&version_item.path)
     };
-    let st_data = data_dir.join("st_data");
+
+    let st_data = if config.data_mode == "local" {
+        st_dir.join("data")
+    } else {
+        data_dir.join("st_data")
+    };
 
     if !st_data.exists() {
-        std::fs::create_dir_all(&st_data).map_err(|e| format!("无法创建全局数据目录：{}", e))?;
+        std::fs::create_dir_all(&st_data).map_err(|e| format!("无法创建数据目录：{}", e))?;
     }
 
     if !st_dir.exists() {
@@ -3676,11 +3657,12 @@ console.log('[GitHub Proxy] URL interceptor loaded, proxy:', PROXY_URL);
     }
 
     std_cmd.arg(&server_js);
-    std_cmd.arg("--dataRoot").arg(&st_data_str);
-
-    // 强制指定 configPath
-    std_cmd.arg("--configPath").arg(&global_cfg_str);
-    tracing::info!("SillyTavern will use config path: {}", global_cfg_str);
+    if config.data_mode == "global" {
+        std_cmd.arg("--dataRoot").arg(&st_data_str);
+        // 强制指定 configPath
+        std_cmd.arg("--configPath").arg(&global_cfg_str);
+        tracing::info!("SillyTavern will use config path: {}", global_cfg_str);
+    }
 
     // 桌面程序模式：禁止酒馆自动打开浏览器，由 Launcher 创建子窗口来展示
     if launch_mode == "desktop" {
@@ -4260,19 +4242,22 @@ pub async fn get_local_ip_addresses() -> Result<serde_json::Value, String> {
     }
 
     // ─── get_if_addrs 枚举所有网卡 ───────────────────────────────────────────────
-    let mut ifaddr_map: std::collections::HashMap<String, LanInterface> = std::collections::HashMap::new();
+    let mut ifaddr_map: std::collections::HashMap<String, LanInterface> =
+        std::collections::HashMap::new();
     if let Ok(all_ifaces) = get_if_addrs::get_if_addrs() {
         for iface in all_ifaces {
             let name = iface.name.clone();
-            let entry = ifaddr_map.entry(name.clone()).or_insert_with(|| LanInterface {
-                name: name.clone(),
-                desc: None,
-                iface_type: None,
-                is_up: true,
-                is_virtual_guess: false,
-                ipv4_addrs: Vec::new(),
-                ipv6_addrs: Vec::new(),
-            });
+            let entry = ifaddr_map
+                .entry(name.clone())
+                .or_insert_with(|| LanInterface {
+                    name: name.clone(),
+                    desc: None,
+                    iface_type: None,
+                    is_up: true,
+                    is_virtual_guess: false,
+                    ipv4_addrs: Vec::new(),
+                    ipv6_addrs: Vec::new(),
+                });
             let ip = iface.addr.ip();
             match ip {
                 IpAddr::V4(v4) => {
@@ -4416,7 +4401,11 @@ pub async fn get_local_ip_addresses() -> Result<serde_json::Value, String> {
     for (idx, iface) in interfaces.iter().enumerate() {
         let name_lower = iface.name.to_lowercase();
         let is_blacklisted_name = name_lower.contains("虚拟") || name_lower.contains("virtual");
-        if !iface.ipv4_addrs.is_empty() && !iface.is_virtual_guess && iface.is_up && !is_blacklisted_name {
+        if !iface.ipv4_addrs.is_empty()
+            && !iface.is_virtual_guess
+            && iface.is_up
+            && !is_blacklisted_name
+        {
             preferred_index = Some(idx);
             break;
         }
@@ -4425,7 +4414,11 @@ pub async fn get_local_ip_addresses() -> Result<serde_json::Value, String> {
         for (idx, iface) in interfaces.iter().enumerate() {
             let name_lower = iface.name.to_lowercase();
             let is_blacklisted_name = name_lower.contains("虚拟") || name_lower.contains("virtual");
-            if !iface.ipv6_addrs.is_empty() && !iface.is_virtual_guess && iface.is_up && !is_blacklisted_name {
+            if !iface.ipv6_addrs.is_empty()
+                && !iface.is_virtual_guess
+                && iface.is_up
+                && !is_blacklisted_name
+            {
                 preferred_index = Some(idx);
                 break;
             }

@@ -32,7 +32,8 @@ struct OwnedArcs {
     git_child_pid: Arc<Mutex<Option<u32>>>,
 }
 
-fn resolve_app_working_dir() -> PathBuf {
+#[allow(unused_variables)]
+fn resolve_app_working_dir(app: &tauri::AppHandle) -> PathBuf {
     let exe_path = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
@@ -45,13 +46,8 @@ fn resolve_app_working_dir() -> PathBuf {
     {
         let exe_str = exe_path.to_string_lossy();
         if exe_str.contains(".app/Contents/MacOS/") {
-            if let Some(bundle_dir) = exe_path
-                .parent() // -> MacOS/
-                .and_then(|p| p.parent()) // -> Contents/
-                .and_then(|p| p.parent()) // -> AppName.app/
-                .and_then(|p| p.parent())
-            {
-                return bundle_dir.to_path_buf();
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                return app_data_dir;
             }
         }
     }
@@ -66,9 +62,9 @@ fn resolve_app_working_dir() -> PathBuf {
             .components()
             .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
             .collect();
-        components.windows(2).any(|pair| {
-            pair[0] == "target" && (pair[1] == "debug" || pair[1] == "release")
-        })
+        components
+            .windows(2)
+            .any(|pair| pair[0] == "target" && (pair[1] == "debug" || pair[1] == "release"))
     };
 
     if cfg!(debug_assertions) || looks_like_target_build {
@@ -87,7 +83,6 @@ fn resolve_app_working_dir() -> PathBuf {
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -118,11 +113,19 @@ pub fn run() {
                 git_child_pid: git_child_pid_arc,
             });
 
-            let path = resolve_app_working_dir();
+            let handle = app.handle().clone();
+            let path = resolve_app_working_dir(&handle);
+
+            // 如果目录不存在，先创建
+            if !path.exists() {
+                if let Err(e) = std::fs::create_dir_all(&path) {
+                    eprintln!("创建应用数据目录失败: {e}");
+                }
+            }
+
             if let Err(e) = std::env::set_current_dir(&path) {
                 eprintln!("设置工作目录失败: {e}");
             }
-
 
             if let Err(e) = ensure_standard_layout(&path) {
                 #[cfg(target_os = "windows")]

@@ -82,6 +82,7 @@ interface AppConfig {
   useSystemNode: boolean
   useSystemGit: boolean
   launchMode: 'normal' | 'desktop' | 'lan' | 'public' | 'debug'
+  dataMode: 'global' | 'local'
   networkProxy: {
     mode: 'none' | 'system' | 'custom'
     host: string
@@ -148,6 +149,7 @@ const config = ref<AppConfig>({
   useSystemNode: true,
   useSystemGit: true,
   launchMode: 'normal',
+  dataMode: 'global',
   networkProxy: {
     mode: 'none',
     host: '127.0.0.1',
@@ -1206,6 +1208,34 @@ const testDirectConnection = async () => {
                 t('settings.launchModeDebugDesc')
               }}</span>
             </div>
+
+            <div class="w-full h-px bg-slate-100 dark:bg-slate-700"></div>
+
+            <!-- Data Mode -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500"
+                >
+                  <PhPackage :size="18" weight="duotone" />
+                </div>
+                <div>
+                  <div class="font-medium text-slate-700 dark:text-slate-300">
+                    {{ t('settings.dataMode') }}
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('settings.dataModeDesc') }}
+                  </div>
+                </div>
+              </div>
+              <select
+                v-model="config.dataMode"
+                class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 min-w-[140px] outline-none transition-all"
+              >
+                <option value="global">{{ t('settings.dataModeGlobal') }}</option>
+                <option value="local">{{ t('settings.dataModeLocal') }}</option>
+              </select>
+            </div>
           </div>
         </section>
 
@@ -1282,7 +1312,7 @@ const testDirectConnection = async () => {
                 <div
                   class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500"
                 >
-                  <PhPalette :size="18" weight="duotone" />
+                  <PhBrowserWindow :size="18" weight="duotone" />
                 </div>
                 <div>
                   <div class="font-medium text-slate-700 dark:text-slate-300">

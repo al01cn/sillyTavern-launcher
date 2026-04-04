@@ -309,7 +309,8 @@ pub async fn scan_local_sillytavern(app: AppHandle) -> Result<(), String> {
                                 }
                                 children.retain(|dir_entry_result| match dir_entry_result {
                                     Ok(e) => {
-                                        let name_owned = e.file_name().to_string_lossy().to_string();
+                                        let name_owned =
+                                            e.file_name().to_string_lossy().to_string();
                                         if should_skip_dir(&name_owned) {
                                             return false;
                                         }

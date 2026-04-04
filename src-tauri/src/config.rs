@@ -2,7 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use sys_locale::get_locale;
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, WebviewWindow, WindowEvent};
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, WebviewWindow, WindowEvent,
+};
 
 use crate::types::{AppConfig, GithubProxyConfig, Lang};
 use crate::utils::get_config_path;
@@ -164,7 +166,8 @@ fn clamp_window_position(
     };
 
     let mut clamped = target;
-    let size = saved_size.unwrap_or_else(|| window.outer_size().unwrap_or(PhysicalSize::new(1200, 800)));
+    let size =
+        saved_size.unwrap_or_else(|| window.outer_size().unwrap_or(PhysicalSize::new(1200, 800)));
     let width = size.width as i32;
     let height = size.height as i32;
 
@@ -232,7 +235,9 @@ pub fn setup_window_position_tracking(app: &AppHandle) {
                 return;
             }
             if let Ok(position) = window_clone.outer_position() {
-                let size = window_clone.outer_size().unwrap_or(PhysicalSize::new(1200, 800));
+                let size = window_clone
+                    .outer_size()
+                    .unwrap_or(PhysicalSize::new(1200, 800));
                 let clamped = clamp_window_position(&window_clone, position, Some(size));
                 config.window_position = Some(crate::types::WindowPosition {
                     x: clamped.x,
@@ -304,7 +309,25 @@ pub fn open_directory(
                 data_dir.join("sillytavern")
             }
         }
-        "data" => data_dir.join("st_data"),
+        "data" => {
+            let cfg = read_app_config_from_disk(&app);
+            if cfg.data_mode == "local" {
+                if !cfg.sillytavern.version.version.is_empty() {
+                    let st_dir = if !cfg.sillytavern.version.path.is_empty() {
+                        PathBuf::from(&cfg.sillytavern.version.path)
+                    } else {
+                        data_dir
+                            .join("sillytavern")
+                            .join(&cfg.sillytavern.version.version)
+                    };
+                    st_dir.join("data")
+                } else {
+                    data_dir.join("st_data")
+                }
+            } else {
+                data_dir.join("st_data")
+            }
+        }
         "node" => {
             if let Some(path) = custom_path {
                 let path_buf = PathBuf::from(path);

@@ -42,7 +42,6 @@ pub struct WindowPosition {
     pub height: Option<i32>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
 pub struct GithubProxyConfig {
@@ -108,6 +107,13 @@ pub struct AppConfig {
     pub launch_mode: String,
     /// 启动器网络代理配置
     pub network_proxy: NetworkProxyConfig,
+    /// 酒馆数据模式：global / local
+    #[serde(default = "default_data_mode")]
+    pub data_mode: String,
+}
+
+fn default_data_mode() -> String {
+    "global".to_string()
 }
 
 impl Default for WindowPosition {
@@ -120,7 +126,6 @@ impl Default for WindowPosition {
         }
     }
 }
-
 
 impl Default for GithubProxyConfig {
     fn default() -> Self {
@@ -171,6 +176,7 @@ impl Default for AppConfig {
             use_system_git: true,
             launch_mode: "normal".to_string(),
             network_proxy: NetworkProxyConfig::default(),
+            data_mode: "global".to_string(),
         }
     }
 }

@@ -119,12 +119,14 @@ onUnmounted(() => {
         <div class="flex items-center w-40 justify-end h-full gap-1">
           <button
             class="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            @click="minimize()">
+            @click="minimize()"
+          >
             <PhMinus class="w-4 h-4" />
           </button>
           <button
             :class="`h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-red-500 hover:text-white transition-colors`"
-            @click="requestClose()">
+            @click="requestClose()"
+          >
             <PhX class="w-4 h-4" />
           </button>
         </div>
@@ -135,36 +137,55 @@ onUnmounted(() => {
     <div class="flex flex-1 overflow-hidden relative">
       <!-- Sidebar -->
       <aside
-        class="w-24 shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900 flex flex-col justify-between py-4 z-50">
+        class="w-24 shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900 flex flex-col justify-between py-4 z-50"
+      >
         <!-- Top Menu -->
         <div class="flex flex-col gap-2 px-3">
-          <router-link to="/" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhPlay :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.quickStart') }}</span>
           </router-link>
-          <router-link to="/tavern" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/tavern"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhList :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.tavernOptions') }}</span>
           </router-link>
-          <router-link to="/versions" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/versions"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhClock :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.versionManagement') }}</span>
           </router-link>
-          <router-link to="/extensions" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/extensions"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhPlug :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.extensionManagement') }}</span>
           </router-link>
-          <router-link to="/resources" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/resources"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhFolderOpen :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.resourceManagement') }}</span>
           </router-link>
-          <router-link to="/tools" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/tools"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhWrench :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.smallTools') }}</span>
           </router-link>
@@ -172,20 +193,28 @@ onUnmounted(() => {
 
         <!-- Bottom Menu -->
         <div class="flex flex-col gap-2 px-3">
-          <router-link to="/console" :active-class="consoleStatus === 2
-              ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-              : 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-            " :class="[
+          <router-link
+            to="/console"
+            :active-class="
+              consoleStatus === 2
+                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+            "
+            :class="[
               'flex flex-col items-center justify-center w-full aspect-square rounded-xl transition-colors group',
               consoleStatus === 2
                 ? 'text-emerald-500 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-300'
                 : 'text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-300',
-            ]">
+            ]"
+          >
             <PhTerminalWindow :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.console') }}</span>
           </router-link>
-          <router-link to="/settings" active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group">
+          <router-link
+            to="/settings"
+            active-class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+            class="flex flex-col items-center justify-center w-full aspect-square rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 group"
+          >
             <PhGear :size="24" weight="duotone" class="mb-1.5 group-hover:scale-110 transition-transform" />
             <span class="text-[11px] font-medium text-center leading-tight">{{ t('nav.settings') }}</span>
           </router-link>

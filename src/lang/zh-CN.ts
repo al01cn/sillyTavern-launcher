@@ -847,6 +847,10 @@ export default {
     scanCpuCores: '扫描占用核心数',
     scanCpuCoresDesc: '分配用于全盘扫描的 CPU 线程数',
     scanCpuCoresAuto: '自动（预留一半防卡死）',
+    dataMode: '酒馆数据模式',
+    dataModeDesc: '选择使用全局数据目录还是当前酒馆目录下的数据',
+    dataModeGlobal: '全局 (st_data)',
+    dataModeLocal: '当前 (酒馆位置/data)',
     launchMode: '酒馆启动模式',
     launchModeDesc: '设置酒馆的启动方式',
     launchModeNormal: '正常模式',
@@ -1030,10 +1034,5 @@ export default {
     interfaceDisplayPrefix: '网卡',
     selectedInterface: '当前网卡',
     interfaceCount: '共 {count} 个接口',
-
   },
 }
-
-
-
-

@@ -4,24 +4,20 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 
 use crate::types::WorldInfoFile;
-use crate::utils::get_config_path;
 
 // ─────────────────────────────────────────────
 // 内部辅助：世界书目录
 // ─────────────────────────────────────────────
 
-fn get_worlds_dir(app: &AppHandle) -> PathBuf {
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
+fn get_world_infos_dir(app: &AppHandle) -> PathBuf {
+    let data_dir = crate::utils::get_st_data_dir(app);
 
-    let primary = data_dir.join("st_data").join("worlds");
+    let primary = data_dir.join("worlds");
     if primary.exists() {
         return primary;
     }
 
-    let fallback = data_dir.join("st_data").join("default-user").join("worlds");
+    let fallback = data_dir.join("default-user").join("worlds");
     if fallback.exists() {
         return fallback;
     }
@@ -37,7 +33,7 @@ fn get_worlds_dir(app: &AppHandle) -> PathBuf {
 pub async fn list_world_infos(app: AppHandle) -> Result<Vec<WorldInfoFile>, String> {
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
-        let dir = get_worlds_dir(&app_clone);
+        let dir = get_world_infos_dir(&app_clone);
         if !dir.exists() {
             return Ok(Vec::new());
         }
@@ -108,7 +104,7 @@ pub async fn read_world_info(app: AppHandle, file_name: String) -> Result<String
 
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
-        let dir = get_worlds_dir(&app_clone);
+        let dir = get_world_infos_dir(&app_clone);
         let file_path = dir.join(&file_name);
         if !file_path.exists() {
             return Err("文件不存在".to_string());
@@ -127,7 +123,7 @@ pub async fn delete_world_infos(app: AppHandle, file_names: Vec<String>) -> Resu
 
     let app_clone = app.clone();
     tokio::task::spawn_blocking(move || {
-        let dir = get_worlds_dir(&app_clone);
+        let dir = get_world_infos_dir(&app_clone);
         let mut errors = Vec::new();
 
         for file_name in file_names {
@@ -186,7 +182,7 @@ pub async fn import_world_info(app: AppHandle, source_path: String) -> Result<()
             .to_string_lossy()
             .to_string();
 
-        let dir = get_worlds_dir(&app_clone);
+        let dir = get_world_infos_dir(&app_clone);
         if !dir.exists() {
             fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         }
@@ -225,8 +221,8 @@ pub async fn import_world_info_from_bytes(
 
     // 2. 放入 blocking 线程池执行写入
     tokio::task::spawn_blocking(move || {
-        // 修正了这里的函数调用，改为 get_worlds_dir
-        let dir = get_worlds_dir(&app_clone);
+        // 修正了这里的函数调用，改为 get_world_infos_dir
+        let dir = get_world_infos_dir(&app_clone);
         if !dir.exists() {
             std::fs::create_dir_all(&dir).map_err(|e| format!("创建目录失败: {}", e))?;
         }

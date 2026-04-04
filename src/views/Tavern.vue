@@ -711,14 +711,14 @@ watch(
                       class="form-input flex-1"
                       :placeholder="t('tavern.domainPlaceholder')"
                     />
-                      <AppTooltip :text="t('common.remove')">
-                        <button
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                          @click="removeDomain(index)"
-                        >
-                          <PhX :size="16" weight="bold" />
-                        </button>
-                      </AppTooltip>
+                    <AppTooltip :text="t('common.remove')">
+                      <button
+                        class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                        @click="removeDomain(index)"
+                      >
+                        <PhX :size="16" weight="bold" />
+                      </button>
+                    </AppTooltip>
                   </div>
                   <button
                     class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -890,14 +890,14 @@ watch(
                           class="form-input flex-1"
                           placeholder="GET, POST, PUT, DELETE, OPTIONS"
                         />
-                      <AppTooltip :text="t('common.remove')">
-                        <button
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                          @click="removeCorsMethod(index)"
-                        >
-                          <PhX :size="16" weight="bold" />
-                        </button>
-                      </AppTooltip>
+                        <AppTooltip :text="t('common.remove')">
+                          <button
+                            class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                            @click="removeCorsMethod(index)"
+                          >
+                            <PhX :size="16" weight="bold" />
+                          </button>
+                        </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -928,14 +928,14 @@ watch(
                           class="form-input flex-1"
                           :placeholder="t('tavern.headerPlaceholder')"
                         />
-                      <AppTooltip :text="t('common.remove')">
-                        <button
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                          @click="removeCorsHeader(index)"
-                        >
-                          <PhX :size="16" weight="bold" />
-                        </button>
-                      </AppTooltip>
+                        <AppTooltip :text="t('common.remove')">
+                          <button
+                            class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                            @click="removeCorsHeader(index)"
+                          >
+                            <PhX :size="16" weight="bold" />
+                          </button>
+                        </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"
@@ -960,14 +960,14 @@ watch(
                           class="form-input flex-1"
                           :placeholder="t('tavern.exposedHeaderPlaceholder')"
                         />
-                      <AppTooltip :text="t('common.remove')">
-                        <button
-                          class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
-                          @click="removeCorsExposedHeader(index)"
-                        >
-                          <PhX :size="16" weight="bold" />
-                        </button>
-                      </AppTooltip>
+                        <AppTooltip :text="t('common.remove')">
+                          <button
+                            class="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95"
+                            @click="removeCorsExposedHeader(index)"
+                          >
+                            <PhX :size="16" weight="bold" />
+                          </button>
+                        </AppTooltip>
                       </div>
                       <button
                         class="w-full py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2"

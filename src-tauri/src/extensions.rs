@@ -121,8 +121,7 @@ pub async fn install_extension_zip(
         let dir = st_dir.join("public").join("scripts").join("extensions");
         (dir, false)
     } else if scope == "user" {
-        let dir = data_dir
-            .join("st_data")
+        let dir = crate::utils::get_st_data_dir(&app)
             .join("default-user")
             .join("extensions")
             .join("third-party");
@@ -569,8 +568,7 @@ pub fn open_extension_folder(
 
         st_dir.join("public").join("scripts").join("extensions")
     } else {
-        data_dir
-            .join("st_data")
+        crate::utils::get_st_data_dir(&app)
             .join("default-user")
             .join("extensions")
     };

@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 
 use crate::types::{ChatFile, ChatGroup, ChatMessage};
-use crate::utils::get_config_path;
 
 // ─────────────────────────────────────────────
 // 内部辅助：对话历史根目录
@@ -12,12 +11,8 @@ use crate::utils::get_config_path;
 // ─────────────────────────────────────────────
 
 fn get_chats_dir(app: &AppHandle) -> PathBuf {
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
-
-    data_dir.join("st_data").join("default-user").join("chats")
+    let data_dir = crate::utils::get_st_data_dir(app);
+    data_dir.join("default-user").join("chats")
 }
 
 // ─────────────────────────────────────────────

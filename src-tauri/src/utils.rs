@@ -232,3 +232,25 @@ pub fn get_config_path(_app: &tauri::AppHandle) -> PathBuf {
 
     path.join("data/config.json")
 }
+
+pub fn get_st_data_dir(app: &tauri::AppHandle) -> PathBuf {
+    let data_dir = get_config_path(app)
+        .parent()
+        .unwrap_or(&PathBuf::from("."))
+        .to_path_buf();
+
+    let config = crate::config::read_app_config_from_disk(app);
+    if config.data_mode == "local" {
+        let version_item = config.sillytavern.version;
+        if !version_item.version.is_empty() {
+            let st_dir = if !version_item.path.is_empty() {
+                PathBuf::from(&version_item.path)
+            } else {
+                data_dir.join("sillytavern").join(&version_item.version)
+            };
+            return st_dir.join("data");
+        }
+    }
+
+    data_dir.join("st_data")
+}

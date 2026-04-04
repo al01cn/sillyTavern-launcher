@@ -4,27 +4,20 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 
 use crate::types::CharacterCardFile;
-use crate::utils::get_config_path;
 
 // ─────────────────────────────────────────────
 // 内部辅助：角色卡目录
 // ─────────────────────────────────────────────
 
 fn get_character_cards_dir(app: &AppHandle) -> PathBuf {
-    let data_dir = get_config_path(app)
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .to_path_buf();
+    let data_dir = crate::utils::get_st_data_dir(app);
 
-    let primary = data_dir.join("st_data").join("characters");
+    let primary = data_dir.join("characters");
     if primary.exists() {
         return primary;
     }
 
-    let fallback = data_dir
-        .join("st_data")
-        .join("default-user")
-        .join("characters");
+    let fallback = data_dir.join("default-user").join("characters");
     if fallback.exists() {
         return fallback;
     }

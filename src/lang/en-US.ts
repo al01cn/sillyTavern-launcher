@@ -766,6 +766,10 @@ export default {
     scanCpuCores: 'Scan CPU Cores',
     scanCpuCoresDesc: 'Number of CPU threads allocated for full disk scan',
     scanCpuCoresAuto: 'Auto (Reserve half to prevent freezing)',
+    dataMode: 'Tavern Data Mode',
+    dataModeDesc: 'Choose whether to use global data or local data in the tavern directory',
+    dataModeGlobal: 'Global (st_data)',
+    dataModeLocal: 'Local (TavernDir/data)',
     launchMode: 'Tavern Launch Mode',
     launchModeDesc: 'Choose how SillyTavern is started',
     launchModeNormal: 'Normal',
@@ -954,10 +958,5 @@ export default {
     interfaceDisplayPrefix: 'Adapter',
     selectedInterface: 'Selected interface',
     interfaceCount: '{count} interfaces detected',
-
   },
 }
-
-
-
-
