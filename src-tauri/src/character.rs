@@ -11,18 +11,7 @@ use crate::types::CharacterCardFile;
 
 fn get_character_cards_dir(app: &AppHandle) -> PathBuf {
     let data_dir = crate::utils::get_st_data_dir(app);
-
-    let primary = data_dir.join("characters");
-    if primary.exists() {
-        return primary;
-    }
-
-    let fallback = data_dir.join("default-user").join("characters");
-    if fallback.exists() {
-        return fallback;
-    }
-
-    primary
+    data_dir.join("default-user").join("characters")
 }
 
 // ─────────────────────────────────────────────
@@ -35,7 +24,7 @@ pub async fn list_character_card_pngs(app: AppHandle) -> Result<Vec<CharacterCar
     tokio::task::spawn_blocking(move || {
         let dir = get_character_cards_dir(&app_clone);
         if !dir.exists() {
-            return Ok(Vec::new());
+            return Err("DIR_NOT_FOUND".to_string());
         }
 
         let mut result = Vec::new();

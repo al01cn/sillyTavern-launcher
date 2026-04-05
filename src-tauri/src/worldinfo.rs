@@ -11,18 +11,7 @@ use crate::types::WorldInfoFile;
 
 fn get_world_infos_dir(app: &AppHandle) -> PathBuf {
     let data_dir = crate::utils::get_st_data_dir(app);
-
-    let primary = data_dir.join("worlds");
-    if primary.exists() {
-        return primary;
-    }
-
-    let fallback = data_dir.join("default-user").join("worlds");
-    if fallback.exists() {
-        return fallback;
-    }
-
-    fallback
+    data_dir.join("default-user").join("worlds")
 }
 
 // ─────────────────────────────────────────────
@@ -35,7 +24,7 @@ pub async fn list_world_infos(app: AppHandle) -> Result<Vec<WorldInfoFile>, Stri
     tokio::task::spawn_blocking(move || {
         let dir = get_world_infos_dir(&app_clone);
         if !dir.exists() {
-            return Ok(Vec::new());
+            return Err("DIR_NOT_FOUND".to_string());
         }
 
         let mut result = Vec::new();

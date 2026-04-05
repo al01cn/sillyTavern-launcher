@@ -1,6 +1,7 @@
 import { check } from '@tauri-apps/plugin-updater'
 import { ask, message } from '@tauri-apps/plugin-dialog'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { invoke } from '@tauri-apps/api/core'
 
 const IGNORE_UPDATE_KEY = 'app_ignore_update_version'
 
@@ -49,6 +50,13 @@ export async function checkUpdate(manual = false) {
         })
 
         await message('更新完成，应用即将重启', { title: '成功', kind: 'info' })
+        try {
+          await invoke('stop_sillytavern')
+          // 等待2秒以确保系统完全释放被占用的端口
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } catch (e) {
+          console.error('Failed to stop tavern process before restart:', e)
+        }
         await relaunch()
       } else {
         if (!manual) {

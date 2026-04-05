@@ -224,7 +224,16 @@ pub fn ensure_standard_layout(base_dir: &Path) -> io::Result<()> {
 // ─────────────────────────────────────────────
 
 pub fn get_config_path(_app: &tauri::AppHandle) -> PathBuf {
+    #[cfg(debug_assertions)]
     let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    #[cfg(not(debug_assertions))]
+    let mut path = std::env::current_exe().unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    #[cfg(not(debug_assertions))]
+    if path.is_file() {
+        path.pop();
+    }
 
     if path.ends_with("src-tauri") {
         path.pop();

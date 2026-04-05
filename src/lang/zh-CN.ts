@@ -645,6 +645,7 @@ export default {
     totalInfos: '共 {count} 个',
     noCharacterCards: '未找到角色卡',
     noCharacterCardsHint: '请确认目录下存在 .png 角色卡文件',
+    dirNotFoundHint: '目录不存在。请启动一次酒馆 或 进行资源迁移',
     noWorldInfos: '未找到世界书',
     noWorldInfosHint: '请确认目录下存在 .json 世界书文件',
     confirmDelete: '确认删除',

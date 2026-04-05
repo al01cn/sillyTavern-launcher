@@ -10,9 +10,9 @@
     !endif
 
     !ifdef LANG_SIMPCHINESE
-        MessageBox MB_YESNO|MB_ICONQUESTION "${DeleteDataQuestion_CN}" IDYES pre_yes IDNO pre_no
+        MessageBox MB_YESNO|MB_ICONQUESTION "${DeleteDataQuestion_CN}" /SD IDNO IDYES pre_yes IDNO pre_no
     !else
-        MessageBox MB_YESNO|MB_ICONQUESTION "${DeleteDataQuestion_EN}" IDYES pre_yes IDNO pre_no
+        MessageBox MB_YESNO|MB_ICONQUESTION "${DeleteDataQuestion_EN}" /SD IDNO IDYES pre_yes IDNO pre_no
     !endif
 
     pre_yes:
@@ -34,7 +34,15 @@
 
     post_delete:
         DetailPrint "正在删除用户数据..."
-        RMDir /r "$INSTDIR\data"
+        ; Remove junctions before recursive delete to prevent wiping linked standalone instances
+        RMDir "$INSTDIR\data\sillytavern\*"
+        RMDir /r "$INSTDIR\data\st_data"
+        RMDir /r "$INSTDIR\data\node"
+        RMDir /r "$INSTDIR\data\git"
+        RMDir /r "$INSTDIR\data\logs"
+        RMDir /r "$INSTDIR\data\sillytavern"
+        Delete "$INSTDIR\data\config.json"
+        RMDir "$INSTDIR\data"
         DetailPrint "用户数据已删除"
         Goto post_done
 

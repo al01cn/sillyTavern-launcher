@@ -402,7 +402,12 @@ const loadCharacterCards = async () => {
     currentPage.value = 1
     void loadThumbnailsWithLimit(list.map(i => i.fileName))
   } catch (e: any) {
-    errorMsg.value = e?.message ? String(e.message) : String(e)
+    const msg = e?.message ? String(e.message) : String(e)
+    if (msg === 'DIR_NOT_FOUND') {
+      errorMsg.value = t('resources.dirNotFoundHint')
+    } else {
+      errorMsg.value = msg
+    }
     characterCards.value = []
   } finally {
     loading.value = false
@@ -418,7 +423,12 @@ const loadWorldInfos = async () => {
     worldInfos.value = list
     currentPage.value = 1
   } catch (e: any) {
-    errorMsg.value = e?.message ? String(e.message) : String(e)
+    const msg = e?.message ? String(e.message) : String(e)
+    if (msg === 'DIR_NOT_FOUND') {
+      errorMsg.value = t('resources.dirNotFoundHint')
+    } else {
+      errorMsg.value = msg
+    }
     worldInfos.value = []
   } finally {
     loading.value = false
