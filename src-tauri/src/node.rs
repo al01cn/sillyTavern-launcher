@@ -960,7 +960,8 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         _ => return Err(format!("Unsupported Arch: {}", arch)),
     };
 
-    let filename = format!("node-v22.12.0-{}-{}.zip", node_os, node_arch);
+    let ext = if cfg!(target_os = "windows") { "zip" } else { "tar.gz" };
+    let filename = format!("node-v22.12.0-{}-{}.{}", node_os, node_arch, ext);
 
     // 五阶回退下载策略：npmmirror → 阿里云 → 清华镜像 → 华为镜像 → 直连
     let npmmirror_url = format!("https://npmmirror.com/mirrors/node/v22.12.0/{}", filename);
@@ -1269,48 +1270,113 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
         std::fs::create_dir_all(&node_dir_clone).map_err(|e| e.to_string())?;
 
         let file = std::fs::File::open(&temp_zip_path_clone).map_err(|e| e.to_string())?;
-        let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
-        let total_files = archive.len();
+        
+        if temp_zip_path_clone.to_string_lossy().ends_with(".zip") {
+            let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+            let total_files = archive.len();
 
-        for i in 0..total_files {
-            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-            let outpath = match file.enclosed_name() {
-                Some(path) => path.to_owned(),
-                None => continue,
-            };
+            for i in 0..total_files {
+                let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+                let outpath = match file.enclosed_name() {
+                    Some(path) => path.to_owned(),
+                    None => continue,
+                };
 
-            let mut components = outpath.components();
-            components.next();
-            let stripped_path: PathBuf = components.collect();
+                let mut components = outpath.components();
+                components.next();
+                let stripped_path: PathBuf = components.collect();
 
-            if stripped_path.as_os_str().is_empty() {
-                continue;
-            }
+                if stripped_path.as_os_str().is_empty() {
+                    continue;
+                }
 
-            let target_path = node_dir_clone.join(&stripped_path);
+                let target_path = node_dir_clone.join(&stripped_path);
 
-            if (*file.name()).ends_with('/') {
-                std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-            } else {
-                if let Some(p) = target_path.parent() {
-                    if !p.exists() {
-                        std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                if (*file.name()).ends_with('/') {
+                    std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+                } else {
+                    if let Some(p) = target_path.parent() {
+                        if !p.exists() {
+                            std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                        }
+                    }
+                    let mut outfile = std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
+                    std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+                }
+
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Some(mode) = file.unix_mode() {
+                        let _ = std::fs::set_permissions(&target_path, std::fs::Permissions::from_mode(mode));
                     }
                 }
-                let mut outfile = std::fs::File::create(&target_path).map_err(|e| e.to_string())?;
-                std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-            }
 
-            if i % 50 == 0 || i == total_files - 1 {
-                let progress = (i as f64) / (total_files as f64);
-                emit_progress(
-                    "extracting",
-                    progress,
-                    &match lang_clone {
-                        Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
-                        Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
-                    },
-                );
+                if i % 50 == 0 || i == total_files - 1 {
+                    let progress = (i as f64) / (total_files as f64);
+                    emit_progress(
+                        "extracting",
+                        progress,
+                        &match lang_clone {
+                            Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
+                            Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
+                        },
+                    );
+                }
+            }
+        } else {
+            // 处理 tar.gz
+            let tar = flate2::read::GzDecoder::new(file);
+            let mut archive = tar::Archive::new(tar);
+            archive.set_preserve_permissions(true);
+            
+            let entries = archive.entries().map_err(|e| e.to_string())?;
+            let mut entries_vec = Vec::new();
+            for entry in entries {
+                if let Ok(e) = entry {
+                    entries_vec.push(e);
+                }
+            }
+            let total_files = entries_vec.len();
+            
+            for (i, mut entry) in entries_vec.into_iter().enumerate() {
+                let path = match entry.path() {
+                    Ok(p) => p.into_owned(),
+                    Err(_) => continue,
+                };
+                
+                let mut components = path.components();
+                components.next(); // Skip the root folder
+                let stripped_path: PathBuf = components.collect();
+                
+                if stripped_path.as_os_str().is_empty() {
+                    continue;
+                }
+                
+                let target_path = node_dir_clone.join(&stripped_path);
+                
+                if entry.header().entry_type() == tar::EntryType::Directory {
+                    std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
+                } else {
+                    if let Some(p) = target_path.parent() {
+                        if !p.exists() {
+                            std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                        }
+                    }
+                    entry.unpack(&target_path).map_err(|e| e.to_string())?;
+                }
+                
+                if i % 50 == 0 || i == total_files - 1 {
+                    let progress = (i as f64) / (total_files as f64);
+                    emit_progress(
+                        "extracting",
+                        progress,
+                        &match lang_clone {
+                            Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
+                            Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
+                        },
+                    );
+                }
             }
         }
         Ok(())

@@ -4937,11 +4937,12 @@ dependencies = [
 
 [[package]]
 name = "sillytavern-launcher-gui"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "catch-unwind",
  "chrono",
  "dirs",
+ "flate2",
  "futures-util",
  "get_if_addrs",
  "headless_chrome",
@@ -4958,6 +4959,7 @@ dependencies = [
  "sevenz-rust",
  "sys-locale",
  "sysinfo",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",
