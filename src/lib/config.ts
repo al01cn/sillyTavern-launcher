@@ -39,11 +39,6 @@ export default {
     ],
     公益API: [
       {
-        icon: 'https://q1.qlogo.cn/g?b=qq&nk=790132463&s=100',
-        name: '炫酷 API',
-        url: 'https://new1.588686.xyz/register?aff=p4f6',
-      },
-      {
         icon: 'https://zipline.chat-linmou.online/u/a3nEt5.jpg',
         name: 'GuDuFree',
         url: 'https://gudufree.yeelam.site/register?aff=YVo4',
