@@ -1325,36 +1325,33 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
                 }
             }
         } else {
-            // 处理 tar.gz
+            // 处理 tar.gz（流式处理，避免预先收集 entries 导致读取位置错误）
             let tar = flate2::read::GzDecoder::new(file);
             let mut archive = tar::Archive::new(tar);
             archive.set_preserve_permissions(true);
-            
-            let entries = archive.entries().map_err(|e| e.to_string())?;
-            let mut entries_vec = Vec::new();
-            for entry in entries {
-                if let Ok(e) = entry {
-                    entries_vec.push(e);
-                }
-            }
-            let total_files = entries_vec.len();
-            
-            for (i, mut entry) in entries_vec.into_iter().enumerate() {
+
+            let mut i = 0usize;
+            for entry in archive.entries().map_err(|e| e.to_string())? {
+                let mut entry = match entry {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+
                 let path = match entry.path() {
                     Ok(p) => p.into_owned(),
                     Err(_) => continue,
                 };
-                
+
                 let mut components = path.components();
                 components.next(); // Skip the root folder
                 let stripped_path: PathBuf = components.collect();
-                
+
                 if stripped_path.as_os_str().is_empty() {
                     continue;
                 }
-                
+
                 let target_path = node_dir_clone.join(&stripped_path);
-                
+
                 if entry.header().entry_type() == tar::EntryType::Directory {
                     std::fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
                 } else {
@@ -1363,20 +1360,22 @@ pub async fn install_nodejs(app: AppHandle) -> Result<(), String> {
                             std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
                         }
                     }
-                    entry.unpack(&target_path).map_err(|e| e.to_string())?;
+                    entry.unpack(&target_path).map_err(|e| {
+                        format!("failed to unpack `{}` into `{}`: {}", path.display(), target_path.display(), e)
+                    })?;
                 }
-                
-                if i % 50 == 0 || i == total_files - 1 {
-                    let progress = (i as f64) / (total_files as f64);
+
+                if i % 50 == 0 {
                     emit_progress(
                         "extracting",
-                        progress,
+                        0.5,
                         &match lang_clone {
-                            Lang::ZhCn => format!("解压中: {}/{} 文件...", i + 1, total_files),
-                            Lang::EnUs => format!("Extracting: {}/{} files...", i + 1, total_files),
+                            Lang::ZhCn => format!("解压中: {} 个文件...", i + 1),
+                            Lang::EnUs => format!("Extracting: {} files...", i + 1),
                         },
                     );
                 }
+                i += 1;
             }
         }
         Ok(())
