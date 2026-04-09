@@ -25,6 +25,8 @@ use tokio::sync::Mutex;
 use crate::config::{apply_saved_window_position, setup_window_position_tracking};
 use crate::types::{InstallState, ProcessState};
 use crate::utils::{ensure_standard_layout, init_logger};
+#[cfg(target_os = "macos")]
+use crate::utils::migrate_macos_data_if_needed;
 
 /// 在 setup 中提前构建、通过 manage 传递给 run 回调，解决生命周期问题
 struct OwnedArcs {
@@ -115,6 +117,11 @@ pub fn run() {
 
             let handle = app.handle().clone();
             let path = resolve_app_working_dir(&handle);
+
+            #[cfg(target_os = "macos")]
+            if let Err(e) = migrate_macos_data_if_needed(&handle, &path) {
+                tracing::error!("macOS 数据迁移失败: {}", e);
+            }
 
             // 如果目录不存在，先创建
             if !path.exists() {

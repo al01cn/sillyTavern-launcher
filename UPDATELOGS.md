@@ -5,6 +5,12 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范。
 
 ---
+## [1.0.7] - 2026-04-09
+
+### 修复
+- **内置NodeJs**：修复了MacOS上内置NodeJs解压失败的问题。
+- **Data数据存放位置**：修复了MacOS上Data数据存放位置不正确的问题。
+
 ## [1.0.6] - 2026-04-08
 
 ### 移除

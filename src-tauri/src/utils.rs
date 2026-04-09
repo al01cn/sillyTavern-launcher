@@ -8,6 +8,7 @@ use tracing_subscriber::{filter::EnvFilter, layer::SubscriberExt, Registry};
 
 use crate::types::AppConfig;
 
+
 // ─────────────────────────────────────────────
 // GitHub 加速下载代理机制
 // ─────────────────────────────────────────────
@@ -223,12 +224,21 @@ pub fn ensure_standard_layout(base_dir: &Path) -> io::Result<()> {
 // 配置文件路径
 // ─────────────────────────────────────────────
 
-pub fn get_config_path(_app: &tauri::AppHandle) -> PathBuf {
+#[allow(unused_variables)]
+pub fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
+    #[cfg(all(target_os = "macos", not(debug_assertions)))]
+    {
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            return app_data_dir.join("data/config.json");
+        }
+    }
+
     #[cfg(debug_assertions)]
     let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     #[cfg(not(debug_assertions))]
-    let mut path = std::env::current_exe().unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let mut path = std::env::current_exe()
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     #[cfg(not(debug_assertions))]
     if path.is_file() {
@@ -240,6 +250,66 @@ pub fn get_config_path(_app: &tauri::AppHandle) -> PathBuf {
     }
 
     path.join("data/config.json")
+}
+
+#[cfg(target_os = "macos")]
+pub fn migrate_macos_data_if_needed(app: &tauri::AppHandle, new_base: &Path) -> Result<(), String> {
+    use std::fs::{create_dir_all, read_dir, remove_dir_all, rename};
+
+    let new_data_dir = new_base.join("data");
+    if new_data_dir.exists() {
+        return Ok(());
+    }
+
+    let legacy_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|pp| pp.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let legacy_data = legacy_path.join("data");
+    if !legacy_data.exists() {
+        create_dir_all(&new_data_dir).map_err(|e| format!("创建 Application Support 数据目录失败: {}", e))?;
+        return Ok(());
+    }
+
+    tracing::info!(
+        "检测到 macOS 旧数据目录 {:?}，开始迁移到 {:?}",
+        legacy_data,
+        new_data_dir
+    );
+
+    create_dir_all(&new_data_dir).map_err(|e| format!("创建 Application Support 数据目录失败: {}", e))?;
+
+    let entries = read_dir(&legacy_data)
+        .map_err(|e| format!("读取旧数据目录失败: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("遍历旧数据目录失败: {}", e))?;
+
+    for entry in entries {
+        let old_path = entry.path();
+        let file_name = entry.file_name();
+        let new_path = new_data_dir.join(&file_name);
+
+        if new_path.exists() {
+            continue;
+        }
+
+        if let Err(e) = rename(&old_path, &new_path) {
+            tracing::error!("迁移 {:?} -> {:?} 失败: {}", old_path, new_path, e);
+            if old_path.is_dir() {
+                copy_dir_all(&old_path, &new_path)
+                    .map_err(|err| format!("复制目录 {:?} 失败: {}", old_path, err))?;
+            } else {
+                std::fs::copy(&old_path, &new_path)
+                    .map_err(|err| format!("复制文件 {:?} 失败: {}", old_path, err))?;
+            }
+        }
+    }
+
+    if let Err(e) = remove_dir_all(&legacy_data) {
+        tracing::warn!("清理旧数据目录失败: {}", e);
+    }
+
+    Ok(())
 }
 
 pub fn get_st_data_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -261,5 +331,32 @@ pub fn get_st_data_dir(app: &tauri::AppHandle) -> PathBuf {
         }
     }
 
+    #[cfg(all(target_os = "macos", not(debug_assertions)))]
+    {
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            return app_data_dir.join("data/st_data");
+        }
+    }
+
     data_dir.join("st_data")
+}
+
+pub fn copy_dir_all(src: &Path, dst: &Path) -> io::Result<()> {
+    if !dst.exists() {
+        fs::create_dir_all(dst)?;
+    }
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if file_type.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
 }
