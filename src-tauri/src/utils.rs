@@ -5,6 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing_subscriber::{filter::EnvFilter, layer::SubscriberExt, Registry};
+use tauri::Manager;
 
 use crate::types::AppConfig;
 
@@ -228,8 +229,9 @@ pub fn ensure_standard_layout(base_dir: &Path) -> io::Result<()> {
 pub fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
     #[cfg(all(target_os = "macos", not(debug_assertions)))]
     {
+        use tauri::Manager;
         if let Ok(app_data_dir) = app.path().app_data_dir() {
-            return app_data_dir.join("data/config.json");
+            return PathBuf::from(app_data_dir.to_string_lossy().to_string()).join("data/config.json");
         }
     }
 
@@ -253,7 +255,7 @@ pub fn get_config_path(app: &tauri::AppHandle) -> PathBuf {
 }
 
 #[cfg(target_os = "macos")]
-pub fn migrate_macos_data_if_needed(app: &tauri::AppHandle, new_base: &Path) -> Result<(), String> {
+pub fn migrate_macos_data_if_needed(_app: &tauri::AppHandle, new_base: &Path) -> Result<(), String> {
     use std::fs::{create_dir_all, read_dir, remove_dir_all, rename};
 
     let new_data_dir = new_base.join("data");
@@ -333,8 +335,9 @@ pub fn get_st_data_dir(app: &tauri::AppHandle) -> PathBuf {
 
     #[cfg(all(target_os = "macos", not(debug_assertions)))]
     {
+        use tauri::Manager;
         if let Ok(app_data_dir) = app.path().app_data_dir() {
-            return app_data_dir.join("data/st_data");
+            return PathBuf::from(app_data_dir.to_string_lossy().to_string()).join("data/st_data");
         }
     }
 
