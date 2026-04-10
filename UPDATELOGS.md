@@ -5,6 +5,15 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范。
 
 ---
+## [1.0.8] - 2026-04-10
+
+## 修复
+- **BUG**：解压 tar.gz 时，原代码先将所有 entries 收集到 Vec 中，此时底层文件流读取位置已移至末尾，再调用 entry.unpack() 时无法读取数据，导致解压失败。
+
+## 感谢
+
+- **willflier**：感谢大佬提交的PR，完善MacOS端的可用性。
+
 ## [1.0.7] - 2026-04-09
 
 ### 修复
